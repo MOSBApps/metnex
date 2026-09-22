@@ -1,0 +1,31 @@
+{
+  "$schema": "https://opendevcon.openese.com/schemas/project-delivery.v1.json",
+  "contractVersion": "1.1",
+  "project": {
+    "name": "Metnex",
+    "slug": "metnex"
+  },
+  "milestones": [
+    {
+      "id": "MS-001",
+      "title": "Platform Baseline & Authentication Foundation",
+      "targetDate": "2026-09-01",
+      "status": "completed",
+      "epics": ["EPIC-001"]
+    },
+    {
+      "id": "MS-002",
+      "title": "Demo Operations & Reporting Release",
+      "targetDate": "2026-09-10",
+      "status": "completed",
+      "epics": ["EPIC-002"]
+    },
+    {
+      "id": "MS-003",
+      "title": "ODC Governance & Security Hardening",
+      "targetDate": "2026-09-15",
+      "status": "completed",
+      "epics": ["EPIC-003"]
+    }
+  ]
+}

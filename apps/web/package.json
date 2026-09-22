@@ -1,0 +1,36 @@
+{
+  "name": "@metnex/web",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "dotenv -e .env.local -- next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@hookform/resolvers": "^5.2.2",
+    "jose": "^6.2.2",
+    "next": "15.5.24",
+    "react": "19.1.0",
+    "react-dom": "19.1.0",
+    "react-hook-form": "^7.73.1",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@eslint/eslintrc": "3.3.1",
+    "@tailwindcss/postcss": "^4.0.0",
+    "@types/node": "22.14.0",
+    "@types/react": "19.1.1",
+    "@types/react-dom": "19.1.2",
+    "dotenv-cli": "8.0.0",
+    "eslint": "9.26.0",
+    "eslint-config-next": "15.5.24",
+    "postcss": "^8.5.18",
+    "tailwindcss": "^4.0.0",
+    "typescript": "5.8.3",
+    "vitest": "^4.1.10"
+  }
+}

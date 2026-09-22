@@ -1,0 +1,33 @@
+{
+  "source": {
+    "users": [
+      { "legacyId": "1", "username": "success.user", "fullName": "Success User", "isActive": true, "email": "success.user@example.com", "createdDate": "2020-01-01T00:00:00.000Z", "roleLegacyId": "10", "sirket": null },
+      { "legacyId": "2", "username": "unresolved.tenant", "fullName": "Unresolved Tenant User", "isActive": true, "email": "unresolved.tenant@example.com", "createdDate": "2020-01-01T00:00:00.000Z", "roleLegacyId": "10", "sirket": null },
+      { "legacyId": "4", "username": "unmapped.permission", "fullName": "Unmapped Permission User", "isActive": true, "email": "unmapped.permission@example.com", "createdDate": "2020-01-01T00:00:00.000Z", "roleLegacyId": "10", "sirket": null },
+      { "legacyId": "5", "username": "duplicate.a", "fullName": "Duplicate User A", "isActive": true, "email": "duplicate.pair@example.com", "createdDate": "2020-01-01T00:00:00.000Z", "roleLegacyId": "10", "sirket": null },
+      { "legacyId": "6", "username": "duplicate.b", "fullName": "Duplicate User B", "isActive": true, "email": "duplicate.pair@example.com", "createdDate": "2020-01-01T00:00:00.000Z", "roleLegacyId": "10", "sirket": null },
+      { "legacyId": "7", "username": "admin.assigned", "fullName": "Admin Assigned User", "isActive": true, "email": "admin.assigned@example.com", "createdDate": "2020-01-01T00:00:00.000Z", "roleLegacyId": "10", "sirket": null },
+      { "legacyId": "8", "username": "failed.retry", "fullName": "Failed Retry User", "isActive": true, "email": "failed.retry@example.com", "createdDate": "2020-01-01T00:00:00.000Z", "roleLegacyId": "10", "sirket": null }
+    ],
+    "roles": [
+      { "legacyId": "10", "name": "Operatör" }
+    ],
+    "permissions": [
+      { "legacyId": "100", "permissionName": "CanManageShifts" },
+      { "legacyId": "101", "permissionName": "CanCreateTicket" }
+    ],
+    "userPermissions": [
+      { "legacyId": "1000", "userLegacyId": "1", "permissionLegacyId": "100" },
+      { "legacyId": "1001", "userLegacyId": "4", "permissionLegacyId": "101" }
+    ]
+  },
+  "approvedTenantAssignmentTable": [
+    { "userLegacyId": "1", "tenantSlug": "MOSB" },
+    { "userLegacyId": "5", "tenantSlug": "MOSB" },
+    { "userLegacyId": "6", "tenantSlug": "MOSB" },
+    { "userLegacyId": "7", "tenantSlug": "MOSB" },
+    { "userLegacyId": "8", "tenantSlug": "MOSB" }
+  ],
+  "adminAssignedPasswordLegacyIds": ["7"],
+  "simulateFailureLegacyIds": ["8"]
+}

@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+# pre-commit hook — Metnex local DB backup
+
+set -euo pipefail
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+BACKUP_SCRIPT="$REPO_ROOT/scripts/backup-db.sh"
+DOCKER_BIN="$(command -v docker 2>/dev/null || true)"
+
+CYAN='\033[0;36m'; YELLOW='\033[1;33m'; GREEN='\033[0;32m'; RED='\033[0;31m'; RESET='\033[0m'
+
+if [[ ! -x "$BACKUP_SCRIPT" ]]; then
+  echo -e "${RED}✗ pre-commit: backup-db.sh bulunamadı veya çalıştırılamaz: $BACKUP_SCRIPT${RESET}" >&2
+  exit 1
+fi
+
+if [[ ! -x "$DOCKER_BIN" ]]; then
+  exit 0
+fi
+
+if ! "$DOCKER_BIN" ps --filter "name=metnex-postgres-dev" --filter "status=running" \
+     --format "{{.Names}}" 2>/dev/null | grep -q "^metnex-postgres-dev$"; then
+  exit 0
+fi
+
+INFRA_ENV="$REPO_ROOT/infra/docker/.env"
+PG_USER="metnex"; PG_DB="metnex"
+[[ -f "$INFRA_ENV" ]] && { set -a; source "$INFRA_ENV"; set +a
+  PG_USER="${POSTGRES_USER:-metnex}"; PG_DB="${POSTGRES_DB:-metnex}"; }
+
+if ! "$DOCKER_BIN" exec metnex-postgres-dev \
+     psql -U "$PG_USER" -d "$PG_DB" -c "SELECT 1" >/dev/null 2>&1; then
+  exit 0
+fi
+
+echo -e "${CYAN}[pre-commit] Commit öncesi DB yedeği alınıyor...${RESET}" >&2
+
+BACKUP_PATH=""
+if BACKUP_PATH="$("$BACKUP_SCRIPT" --label pre-commit 2>&1 | tee /dev/stderr | tail -1)"; then
+  if [[ -f "$BACKUP_PATH" ]]; then
+    REL="$(realpath --relative-to="$REPO_ROOT" "$BACKUP_PATH" 2>/dev/null || echo "$BACKUP_PATH")"
+    echo -e "${GREEN}[pre-commit] ✓ Yedek hazır: ${REL}${RESET}" >&2
+    echo -e "${CYAN}[pre-commit] Geri almak için: ./scripts/restore-db.sh --file ${REL}${RESET}" >&2
+  fi
+else
+  echo -e "${RED}[pre-commit] ✗ DB yedeği alınamadı — commit iptal edildi.${RESET}" >&2
+  echo -e "  Sorunu çözdükten sonra tekrar commit yapın." >&2
+  echo -e "  Yedeği atlamak için (risk): git commit --no-verify" >&2
+  exit 1
+fi

@@ -1,0 +1,19 @@
+# Keep secrets, local data and build output out of the Docker build context.
+.env
+.env.*
+**/.env
+**/.env.*
+*.pem
+*.key
+*.crt
+backup/
+.git/
+node_modules/
+**/node_modules/
+coverage/
+**/coverage/
+dist/
+**/dist/
+.next/
+**/.next/
+.turbo/

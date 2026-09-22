@@ -1,0 +1,374 @@
+name: Pipeline
+
+# Her branch kendi workflow dosyasını okur — workflow_run gibi
+# "her zaman main'den oku" kısıtlaması yoktur.
+on:
+  push:
+    branches: [dev, test, main]
+  pull_request:
+    branches: [dev, test, main]
+
+# Only superseded PR runs are cancelled. A newer push must never cancel an in-flight run on a
+# deployable branch: that run may be applying a database migration.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  GHCR_REGISTRY: ghcr.io/${{ github.repository_owner }}
+  LOCAL_REGISTRY: 127.0.0.1:5000
+
+# ─────────────────────────────────────────────────────────────────────────────
+# CI — Her push ve PR'da çalışır
+# ─────────────────────────────────────────────────────────────────────────────
+
+jobs:
+  secret-scan:
+    name: Secret Scanning
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Run Gitleaks (CLI — no license required)
+        run: |
+          VER=$(curl -sSf https://api.github.com/repos/gitleaks/gitleaks/releases/latest \
+                | grep '"tag_name"' | cut -d'"' -f4 | tr -d 'v')
+          curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${VER}/gitleaks_${VER}_linux_x64.tar.gz" \
+            | tar -xz gitleaks
+          ./gitleaks detect --source . --redact --exit-code 1
+
+  dependency-scan:
+    name: Dependency Scanning (SCA)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm audit --audit-level=high
+
+  sast:
+    name: SAST (Type Check + Lint)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run typecheck
+      - run: pnpm run lint
+
+  test:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    needs: [secret-scan, dependency-scan, sast]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run test
+
+  build-check:
+    name: Build Check
+    runs-on: ubuntu-latest
+    needs: [test]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run build
+
+# ─────────────────────────────────────────────────────────────────────────────
+# CD — Sadece push'ta çalışır (PR'larda Docker build/deploy atlanır)
+# ─────────────────────────────────────────────────────────────────────────────
+
+  docker-build:
+    name: Docker Build & Push
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    needs: [build-check]
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      env_name:     ${{ steps.meta.outputs.env_name }}
+      env_upper:    ${{ steps.meta.outputs.env_upper }}
+      image_tag:    ${{ steps.meta.outputs.image_tag }}
+      stack_name:   ${{ steps.meta.outputs.stack_name }}
+      compose_file: ${{ steps.meta.outputs.compose_file }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve environment
+        id: meta
+        run: |
+          SHA=$(echo "${{ github.sha }}" | head -c 7)
+          BRANCH="${{ github.ref_name }}"
+
+          if   [[ "$BRANCH" == "main" ]]; then ENV=prod
+          elif [[ "$BRANCH" == "test" ]]; then ENV=test
+          else                                  ENV=dev
+          fi
+
+          ENV_UPPER=$(echo "$ENV" | tr '[:lower:]' '[:upper:]')
+          echo "env_name=$ENV"                                         >> "$GITHUB_OUTPUT"
+          echo "env_upper=$ENV_UPPER"                                  >> "$GITHUB_OUTPUT"
+          echo "image_tag=${ENV}-${SHA}"                               >> "$GITHUB_OUTPUT"
+          echo "stack_name=metnex-${ENV}"                              >> "$GITHUB_OUTPUT"
+
+          if   [[ "$ENV" == "prod" ]]; then
+            echo "compose_file=infra/docker/docker-compose.swarm.yml"     >> "$GITHUB_OUTPUT"
+          elif [[ "$ENV" == "test" ]]; then
+            echo "compose_file=infra/docker/docker-compose.test.yml"      >> "$GITHUB_OUTPUT"
+          else
+            echo "compose_file=infra/docker/docker-compose.dev-stack.yml" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build & push API image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/api/Dockerfile
+          push: true
+          tags: ${{ env.GHCR_REGISTRY }}/metnex-api:${{ steps.meta.outputs.image_tag }}
+          cache-from: type=gha,scope=api-${{ steps.meta.outputs.env_name }}
+          cache-to:   type=gha,scope=api-${{ steps.meta.outputs.env_name }},mode=max
+
+      - name: Build & push Web image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/web/Dockerfile
+          push: true
+          build-args: |
+            NEXT_PUBLIC_API_URL=${{ vars[format('{0}_API_URL', steps.meta.outputs.env_upper)] }}
+            NEXT_PUBLIC_BUILD_SHA=${{ steps.meta.outputs.image_tag }}
+          tags: ${{ env.GHCR_REGISTRY }}/metnex-web:${{ steps.meta.outputs.image_tag }}
+          cache-from: type=gha,scope=web-${{ steps.meta.outputs.env_name }}
+          cache-to:   type=gha,scope=web-${{ steps.meta.outputs.env_name }},mode=max
+
+  scan:
+    name: Container Security Scan
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    needs: [docker-build]
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install Trivy
+        run: |
+          curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh \
+            | sh -s -- -b /usr/local/bin
+          trivy --version
+
+      - name: Scan API image
+        run: |
+          trivy image \
+            --exit-code 1 \
+            --severity HIGH,CRITICAL \
+            --ignore-unfixed \
+            --ignorefile .trivyignore \
+            --no-progress \
+            ${{ env.GHCR_REGISTRY }}/metnex-api:${{ needs.docker-build.outputs.image_tag }}
+
+      - name: Scan Web image
+        run: |
+          trivy image \
+            --exit-code 1 \
+            --severity HIGH,CRITICAL \
+            --ignore-unfixed \
+            --ignorefile .trivyignore \
+            --no-progress \
+            ${{ env.GHCR_REGISTRY }}/metnex-web:${{ needs.docker-build.outputs.image_tag }}
+
+  # Control-plane (public schema) database migration. Runs as its own job so a failure stops
+  # the pipeline before anything is deployed. The GitHub Environment (reviewers on prod) gates
+  # the migration itself. Never triggered from application startup and never run with any
+  # application user's privileges.
+  migrate:
+    name: Migrate → ${{ needs.docker-build.outputs.env_name }}
+    if: github.event_name == 'push'
+    runs-on: self-hosted
+    needs: [docker-build, scan]
+    environment: ${{ needs.docker-build.outputs.env_name }}
+    concurrency:
+      group: metnex-migration-${{ needs.docker-build.outputs.env_name }}
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Verify artifact, run control-plane migration
+        env:
+          ENV_NAME:  ${{ needs.docker-build.outputs.env_name }}
+          IMAGE_TAG: ${{ needs.docker-build.outputs.image_tag }}
+        run: |
+          set -euo pipefail
+
+          GHCR_API="${GHCR_REGISTRY}/metnex-api:${IMAGE_TAG}"
+          docker pull "$GHCR_API"
+
+          # The migration artifact must exist in the image before anything touches the database.
+          if ! docker run --rm --entrypoint test "$GHCR_API" -f apps/api/dist/migrate.js; then
+            echo "::error::apps/api/dist/migrate.js is missing from the API image; refusing to migrate"
+            exit 1
+          fi
+          echo "✓ Migration artifact present"
+
+          # Secrets are read one named variable at a time from the server-side env file — the file
+          # is never `source`d (that would export every secret in it and evaluate shell syntax).
+          # Values are never echoed or placed on a command line.
+          source scripts/ci/env-allowlist.sh
+          SERVER_ENV_FILE="/opt/metnex/${ENV_NAME}/.env"
+
+          # Only DATABASE_URL, through a private (0600) temporary env-file removed on exit — not
+          # as `-e NAME=value`, which would expand the value into the process list.
+          umask 077
+          MIGRATION_ENV_FILE="$(mktemp "${RUNNER_TEMP:-/tmp}/migration-env.XXXXXX")"
+          trap 'rm -f "$MIGRATION_ENV_FILE"' EXIT
+          write_env_file_var "$MIGRATION_ENV_FILE" "$SERVER_ENV_FILE" DATABASE_URL
+
+          docker run --rm \
+            --network "metnex-${ENV_NAME}" \
+            --env-file "$MIGRATION_ENV_FILE" \
+            "$GHCR_API" \
+            node apps/api/dist/migrate.js
+          echo "✓ Control-plane migration complete"
+
+  deploy:
+    name: Deploy → ${{ needs.docker-build.outputs.env_name }}
+    if: github.event_name == 'push'
+    runs-on: self-hosted
+    needs: [docker-build, scan, migrate]
+    environment: ${{ needs.docker-build.outputs.env_name }}
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Pull, retag, deploy
+        env:
+          ENV_NAME:     ${{ needs.docker-build.outputs.env_name }}
+          IMAGE_TAG:    ${{ needs.docker-build.outputs.image_tag }}
+          STACK_NAME:   ${{ needs.docker-build.outputs.stack_name }}
+          COMPOSE_FILE: ${{ needs.docker-build.outputs.compose_file }}
+        run: |
+          set -euo pipefail
+
+          GHCR_API="${GHCR_REGISTRY}/metnex-api:${IMAGE_TAG}"
+          GHCR_WEB="${GHCR_REGISTRY}/metnex-web:${IMAGE_TAG}"
+          LOCAL_API="${LOCAL_REGISTRY}/metnex-api:${IMAGE_TAG}"
+          LOCAL_WEB="${LOCAL_REGISTRY}/metnex-web:${IMAGE_TAG}"
+
+          docker pull "$GHCR_API"
+          docker pull "$GHCR_WEB"
+          echo "✓ Images pulled from GHCR"
+
+          docker tag "$GHCR_API" "$LOCAL_API"
+          docker tag "$GHCR_WEB" "$LOCAL_WEB"
+          docker push "$LOCAL_API"
+          docker push "$LOCAL_WEB"
+          echo "✓ Images pushed to local registry"
+
+          # Secrets are read one named variable at a time from the server-side env file — the file
+          # is never `source`d (that would export every secret in it and evaluate shell syntax).
+          # Values are never echoed or placed on a command line.
+          source scripts/ci/env-allowlist.sh
+          SERVER_ENV_FILE="/opt/metnex/${ENV_NAME}/.env"
+
+          # Variables interpolated by `docker stack deploy` from the compose files
+          # (infra/docker/docker-compose.{swarm,test,dev-stack}.yml). Explicit allowlist;
+          # a static test keeps it in sync with the compose files.
+          export_env_allowlist "$SERVER_ENV_FILE" \
+            ALLOWED_ORIGINS DATABASE_URL GREENDOCS_API_KEY GREENDOCS_BASE_URL \
+            JWT_EXPIRES_IN JWT_REFRESH_EXPIRES_IN JWT_SECRET \
+            MINIO_ROOT_PASSWORD MINIO_ROOT_USER NEXT_PUBLIC_API_URL REDIS_URL \
+            REPORT_RENDER_INTERNAL_TOKEN REPORT_RENDER_TIMEOUT_MS
+
+          export TAG="${IMAGE_TAG}"
+          docker stack deploy \
+            --compose-file "${COMPOSE_FILE}" \
+            --prune \
+            "${STACK_NAME}"
+
+          echo "Waiting for services to converge..."
+          TIMEOUT=180
+          ELAPSED=0
+          INTERVAL=10
+          SERVICES=("metnex-api" "metnex-web")
+
+          for SVC in "${SERVICES[@]}"; do
+            echo "→ Checking ${STACK_NAME}_${SVC}"
+            while true; do
+              RUNNING=$(docker service ps "${STACK_NAME}_${SVC}" \
+                --filter desired-state=running \
+                --format '{{.CurrentState}}' 2>/dev/null | grep -c "^Running" || true)
+              FAILED=$(docker service ps "${STACK_NAME}_${SVC}" \
+                --filter desired-state=running \
+                --format '{{.CurrentState}}' 2>/dev/null | grep -c "Failed\|Rejected\|Shutdown" || true)
+
+              if [[ "$RUNNING" -ge 1 && "$FAILED" -eq 0 ]]; then
+                echo "  ✓ ${SVC} is running"
+                break
+              fi
+              if [[ "$ELAPSED" -ge "$TIMEOUT" ]]; then
+                echo "  ✗ ${SVC} did not converge in ${TIMEOUT}s — checking logs:"
+                docker service ps "${STACK_NAME}_${SVC}" --no-trunc
+                docker service logs "${STACK_NAME}_${SVC}" --tail 30
+                exit 1
+              fi
+              sleep "$INTERVAL"
+              ELAPSED=$((ELAPSED + INTERVAL))
+            done
+          done
+
+          echo ""
+          echo "Stack services:"
+          docker stack services "${STACK_NAME}"

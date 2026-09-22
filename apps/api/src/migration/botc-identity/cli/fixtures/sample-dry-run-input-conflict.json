@@ -1,0 +1,23 @@
+{
+  "source": {
+    "users": [
+      { "legacyId": "1", "username": "success.user", "fullName": "Success User", "isActive": true, "email": "success.user@example.com", "createdDate": "2020-01-01T00:00:00.000Z", "roleLegacyId": "10", "sirket": null },
+      { "legacyId": "3", "username": "conflict.tenant", "fullName": "Conflict Tenant User", "isActive": true, "email": "conflict.tenant@example.com", "createdDate": "2020-01-01T00:00:00.000Z", "roleLegacyId": "10", "sirket": null }
+    ],
+    "roles": [
+      { "legacyId": "10", "name": "Operatör" }
+    ],
+    "permissions": [
+      { "legacyId": "100", "permissionName": "CanManageShifts" }
+    ],
+    "userPermissions": [
+      { "legacyId": "1000", "userLegacyId": "1", "permissionLegacyId": "100" }
+    ]
+  },
+  "approvedTenantAssignmentTable": [
+    { "userLegacyId": "1", "tenantSlug": "MOSB" },
+    { "userLegacyId": "3", "tenantSlug": "MOSB" },
+    { "userLegacyId": "3", "tenantSlug": "MOSEDAS" },
+    { "userLegacyId": "99", "tenantSlug": "MOSB" }
+  ]
+}

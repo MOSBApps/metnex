@@ -1,0 +1,32 @@
+{
+  "$schema": "https://opendevcon.openese.com/schemas/project-plan.v1.json",
+  "contractVersion": "1.1",
+  "project": {
+    "name": "Metnex",
+    "slug": "metnex",
+    "description": "Yeniden kullanılabilir kurumsal multi-tenant SaaS platform temeli, güvenlik, yönetişim ve mühendislik iskeleti."
+  },
+  "epics": [
+    {
+      "id": "EPIC-001",
+      "title": "SaaS Platform Foundation & Multi-Tenant Architecture",
+      "status": "done",
+      "priority": "must",
+      "description": "Platform bootstrap, multi-tenant hierarchy (Platform Root, Customer Root, Standard Child), user/role management, package entitlements."
+    },
+    {
+      "id": "EPIC-002",
+      "title": "Demo Operations & Reporting Foundation",
+      "status": "done",
+      "priority": "must",
+      "description": "Demo sample definitions/transactions CRUD, Glassmorphic UI console, HTML/PDF/XLSX reporting foundation."
+    },
+    {
+      "id": "EPIC-003",
+      "title": "Platform Security, Operations & Diagnostics",
+      "status": "done",
+      "priority": "must",
+      "description": "TOTP MFA katmanı, Impersonation, Platform Audit Log, Performance Diagnostics ve ICU collation doğrulamaları."
+    }
+  ]
+}

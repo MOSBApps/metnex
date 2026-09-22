@@ -1,0 +1,35 @@
+version: '3.8'
+
+# Local Docker registry — 127.0.0.1:5000
+# Tüm ortamlar (dev/test/prod) bu registry'yi paylaşır.
+# Bir kez deploy edilir, güncellenmesi gerekmez.
+#
+# Deploy:
+#   docker stack deploy -c docker-compose.registry.yml metnex-registry
+#
+# Gereksinim: /datastore/registry dizini önceden oluşturulmuş olmalı
+#   sudo mkdir -p /datastore/registry && sudo chown $USER:docker /datastore/registry
+
+services:
+  registry:
+    image: registry:2
+    ports:
+      - "127.0.0.1:5000:5000"
+    volumes:
+      - type: bind
+        source: /datastore/registry
+        target: /var/lib/registry
+    environment:
+      REGISTRY_STORAGE_DELETE_ENABLED: "true"
+    deploy:
+      replicas: 1
+      placement:
+        constraints: [node.role == manager]
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:5000/v2/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3

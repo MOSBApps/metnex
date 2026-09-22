@@ -1,0 +1,190 @@
+/*
+ * Glassmorphic High-Tech Console theme tokens (ODC-UI-004).
+ *
+ * Everything here is scoped under `.glass-console` — it never touches the existing light,
+ * `surface`/`ink`/`status`/`brand`-token operational UI.
+ * A screen opts in by rendering inside `<GlassConsoleRoot>`
+ * (`src/components/glass-console/theme.tsx`), which stamps this class plus a `data-theme`
+ * attribute.
+ *
+ * Three-state resolution per token, in this order:
+ *   1. `.glass-console[data-theme="dark"]`  — explicit dark (wins over system)
+ *   2. `.glass-console[data-theme="light"]` — explicit light (wins over system)
+ *   3. `prefers-color-scheme` on an unstamped `.glass-console` — system default
+ */
+
+.glass-console {
+  /* ---- LIGHT_GLASS_CONSOLE (default token set) ---- */
+  --gc-canvas: #eef2f8;
+  --gc-canvas-glow: radial-gradient(ellipse 60% 40% at 50% -10%, rgba(8, 145, 178, 0.10), transparent 60%);
+
+  --gc-glass-base: rgba(255, 255, 255, 0.55);
+  --gc-glass-elevated: rgba(255, 255, 255, 0.75);
+  --gc-glass-subtle: rgba(255, 255, 255, 0.35);
+
+  --gc-text-primary: #0f172a;
+  --gc-text-secondary: #334155;
+  --gc-text-muted: #64748b;
+  --gc-text-disabled: #94a3b8;
+
+  --gc-border-subtle: rgba(15, 23, 42, 0.08);
+  --gc-border-default: rgba(15, 23, 42, 0.14);
+  --gc-border-focus: #0891b2;
+
+  --gc-accent-primary: #0891b2;
+  --gc-accent-secondary: #2563eb;
+
+  --gc-status-success: #059669;
+  --gc-status-warning: #b45309;
+  --gc-status-danger: #e11d48;
+  --gc-status-neutral: #64748b;
+  --gc-status-unsupported: #e11d48;
+
+  --gc-glow-primary: 0 0 16px rgba(8, 145, 178, 0.20);
+  --gc-glow-success: 0 0 14px rgba(5, 150, 105, 0.18);
+  --gc-glow-warning: 0 0 14px rgba(180, 83, 9, 0.18);
+  --gc-glow-danger: 0 0 14px rgba(225, 29, 72, 0.18);
+
+  --gc-glass-blur: 16px;
+  --gc-glass-border-opacity: 0.14;
+  --gc-glass-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6), 0 8px 24px rgba(15, 23, 42, 0.10);
+  --gc-glass-hover-overlay: rgba(15, 23, 42, 0.03);
+  --gc-glass-focus-ring: 0 0 0 3px rgba(8, 145, 178, 0.25);
+  --gc-glass-disabled-opacity: 0.45;
+  --gc-glass-fallback-surface: #f1f5f9;
+  --gc-glass-highlight: linear-gradient(160deg, rgba(255, 255, 255, 0.55) 0%, rgba(255, 255, 255, 0.12) 40%, transparent 70%);
+
+  color: var(--gc-text-primary);
+  background-color: var(--gc-canvas);
+}
+
+@media (prefers-color-scheme: dark) {
+  .glass-console:not([data-theme='light']) {
+    --gc-canvas: #05070c;
+    --gc-canvas-glow: radial-gradient(ellipse 65% 50% at 50% -8%, rgba(34, 211, 238, 0.32), transparent 62%),
+      radial-gradient(ellipse 55% 45% at 88% 65%, rgba(96, 165, 250, 0.14), transparent 65%),
+      repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.028) 0px, rgba(255, 255, 255, 0.028) 1px, transparent 1px, transparent 48px),
+      repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.028) 0px, rgba(255, 255, 255, 0.028) 1px, transparent 1px, transparent 48px);
+
+    --gc-glass-base: rgba(255, 255, 255, 0.08);
+    --gc-glass-elevated: rgba(255, 255, 255, 0.20);
+    --gc-glass-subtle: rgba(255, 255, 255, 0.045);
+
+    --gc-text-primary: #f1f5f9;
+    --gc-text-secondary: #cbd5e1;
+    --gc-text-muted: #94a3b8;
+    --gc-text-disabled: #64748b;
+
+    --gc-border-subtle: rgba(255, 255, 255, 0.09);
+    --gc-border-default: rgba(255, 255, 255, 0.20);
+    --gc-border-focus: #22d3ee;
+
+    --gc-accent-primary: #22d3ee;
+    --gc-accent-secondary: #60a5fa;
+
+    --gc-status-success: #34d399;
+    --gc-status-warning: #fbbf24;
+    --gc-status-danger: #fb7185;
+    --gc-status-neutral: #94a3b8;
+    --gc-status-unsupported: #fb7185;
+
+    --gc-glow-primary: 0 0 24px rgba(34, 211, 238, 0.35);
+    --gc-glow-success: 0 0 20px rgba(52, 211, 153, 0.30);
+    --gc-glow-warning: 0 0 20px rgba(251, 191, 36, 0.30);
+    --gc-glow-danger: 0 0 20px rgba(251, 113, 133, 0.30);
+
+    --gc-glass-blur: 20px;
+    --gc-glass-border-opacity: 0.12;
+    --gc-glass-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.09), 0 8px 32px rgba(0, 0, 0, 0.45);
+    --gc-glass-hover-overlay: rgba(255, 255, 255, 0.03);
+    --gc-glass-focus-ring: 0 0 0 3px rgba(34, 211, 238, 0.35);
+    --gc-glass-disabled-opacity: 0.45;
+    --gc-glass-fallback-surface: #181e2a;
+    --gc-glass-highlight: linear-gradient(160deg, rgba(34, 211, 238, 0.08) 0%, rgba(96, 165, 250, 0.035) 35%, transparent 65%);
+  }
+}
+
+.glass-console[data-theme='dark'] {
+  --gc-canvas: #05070c;
+  --gc-canvas-glow: radial-gradient(ellipse 65% 50% at 50% -8%, rgba(34, 211, 238, 0.32), transparent 62%),
+      radial-gradient(ellipse 55% 45% at 88% 65%, rgba(96, 165, 250, 0.14), transparent 65%),
+      repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.028) 0px, rgba(255, 255, 255, 0.028) 1px, transparent 1px, transparent 48px),
+      repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.028) 0px, rgba(255, 255, 255, 0.028) 1px, transparent 1px, transparent 48px);
+
+  --gc-glass-base: rgba(255, 255, 255, 0.08);
+  --gc-glass-elevated: rgba(255, 255, 255, 0.20);
+  --gc-glass-subtle: rgba(255, 255, 255, 0.045);
+
+  --gc-text-primary: #f1f5f9;
+  --gc-text-secondary: #cbd5e1;
+  --gc-text-muted: #94a3b8;
+  --gc-text-disabled: #64748b;
+
+  --gc-border-subtle: rgba(255, 255, 255, 0.09);
+  --gc-border-default: rgba(255, 255, 255, 0.20);
+  --gc-border-focus: #22d3ee;
+
+  --gc-accent-primary: #22d3ee;
+  --gc-accent-secondary: #60a5fa;
+
+  --gc-status-success: #34d399;
+  --gc-status-warning: #fbbf24;
+  --gc-status-danger: #fb7185;
+  --gc-status-neutral: #94a3b8;
+  --gc-status-unsupported: #fb7185;
+
+  --gc-glow-primary: 0 0 24px rgba(34, 211, 238, 0.35);
+  --gc-glow-success: 0 0 20px rgba(52, 211, 153, 0.30);
+  --gc-glow-warning: 0 0 20px rgba(251, 191, 36, 0.30);
+  --gc-glow-danger: 0 0 20px rgba(251, 113, 133, 0.30);
+
+  --gc-glass-blur: 20px;
+  --gc-glass-border-opacity: 0.12;
+  --gc-glass-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.09), 0 8px 32px rgba(0, 0, 0, 0.45);
+  --gc-glass-hover-overlay: rgba(255, 255, 255, 0.03);
+  --gc-glass-focus-ring: 0 0 0 3px rgba(34, 211, 238, 0.35);
+  --gc-glass-disabled-opacity: 0.45;
+  --gc-glass-fallback-surface: #0b0f17;
+  --gc-glass-highlight: linear-gradient(160deg, rgba(34, 211, 238, 0.08) 0%, rgba(96, 165, 250, 0.035) 35%, transparent 65%);
+}
+
+.bg-glass-base {
+  --gc-glass-surface-bg: var(--gc-glass-base);
+}
+
+.bg-glass-elevated {
+  --gc-glass-surface-bg: var(--gc-glass-elevated);
+}
+
+.bg-glass-subtle {
+  --gc-glass-surface-bg: var(--gc-glass-subtle);
+}
+
+.glass-panel {
+  background-color: var(--gc-glass-surface-bg, var(--gc-glass-fallback-surface));
+}
+
+@supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+  .glass-panel {
+    background-color: var(--gc-glass-surface-bg, var(--gc-glass-base));
+    background-image: var(--gc-glass-highlight);
+    backdrop-filter: blur(var(--gc-glass-blur));
+    -webkit-backdrop-filter: blur(var(--gc-glass-blur));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .glass-console {
+    --gc-glow-primary: none;
+    --gc-glow-success: none;
+    --gc-glow-warning: none;
+    --gc-glow-danger: none;
+  }
+}
+
+.glass-console[data-perf='reduced'] {
+  --gc-glow-primary: none;
+  --gc-glow-success: none;
+  --gc-glow-warning: none;
+  --gc-glow-danger: none;
+}

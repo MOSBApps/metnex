@@ -1,0 +1,19 @@
+server:
+  port: 8088
+
+spring:
+  application:
+    name: jasper-renderer
+
+# Mirrors apps/api/.env.example / REPORT_RENDER_* naming so the two services agree on config.
+renderer:
+  internal-token: ${REPORT_RENDER_INTERNAL_TOKEN:}
+  timeout-ms: ${REPORT_RENDER_TIMEOUT_MS:15000}
+  max-rows: ${RENDERER_MAX_ROWS:5000}
+  max-payload-bytes: ${RENDERER_MAX_PAYLOAD_BYTES:10485760}
+  max-template-bytes: ${RENDERER_MAX_TEMPLATE_BYTES:262144}
+
+logging:
+  level:
+    root: INFO
+    com.metnex.jasperrenderer: INFO

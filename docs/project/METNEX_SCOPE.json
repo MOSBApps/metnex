@@ -1,0 +1,39 @@
+{
+  "$schema": "https://opendevcon.openese.com/schemas/project-scope.v1.json",
+  "contractVersion": "1.1",
+  "project": {
+    "name": "Metnex",
+    "slug": "metnex"
+  },
+  "inScope": [
+    "Platform Bootstrap & Builtin Roles/Permissions",
+    "Hiyerarşik Multi-Tenant İzolasyonu (PLATFORM_ROOT, ROOT, STANDARD)",
+    "JWT + HttpOnly Cookie Auth, MFA (TOTP) AES-256-GCM, Impersonation",
+    "ResourcePackage & PackageFeature Entitlements",
+    "Demo Operations & Reporting Foundation (HTML, PDF, XLSX)",
+    "Glassmorphic Console UI (Next.js 15, Tailwind, React 19)",
+    "PostgreSQL ICU collation (tr-TR) & Drizzle ORM standardı",
+    "ODC Governance Pipeline & Scripting (create-project.sh, check.sh)"
+  ],
+  "outOfScope": [
+    "Canlı Ödeme Sistemleri Entegrasyonu (Stripe/Iyzico)",
+    "Canlı SMS Gateway Entegrasyonları"
+  ],
+  "personas": [
+    {
+      "id": "SYSTEM_ADMIN",
+      "name": "Platform Super Admin",
+      "description": "Tüm platformu, kiracıları, paketleri, audit ve performans kayıtlarını yönetir."
+    },
+    {
+      "id": "TENANT_ADMIN",
+      "name": "Müşteri Kiracı Yöneticisi",
+      "description": "Kendi müşteri ağacındaki alt kiracıları, kullanıcıları ve rolleri yönetir."
+    },
+    {
+      "id": "USER",
+      "name": "Standart Kullanıcı",
+      "description": "Yetkili olduğu kiracı kapsama alanında operasyonel modülleri kullanır."
+    }
+  ]
+}

@@ -1,0 +1,50 @@
+{
+  "$schema": "https://opendevcon.openese.com/schemas/project-traceability.v1.json",
+  "contractVersion": "1.1",
+  "project": {
+    "name": "Metnex",
+    "slug": "metnex"
+  },
+  "traceability": [
+    {
+      "discoveryRef": "F-001",
+      "srsFeatRef": "FEAT-001",
+      "srsFrRef": "FR-001",
+      "srsBrRef": "BR-001",
+      "srsAcRef": "AC-001",
+      "epicRef": "EPIC-001"
+    },
+    {
+      "discoveryRef": "F-002",
+      "srsFeatRef": "FEAT-003",
+      "srsFrRef": "FR-005",
+      "srsBrRef": "BR-002",
+      "srsAcRef": "AC-001",
+      "epicRef": "EPIC-003"
+    },
+    {
+      "discoveryRef": "F-003",
+      "srsFeatRef": "FEAT-004",
+      "srsFrRef": "FR-007",
+      "srsBrRef": "BR-001",
+      "srsAcRef": "AC-001",
+      "epicRef": "EPIC-003"
+    },
+    {
+      "discoveryRef": "F-004",
+      "srsFeatRef": "FEAT-005",
+      "srsFrRef": "FR-008",
+      "srsBrRef": "BR-003",
+      "srsAcRef": "AC-001",
+      "epicRef": "EPIC-001"
+    },
+    {
+      "discoveryRef": "F-005",
+      "srsFeatRef": "FEAT-007",
+      "srsFrRef": "FR-012",
+      "srsBrRef": "BR-001",
+      "srsAcRef": "AC-001",
+      "epicRef": "EPIC-002"
+    }
+  ]
+}

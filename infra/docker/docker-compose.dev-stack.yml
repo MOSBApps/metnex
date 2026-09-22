@@ -1,0 +1,117 @@
+version: '3.8'
+
+# Dev app stack — dev branch CI'dan otomatik deploy edilir.
+# NPM routing: metnex-dev.<domain> → 127.0.0.1:3000
+#              metnex-api-dev.<domain> → 127.0.0.1:3001
+#
+# Ön koşul: metnex-infra-dev stack çalışıyor olmalı (postgres+redis+minio)
+# Deploy:
+#   set -a && source /opt/metnex/dev/.env && set +a
+#   TAG=dev-<sha> docker stack deploy -c docker-compose.dev-stack.yml metnex-dev
+
+services:
+  metnex-api:
+    image: 127.0.0.1:5000/metnex-api:${TAG}
+    ports:
+      - "127.0.0.1:3001:3001"
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-8h}
+      JWT_REFRESH_EXPIRES_IN: ${JWT_REFRESH_EXPIRES_IN:-7d}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS}
+      MINIO_ENDPOINT: minio
+      MINIO_PORT: 9000
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+      MINIO_BUCKET: metnex-dev
+      MINIO_USE_SSL: "false"
+      GREENDOCS_BASE_URL: ${GREENDOCS_BASE_URL}
+      GREENDOCS_API_KEY: ${GREENDOCS_API_KEY}
+      THROTTLE_TTL: 60000
+      THROTTLE_LIMIT: 200
+      REPORT_RENDER_ENDPOINT: http://jasper-renderer:8088/render
+      REPORT_RENDER_INTERNAL_TOKEN: ${REPORT_RENDER_INTERNAL_TOKEN}
+      REPORT_RENDER_TIMEOUT_MS: ${REPORT_RENDER_TIMEOUT_MS:-15000}
+    networks:
+      - metnex-dev
+    deploy:
+      replicas: 1
+      update_config:
+        parallelism: 1
+        order: start-first         # Yeni container hazır olunca eskisi kapatılır
+        failure_action: rollback
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3001/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  metnex-web:
+    image: 127.0.0.1:5000/metnex-web:${TAG}
+    ports:
+      - "127.0.0.1:3000:3000"
+    environment:
+      NODE_ENV: production
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+      HOSTNAME: "0.0.0.0"
+    networks:
+      - metnex-dev
+    deploy:
+      replicas: 1
+      update_config:
+        parallelism: 1
+        order: start-first
+        failure_action: rollback
+      restart_policy:
+        condition: on-failure
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://127.0.0.1:3000/api/health', r => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"]
+      interval: 20s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  # Internal-only Jasper Reports render service (TASK-022.5). No ports: — reachable only from
+  # metnex-api over the metnex-dev overlay network, never published to the host.
+  jasper-renderer:
+    image: 127.0.0.1:5000/metnex-jasper-renderer:${TAG}
+    environment:
+      REPORT_RENDER_INTERNAL_TOKEN: ${REPORT_RENDER_INTERNAL_TOKEN}
+      JAVA_OPTS: "-Xms128m -Xmx384m"
+    networks:
+      - metnex-dev
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+        reservations:
+          memory: 256M
+      update_config:
+        parallelism: 1
+        order: start-first
+        failure_action: rollback
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8088/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+networks:
+  metnex-dev:
+    external: true    # metnex-infra-dev ile paylaşılan overlay ağı
