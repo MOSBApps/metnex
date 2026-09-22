@@ -1,13 +1,16 @@
 import { Controller, Get, Headers, Param, Query, Res, UseGuards } from '@nestjs/common'
 import { Response } from 'express'
 import { requireTenantId } from '../common/tenant-header.util'
+import { RequireMfaSetupComplete } from '../platform/decorators/require-mfa-setup-complete.decorator'
+import { MfaEnforcementGuard } from '../platform/guards/mfa-enforcement.guard'
 import { JwtAuthGuard } from '../platform/jwt-auth.guard'
 import { PermissionGuard, RequirePermission } from '../platform/permission.guard'
 import { ReportRenderService } from './report-render.service'
 import { ReportingService } from './reporting.service'
 
 @Controller('reports')
-@UseGuards(JwtAuthGuard, PermissionGuard)
+@UseGuards(JwtAuthGuard, PermissionGuard, MfaEnforcementGuard)
+@RequireMfaSetupComplete()
 export class ReportingController {
   constructor(
     private readonly reporting: ReportingService,

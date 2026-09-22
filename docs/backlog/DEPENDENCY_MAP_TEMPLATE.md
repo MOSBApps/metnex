@@ -1,4 +1,4 @@
-# Open Mas — Dependency Map Template
+# Metnex — Dependency Map Template
 
 ## Dependency Matrix
 

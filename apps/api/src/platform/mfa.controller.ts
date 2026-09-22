@@ -1,5 +1,7 @@
-import { BadRequestException, Body, Controller, ForbiddenException, Get, HttpCode, HttpStatus, Param, Patch, Post, UseGuards } from '@nestjs/common'
+import { BadRequestException, Body, Controller, ForbiddenException, Get, HttpCode, HttpStatus, Param, Patch, Post, Res, UseGuards } from '@nestjs/common'
 import { AuthGuard } from '@nestjs/passport'
+import type { Response } from 'express'
+import { COOKIE_MAX_AGE_MS, REFRESH_COOKIE } from './auth.controller'
 import { CurrentUser } from './current-user.decorator'
 import {
   validateDisableTotp,
@@ -17,6 +19,7 @@ interface RequestUser {
   sub?: string
   email: string
   isSystemAdmin: boolean
+  mfaVerified?: boolean
   impersonation?: boolean
   impersonatorUserId?: string | null
 }
@@ -62,13 +65,23 @@ export class MfaController {
 
   @Post('challenge/verify')
   @HttpCode(HttpStatus.OK)
-  async verifyChallenge(@Body() dto: VerifyMfaChallengeDto) {
+  async verifyChallenge(@Body() dto: VerifyMfaChallengeDto, @Res({ passthrough: true }) res: Response) {
     const validation = validateVerifyMfaChallenge(dto)
     if (!validation.valid) throw new BadRequestException(validation.errors)
-    return this.mfaService.verifyChallenge(dto.challengeToken, {
+    const { accessToken, refreshToken } = await this.mfaService.verifyChallenge(dto.challengeToken, {
       code: dto.code,
       recoveryCode: dto.recoveryCode,
     })
+    // Same httpOnly refresh cookie contract as POST /auth/login — an MFA-verified login must be
+    // able to silently refresh its session exactly like a non-MFA login.
+    res.cookie(REFRESH_COOKIE, refreshToken, {
+      httpOnly: true,
+      secure: process.env['NODE_ENV'] === 'production',
+      sameSite: 'lax',
+      maxAge: COOKIE_MAX_AGE_MS,
+      path: '/',
+    })
+    return { accessToken }
   }
 
   @UseGuards(AuthGuard('jwt'))
@@ -92,30 +105,27 @@ export class MfaController {
     return this.mfaService.adminResetMfa(getUserId(admin), null, userId, {
       impersonation: admin.impersonation === true,
       impersonatorUserId: admin.impersonatorUserId ?? null,
+      actorMfaVerified: admin.mfaVerified === true,
     })
   }
 
   @UseGuards(AuthGuard('jwt'))
-  @Get('policy')
-  async getPolicy(@Param('tenantId') tenantId: string) {
-    if (tenantId !== undefined) {
-      const validation = validateMfaPathId(tenantId, 'Kiracı')
-      if (!validation.valid) throw new BadRequestException(validation.errors)
-    }
-    if (!tenantId) return { mfaRequired: false }
-    return this.mfaService.getTenantPolicy(tenantId)
+  @Get('policy/:tenantId')
+  async getPolicy(@CurrentUser() user: RequestUser, @Param('tenantId') tenantId: string) {
+    if (!user.isSystemAdmin) throw new ForbiddenException('Bu endpoint yalnızca sistem yöneticilerine açıktır')
+    const validation = validateMfaPathId(tenantId, 'Kiracı')
+    if (!validation.valid) throw new BadRequestException(validation.errors)
+    return this.mfaService.getTenantPolicy(getUserId(user), tenantId)
   }
 
   @UseGuards(AuthGuard('jwt'))
-  @Patch('policy')
+  @Patch('policy/:tenantId')
   async setPolicy(@CurrentUser() user: RequestUser, @Param('tenantId') tenantId: string, @Body() dto: SetTenantMfaPolicyDto) {
+    if (!user.isSystemAdmin) throw new ForbiddenException('Bu endpoint yalnızca sistem yöneticilerine açıktır')
+    const idValidation = validateMfaPathId(tenantId, 'Kiracı')
+    if (!idValidation.valid) throw new BadRequestException(idValidation.errors)
     const validation = validateSetTenantMfaPolicy(dto)
     if (!validation.valid) throw new BadRequestException(validation.errors)
-    if (tenantId !== undefined) {
-      const validation = validateMfaPathId(tenantId, 'Kiracı')
-      if (!validation.valid) throw new BadRequestException(validation.errors)
-    }
-    if (!tenantId) return { mfaRequired: false }
-    return this.mfaService.setTenantPolicy(tenantId, dto.mfaRequired, getUserId(user))
+    return this.mfaService.setTenantPolicy(getUserId(user), tenantId, dto.mfaRequired)
   }
 }

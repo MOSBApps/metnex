@@ -1,6 +1,8 @@
 import { Module } from '@nestjs/common'
+import { AuditModule } from '../audit/audit.module'
 import { DbModule } from '../db/db.module'
 import { JwtAuthGuard } from '../platform/jwt-auth.guard'
+import { MfaRequirementService } from '../platform/mfa-requirement.service'
 import { PermissionGuard } from '../platform/permission.guard'
 import { REPORT_DATASET_PROVIDERS, type ReportDatasetProvider } from './dataset/report-dataset.contract'
 import { ReportDatasetResolver } from './dataset/report-dataset.resolver'
@@ -18,7 +20,7 @@ import { TemplateRegistryService } from './templates/template-registry'
 const DEFAULT_DATASET_PROVIDERS: ReportDatasetProvider[] = []
 
 @Module({
-  imports: [DbModule],
+  imports: [DbModule, AuditModule],
   controllers: [ReportingController],
   providers: [
     ReportingService,
@@ -28,6 +30,7 @@ const DEFAULT_DATASET_PROVIDERS: ReportDatasetProvider[] = []
     { provide: REPORT_DATASET_PROVIDERS, useValue: DEFAULT_DATASET_PROVIDERS },
     JwtAuthGuard,
     PermissionGuard,
+    MfaRequirementService,
   ],
 })
 export class ReportingModule {}

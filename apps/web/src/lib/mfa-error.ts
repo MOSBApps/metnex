@@ -18,7 +18,7 @@ export function getMfaErrorGuidance(error: unknown): MfaErrorGuidance | null {
       code,
       message: 'Bu alanı kullanmak için MFA kurulumu gerekiyor.',
       ctaLabel: 'MFA Kurulumuna Git',
-      ctaHref: '/profile',
+      ctaHref: '/app/settings/security',
     }
   }
   if (code === 'MFA_SESSION_NOT_VERIFIED') {

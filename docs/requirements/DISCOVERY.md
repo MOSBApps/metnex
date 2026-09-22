@@ -60,12 +60,13 @@ Kurallar:
 
 ```text
 MİP customer root tenant
-├── MOSB tenant
-├── MOSEDAŞ tenant
-└── MOSBİO tenant
+├── MOSB Enerji operasyon tenantı
+└── MOSBİO operasyon tenantı
 ```
 
-- MOSB, MOSEDAŞ ve MOSBİO kendi tenant kapsamlarında kendi SCADA/DMS verilerini görür.
+- MOSB Enerji ve MOSBİO kendi operasyon tenantlarında kendi yetkili verilerini görür.
+- MOSEDAŞ Metnex tenantı değildir; dış üretim planlama sistemi olarak B2B external-system kimliğiyle bağlanır.
+- MOSB varlık sahibi olabilir ancak Metnex operasyon tenantı değildir; sahiplik BEAM/ERP'de kalır.
 - MİP root tenant, yetkili kullanıcılar için bağlı işletmelerin aggregate analizlerini görebilir.
 - Bir şirket tenant’ı varsayılan olarak diğer şirketlerin verisini göremez.
 - Root tenant görünürlüğü yalnızca tenant türüne dayanmaz; permission ve `canAggregateChildren`
@@ -387,7 +388,7 @@ Geliştirme
 |---|---|---|
 | ERP kapsamındaki mevcut süreçler | Netsis ERP | Entegrasyon; tekrar geliştirme yapılmaz |
 | Maliyet muhasebesi | Netsis hedef alanı; mevcut durumda aktif değil | Varsayılan olarak Metnex sahipliği değildir |
-| Üretim planlama | Metnex | Üretim siparişinden üretim kaynağı planına kadar ana planlama sistemi |
+| Üretim planlama | MOSEDAŞ ayrı uygulaması | Plan ve üretim emri SoR'u; Metnex operasyon yürütme ve gerçekleşme SoR'u |
 | Üretim / ERP kaydı | Netsis ERP | Metnex'teki onaylı plan üzerinden entegrasyonla tetikleme ve sonuç aktarımı |
 | Varlık yönetimi | Beam | Entegrasyon |
 | Bakım yönetimi | Beam | Entegrasyon |
@@ -667,15 +668,31 @@ Mevcut §5 ve §5.1 kurallarına ek olarak:
 
 # 21. Enerji Üretim, Buhar Arzı ve Operasyon Alanı
 
-## 21.1 Elektrik Üretim Talebi ve Planlama — Wave 2/3 Dışı Gelecek Adayı
+## 21.1 Elektrik Üretim Talebi ve Planlama — DEC-0014 ile Güncellenmiş Gelecek Adayı
 
 - MOSEDAŞ enerji ticareti yapmaktadır.
 - Elektrik fiyatlarının üretimi anlamlı kıldığı durumlarda üretim siparişi oluşturulur.
-- Üretim operasyon uzmanları çalıştırılacak üretim kaynaklarını ve üretim planını Metnex'te belirler.
-- Üretim planlamasının System of Record'u Metnex'tir.
-- Netsis içinde üretim planlaması yapılmayacaktır.
-- Onaylı plan üzerinden gerekli ERP / üretim kayıtları entegrasyonla Netsis'te tetiklenecektir.
-- Gerçekleşen üretim sonuçları gerektiğinde iki sistem arasında aktarılacaktır.
+- Üretim planı ve üretim emri ayrı MOSEDAŞ uygulamasında oluşturulur.
+- MOSEDAŞ üretim planı ve emrinin System of Record'udur.
+- Metnex emri teknik ve operasyonel olarak doğrular, kabul/ret eder ve sahada yürütür.
+- Metnex gerçekleşme, sapma ve üretim olaylarını MOSEDAŞ'a geri bildirir.
+- Netsis/ERP ana veri ve ERP süreçleri kendi System of Record sınırında kalır; Metnex planlama SoR'u değildir.
+- Pazar, fiyat, optimizasyon ve tedarikçi planlama fonksiyonları Metnex kapsamına alınmaz.
+
+### 21.1.1 Operasyon ve tenant sınırı
+
+- MİP root altında MOSB Enerji ve MOSBIO ayrı operasyon tenantlarıdır.
+- MOSB varlık sahibi olsa da Metnex operasyon tenantı değildir.
+- MOSEDAŞ Metnex tenantı değildir; external-system kimliği ve allowlist ile entegre olur.
+- Varlık sahipliği BEAM/ERP'de; Metnex tesis/makine referansı ve operasyonel snapshot kullanır.
+- Kömür Kazanı MOSB Enerji altında tesis/ünite operasyon referansıdır.
+
+### 21.1.2 Üretim emri ve olay akışı
+
+- Emirler versiyonlu ve idempotent alınır; Metnex operasyon uygunluğunu kontrol eder.
+- Koşullar bozulursa emir `PAUSED` veya `EXECUTION_BLOCKED` olur ve MOSEDAŞ'a olay gönderilir.
+- Olaylar Metnex'te önce kalıcılaşır, ardından asenkron gönderilir.
+- `CRITICAL`, `HIGH`, `NORMAL` öncelikleri ve teknik alındı/işleme sonucu ayrımı bulunur.
 
 Bilinen üretim kaynakları:
 
@@ -745,6 +762,26 @@ Bu kural:
 için geçerlidir.
 
 Otomatik cihaz / LIMS veri aktarımı mevcut kapsamın parçası değildir.
+
+### 22.3.1 Onaylı Laboratuvar Ürün Sınırı
+
+- Laboratuvar analiz türleri ve parametreleri parametrik olarak eklenebilir.
+- İlk analiz kümesi kömür, biyokütle, blend/paçal ve su analizleridir.
+- Analiz tanımları Laboratuvar domain yöneticisi tarafından onay ve audit ile yönetilir.
+- Sonuç yaşam döngüsü taslak → onay → kilitli şeklindedir; düzeltme yeni revizyonla yapılır.
+
+## 22.4 İşletme Modülü Ürün Sınırı
+
+- İşletmede elle girilen operasyonel değerler kontrollü parametrik formlarla tutulur.
+- İşletme form/alan tanımları İşletme domain yöneticisi tarafından onay ve audit ile yönetilir.
+- Veri yaşam döngüsü taslak → kontrol/onay → kilitli şeklindedir; düzeltme revizyonla yapılır.
+- Laboratuvar ve İşletme ayrı altyapı, domain, permission ve audit sınırlarına sahiptir.
+
+## 22.5 İlk Ekran Sırası
+
+1. Operasyon merkezi özeti, vardiya listesi/detayı, üretim emri listesi/detayı ve olay akışı.
+2. Laboratuvar analiz/parametre, numune, sonuç, onay/kilit ve geçmiş ekranları.
+3. İşletme form/alan, veri girişi, onay/kilit ve geçmiş ekranları.
 
 ---
 

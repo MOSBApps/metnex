@@ -65,20 +65,20 @@ Domain references (read before implementing in a new area):
 External reporting (read before finishing any task):
 
 * `../opendevcon/README.md` — reporting surface for non-AI external tools (e.g. OpenDevConnect)
-* `../opendevcon/PROJECT_STATE.md` — single-source current project state
+* `../opendevcon/METNEX_STATE.md` — single-source current project state
 * `../opendevcon/PROGRESS_LOG.md` — append-only session log
-* `../runbooks/PROJECT_LIFECYCLE_AND_STATUS_RUNBOOK.md` — full lifecycle and reporting contract
+* `../runbooks/METNEX_LIFECYCLE_AND_STATUS_RUNBOOK.md` — full lifecycle and reporting contract
 
 > **Reporting Rule:** Before marking any task complete, both AI1 and AI2 must:
 >
 > 1. Update the `status` field of the relevant `backlog/EPIC-*.md` (or Feature/Story/Task) file.
-> 2. Update `../opendevcon/PROJECT_STATE.md` (`stage`, `active_epics`, `updated_at`).
+> 2. Update `../opendevcon/METNEX_STATE.md` (`stage`, `active_epics`, `updated_at`).
 > 3. Append a new entry to `../opendevcon/PROGRESS_LOG.md` (append-only — never edit or delete prior entries).
 >
 > Skipping any of these three steps means the task is **not complete** — see the
 > Quality Gates "Status & External Reporting Gate" in `QUALITY_GATES.md`.
 > This is how external, non-AI tools learn the project's status. See
-> `PROJECT_LIFECYCLE_AND_STATUS_RUNBOOK.md` §7.
+> `METNEX_LIFECYCLE_AND_STATUS_RUNBOOK.md` §7.
 
 > **Locale & Collation Rule (DEC-0006):** Before designing any data model or sort behaviour,
 > verify the project's DB collation decision is recorded in `../domain/DB_META.md § Locale & Collation`.
@@ -229,7 +229,7 @@ Before marking any task complete, check whether the work has documentation impac
 | New UI screen or pattern added | `docs/ui-contract/` relevant files |
 | UI override applied (Seviye 3) | `docs/ui-contract/governance/deviation-log.md` |
 | **New project initialised** | `docs/domain/DB_META.md § Locale & Collation` filled + `docs/decisions/DEC-NNNN-db-locale.md` created |
-| **Any task completed (always)** | `docs/opendevcon/PROJECT_STATE.md` + `docs/opendevcon/PROGRESS_LOG.md` |
+| **Any task completed (always)** | `docs/opendevcon/METNEX_STATE.md` + `docs/opendevcon/PROGRESS_LOG.md` |
 
 A task that changes the domain model or architecture without updating the corresponding doc is **incomplete**.
 

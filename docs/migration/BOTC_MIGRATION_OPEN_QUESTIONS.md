@@ -1234,3 +1234,62 @@ Açık: kontrollü yerel DB smoke test onayı (AI1/kullanıcı kararı bekliyor)
 
 **Güncelleme (TASK-027.47-R1, 2026-09-22) — kontrollü yerel DB smoke test TAMAMLANDI (kullanıcı onayıyla):** yukarıdaki "yapılmadı, onay bekliyor" maddesi kapatıldı. Kullanıcı onayı alındıktan sonra izole, tek seferlik, kalıcı volume'suz bir Postgres container'ı (`docker run --rm`) başlatıldı; `DATABASE_URL` yalnızca bu geçici container'a işaret etti (production'a hiç bağlanılmadı); tüm migration'lar (0000–0003) derlenmiş `dist/migrate.js` ile uygulandı; break-glass servisi gerçek `PlatformAuditService` ile birlikte örneklenip 15 senaryo elle tetiklendi — **15/15 geçti**, en önemlisi **gerçek eşzamanlı iki `recover()` çağrısının** aynı token üzerinde yarıştığı senaryoda yalnızca birinin başarılı olduğu, kaybeden çağrının `TOKEN_ALREADY_USED` ile reddedildiği doğrulandı (bu, mock'larla kanıtlanamayan tek senaryoydu). Audit tablosunda hiçbir credential bulunmadı. Container `docker stop` ile durduruldu (`--rm` ile otomatik silindi), kalıcı volume hiç oluşmadı. Tam sonuçlar `METNEX_PLATFORM_PRIVILEGE_MODEL_DECISION_PACKAGE.md` §14.11'de.
 Açık: TASK-027.48 (MFA enforcement), TASK-027.49 (tenant-rol delegasyonu), F6'nın kalan audit kapsamı, Q-DP22b/c, Q-DP21d, Q-DP17, Q-DP04, Q-ENV01, dev ROOT backfill, formal SYSTEM_ADMIN demotion yolu (kod değişikliği gerektirir, henüz tasarlanmadı), `BREAK_GLASS_RECOVERY_TOKEN` üretimi/saklanması ve runbook onayı (operasyonel, Ops/AI1/PO kararı).
+
+---
+
+## MFA Policy Activation ve Enforcement Geçişi — Q-DP22b/c KAPANDI (TASK-027.48, 2026-09-22)
+
+Karar paketleri (`METNEX_AUTHORIZATION_ENDPOINT_AUDIT_AND_MFA_POLICY_DECISION.md` §5–§6) Product
+Owner tarafından kapatıldı ve uygulandı. **Q-DP22b:** MFA policy route'ları `GET/PATCH
+auth/mfa/policy/:tenantId` olarak düzeltildi, `isSystemAdmin`-only yetki eklendi (controller +
+service'te bağımsız fail-closed kontrol), `MFA_POLICY_UPDATED` audit'i eklendi. **Q-DP22c:** admin
+MFA reset (`POST auth/mfa/admin/:userId/reset`) için tek yeni kural eklendi — aktörün kendi MFA'sı
+etkinse mevcut oturumun `mfaVerified` olması zorunlu (aksi halde 403 + `ACTOR_MFA_NOT_VERIFIED`
+audit'i); MFA'sı etkin olmayan aktör için geçici izin + `actorMfaBypassWarning` audit uyarısı
+kaydedilir. Self-reset ve impersonation reddi zaten TASK-027.46/47'den beri kod seviyesinde
+uygulanıyordu, bu task'ta değiştirilmedi (yalnızca teyit edildi).
+
+**Enforcement wiring (kullanıcı kararıyla, yalnızca hazırlık değil gerçek aktivasyon):**
+`MfaEnforcementGuard` + `@RequireMfaSetupComplete()`, `docs/runbooks/MFA_ENFORCEMENT_ROUTE_MATRIX.md`'de
+listelenen tüm korumalı controller'lara uygulandı (platform/roles/tenants/users/saas,
+customer-admin, reports, platform/settings, tenant settings, admin/perf, platform-audit-logs,
+auth/change-password). MFA akışının kendisi, kimlik bootstrap'i (`auth/me`, `platform/me/*`) ve
+login/logout **bilinçli olarak muaf** tutuldu — aksi halde hiç kimse MFA kurulumunu
+tamamlayamazdı.
+
+**Kritik bulgu ve kapatılması — web'de MFA setup UI hiç yoktu:** implementasyona başlamadan önce
+`totp/setup`/`totp/verify-setup`/`mfa/status`'ı çağıran hiçbir web bileşeni bulunmadığı, ayrıca
+login'in `requiresMfa` yanıtını hiç ele almadığı tespit edildi — bu haliyle enforcement açılsaydı
+gerçek bir kilitlenme (task'ın kendi kritik güvenlik kuralının ihlali) olurdu. Kullanıcı "MFA'yı
+komple geliştir" kararıyla kapsamı genişletti: `apps/web/src/app/(app)/app/settings/security/page.tsx`
+(TOTP kurulum/QR/kurtarma kodu/devre dışı bırakma/yenileme) ve login sayfasının MFA challenge
+adımı (TOTP veya kurtarma kodu) eklendi; `apps/web/src/lib/api.ts` merkezi `request()` artık
+`MFA_SETUP_REQUIRED`/`MFA_SESSION_NOT_VERIFIED` 403'lerini yakalayıp otomatik yönlendiriyor.
+
+**Yan bulgu (kod düzeltmesi):** `POST auth/mfa/challenge/verify` yalnızca body'de
+`{accessToken, refreshToken}` döndürüyordu, httpOnly refresh cookie'sini hiç set etmiyordu — login
+ile aynı sözleşmeye getirildi (`POST auth/login`'in kullandığı cookie kodu `auth.controller.ts`'ten
+export edilip paylaşıldı), aksi halde MFA ile giren bir kullanıcı sayfa yenilemesinde oturumunu
+kaybederdi.
+
+**Geçiş stratejisi:** setup-required (kullanıcı kararı) — kademeli rollout veya grace period
+uygulanmadı; MFA'sı gerekli ama kurulu olmayan kullanıcı yalnızca MFA setup akışına yönlendirilir,
+kilitlenmez.
+
+**Doğrulama:** yeni `apps/api/src/platform/guards/mfa-enforcement.guard.spec.ts` (10 test, guard'ın
+kendi karar ağacı); `endpoint-authorization-inventory.spec.ts` snapshot'ı 91 endpoint'e güncellendi
+(guard sessizce kaldırılır/eklenirse kırılır); `mfa-admin-reset-authorization.spec.ts`,
+`authorization-audit-findings.spec.ts`, `mfa-settings-perf-validation.spec.ts`,
+`platform-user-admin-privilege-boundary.spec.ts`, `platform-dto-validation.spec.ts` güncellendi.
+`pnpm --filter api exec jest --runInBand` → **54 suite / 1520 test PASS**;
+`pnpm --filter api exec eslint "src/**/*.ts"` temiz; `pnpm --filter web exec tsc --noEmit` temiz;
+`pnpm --filter web run test` (vitest) → 8 dosya / 117 test PASS; `pnpm run build` → api + web
+PASS. `./scripts/check.sh --skip-docker` lint adımı apps/web'in önceden var olan
+`eslint-plugin-react-hooks` çözümleme sorunuyla (TASK-027-36'da kayıtlı, bu task'tan bağımsız)
+durdu — audit/typecheck adımları PASS, kalan adımlar yukarıdaki gibi elle doğrulandı. Gerçek
+DB/HTTP/MFA sağlayıcısı kullanılmadı; enforcement gerçek ortamda henüz hiç çalıştırılmadı. Git
+commit/push yapılmadı.
+
+Açık: Q-DP22a (kalıcı permission modeli), TASK-027.49 (tenant-rol delegasyonu), F6'nın kalan audit
+kapsamı, Q-DP21d, Q-DP17, Q-DP04, Q-ENV01, dev ROOT backfill, formal SYSTEM_ADMIN demotion yolu,
+`BREAK_GLASS_RECOVERY_TOKEN` üretimi/saklanması ve runbook onayı.

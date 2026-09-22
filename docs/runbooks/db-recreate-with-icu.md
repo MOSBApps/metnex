@@ -306,9 +306,9 @@ scp user@sunucu:/opt/metnex/prod/backup/<backup_dosyası>.dump ./backup/
 Prod maintenance öncesinde iletilecek mesaj taslağı:
 
 ```
-Konu: Open Mas — Planlı Bakım [tarih saat]
+Konu: Metnex — Planlı Bakım [tarih saat]
 
-Open Mas veritabanı Türkçe locale optimizasyonu için kısa planlı bakım yapılacaktır.
+Metnex veritabanı Türkçe locale optimizasyonu için kısa planlı bakım yapılacaktır.
 Tahmini süre: XX dakika.
 Bakım süresi boyunca sisteme erişilememektedir.
 Bakım tamamlandığında bildirim gönderilecektir.

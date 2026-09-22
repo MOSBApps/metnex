@@ -6,13 +6,14 @@ Diğer runbook'lar **süreç ve format** tanımlar:
 
 - `REQUIREMENTS_DISCOVERY_AND_SRS_RUNBOOK.md` — Discovery ve SRS üretiminin
   kuralları.
-- `PROJECT_LIFECYCLE_AND_STATUS_RUNBOOK.md` — SRS sonrası evreler ve
+- `METNEX_LIFECYCLE_AND_STATUS_RUNBOOK.md` — SRS sonrası evreler ve
   makine tarafından okunabilir durum kontratı.
 
 Bu doküman ise **insan tarafının** (Product Owner / Chief Engineer — kim
 projeyi yürütüyorsa) baştan sona **hangi sırayla, hangi eylemi** yapacağını
-anlatan operasyonel checklist'tir. Yeni bir proje metnex'dan türetildiğinde
-bu dosya baştan sona takip edilir.
+anlatan operasyonel checklist'tir. Metnex, tek bir somut ürün olarak bu
+repo üzerinde geliştirilir — bu dosya, Faz 0 sonrası yeni bir EPIC/feature
+akışı her başladığında Faz 4'ten itibaren takip edilir.
 
 Rol kısaltmaları:
 
@@ -25,39 +26,23 @@ Rol kısaltmaları:
 
 ---
 
-## Faz 0 — Proje Kurulumu (Otomatik: `scripts/create-project.sh`)
+## Faz 0 — Proje Kurulumu (tamamlandı, referans amaçlı)
 
-Bu faz elle yapılmaz; `scripts/create-project.sh` (Windows: `create-project.ps1`)
-çalıştırılır:
+Metnex artık kendi kod tabanı, `git` geçmişi ve remote'u olan somut bir
+üründür; bu depoyu başka bir projeye fork etmek için otomatik bir
+generator script'i **bulunmaz** (`scripts/create-project.sh`/`.ps1`
+bilinçli olarak kaldırıldı — Metnex kendi kendini şablon olarak sunmaz).
 
-```bash
-./scripts/create-project.sh --name "Proje Adı" --slug proje-slug \
-  --app-language tr-TR --db-collation tr-x-icu --db-locale-provider icu \
-  --port-base 7500
-```
+Yeni bir Metnex kurulumu (ör. yeni bir müşteri/ortam) gerekiyorsa elle:
 
-Script otomatik olarak halleder:
-
-- Skeleton'ı `--out` hedefine kopyalar (git/node_modules/dist hariç).
-- `Open Mas`, `metnex`, `tr-TR`,
-  `tr-x-icu`, `icu` placeholder'larını tüm
-  dosyalarda (root `ODC.md` dahil) doldurur.
-- Dosya/klasör adlarındaki `metnex`/`PROJECT` kalıplarını slug ile
-  değiştirir.
-- `.project-defaults` içindeki `DEV_PORT_BASE`'i ayarlar.
-
-**Script bitince PO'nun elle yapması gerekenler (script bunları yapmaz):**
-
-1. `git init && pnpm install` (script son çıktısında hatırlatır).
-2. Repo kökündeki **`ODC.md`**'yi aç, placeholder'ların doğru dolduğunu
-   doğrula (`project.description` alanı hâlâ `TBD` — Faz 1 sonunda
-   doldurulacak).
+1. `git clone`, `pnpm install`, `./scripts/setup-hooks.sh`.
+2. Repo kökündeki **`ODC.md`**'yi doğrula (`project.name`/`slug` zaten
+   `Metnex`/`metnex`).
 3. `docs/domain/DB-METADATA-TEMPLATE.md`'yi kopyalayıp `docs/domain/DB_META.md`
-   olarak, script'e verdiğin `--db-collation`/`--db-locale-provider`
-   değerleriyle doldur. **Script bunu otomatik yapmaz** — `DB_META.md`
-   boş/eksik kalması `DEC-0006` gereği **blocker**'dır.
-4. `docs/opendevcon/PROJECT_STATE.md` içinde `stage: discovery` olduğunu
-   doğrula (varsayılan zaten budur, elle değişiklik gerekmez).
+   olarak, ortamın `--db-collation`/`--db-locale-provider` değerleriyle
+   doldur. `DB_META.md` boş/eksik kalması `DEC-0006` gereği **blocker**'dır.
+4. `docs/opendevcon/METNEX_STATE.md` içindeki `stage` alanını gerçek
+   duruma göre kontrol et.
 
 ---
 
@@ -103,7 +88,7 @@ alanlar dolu veya bilinçli olarak açık soru işaretli.
    mi, vb.).
 6. Kontrol tamamlandığında `docs/requirements/SRS.md` **Durum: Onaylı**
    yap. Onaysız SRS geliştirme kaynağı olarak kullanılamaz.
-7. `docs/opendevcon/PROJECT_STATE.md` içinde `stage: srs` → geçiş notunu
+7. `docs/opendevcon/METNEX_STATE.md` içinde `stage: srs` → geçiş notunu
    ekle, `updated_at`/`updated_by` doldur.
 
 **Çıkış kriteri:** SRS Durum = Onaylı.
@@ -119,11 +104,10 @@ alanlar dolu veya bilinçli olarak açık soru işaretli.
    kayıtlı mı — `docs/domain/DB_META.md` boşsa **blocker**.
 3. `ARCHITECTURE_RULES.md` ile çelişen bir karar varsa önce onu güncelle
    veya kararı reddet.
-4. Repo kökündeki `ODC.md`'yi doğrula — Faz 0'da `create-project.sh`
-   tarafından zaten oluşturuldu/dolduruldu. Burada yalnızca
+4. Repo kökündeki `ODC.md`'yi doğrula. Burada yalnızca
    `project.description` alanını (Discovery/SRS artık netleştiği için)
    ve doc lokasyonlarının projede fiilen doğru olduğunu kontrol et.
-5. `docs/opendevcon/PROJECT_STATE.md` → `stage: architecture`.
+5. `docs/opendevcon/METNEX_STATE.md` → `stage: architecture`.
 
 **Çıkış kriteri:** Kritik DEC'ler `Accepted`, `ODC.md` doğrulanmış.
 
@@ -142,7 +126,7 @@ alanlar dolu veya bilinçli olarak açık soru işaretli.
      zinciri: F-xxx → FEAT-xxx → FR-xxx → BR-xxx → AC-xxx → TC-xxx)
 3. PO, üretilen backlog'u SRS'ye göre doğrular — SRS'de olmayan bir iş
    kuralı backlog'a giremez.
-4. `docs/opendevcon/PROJECT_STATE.md` → `stage: backlog`, `active_epics`
+4. `docs/opendevcon/METNEX_STATE.md` → `stage: backlog`, `active_epics`
    ilk sette dolu.
 
 **Çıkış kriteri:** İlk EPIC seti `ready` durumunda, `srs_refs` dolu.
@@ -162,7 +146,7 @@ Bu döngü, `continuous` evresine kadar (ve sonrasında da) tekrar eder.
    iş bitmiş sayılmaz.
 4. AI2 görev bitince (AGENT_BOOTSTRAP.md **Reporting Rule**, zorunlu):
    - Backlog dosyasının `status`'unu günceller (genelde `review`).
-   - `docs/opendevcon/PROJECT_STATE.md`'i günceller.
+   - `docs/opendevcon/METNEX_STATE.md`'i günceller.
    - `docs/opendevcon/PROGRESS_LOG.md`'e kayıt ekler.
 5. PO (veya AI1) review yapar — `review` durumundaki işler "Human
    Attention" kuyruğudur. Onaylanırsa `status: done`; sorun varsa geri
@@ -183,7 +167,7 @@ Bu döngü, `continuous` evresine kadar (ve sonrasında da) tekrar eder.
 ## Faz 6 — Release
 
 1. SRS'deki MVP kabul kriterlerinin tamamı `done` mu kontrol et.
-2. `docs/opendevcon/PROJECT_STATE.md` → `stage: released`,
+2. `docs/opendevcon/METNEX_STATE.md` → `stage: released`,
    `last_release` doldurulur.
 3. `PROGRESS_LOG.md`'e release kaydı düş.
 
@@ -193,31 +177,31 @@ Bu döngü, `continuous` evresine kadar (ve sonrasında da) tekrar eder.
 
 ## Faz 7 — Sürekli Geliştirme
 
-1. `docs/opendevcon/PROJECT_STATE.md` → `stage: continuous`.
+1. `docs/opendevcon/METNEX_STATE.md` → `stage: continuous`.
 2. Faz 5 (Geliştirme Döngüsü) aynen devam eder; tek fark artık backlog
    akışı MVP sonrası feature/bakım/teknik borç karışımıdır.
 3. Periyodik olarak (ör. her sprint/ay sonu) PO şunları gözden geçirir:
-   - `docs/opendevcon/PROJECT_STATE.md` güncel mi (agent'lar atlamış mı)?
+   - `docs/opendevcon/METNEX_STATE.md` güncel mi (agent'lar atlamış mı)?
    - Açık `blocked` EPIC var mı, neden bekliyor?
    - `docs/decisions/` içinde eskimiş/geçersiz DEC var mı?
 
 `continuous` terminal evredir; geri düşüş yoktur (yalnızca yeni bir
 SRS/discovery döngüsü gerektiren büyük bir pivot varsa
-`PROJECT_LIFECYCLE_AND_STATUS_RUNBOOK.md` §2'deki istisna kuralı
+`METNEX_LIFECYCLE_AND_STATUS_RUNBOOK.md` §2'deki istisna kuralı
 uygulanır).
 
 ---
 
 ## Tek Sayfa Özet Checklist
 
-- [ ] Faz 0: `create-project.sh` çalıştırıldı, `ODC.md` doğrulandı,
-      `DB_META.md` elle dolduruldu (script yapmaz — DEC-0006 blocker)
+- [ ] Faz 0: `ODC.md` doğrulandı, `DB_META.md` elle dolduruldu
+      (DEC-0006 blocker)
 - [ ] Faz 1: `docs/requirements/DISCOVERY.md` dolduruldu, tamamlanma
       kontrolü geçti
 - [ ] Faz 2: AI0 → SRS üretti, insan review yaptı, **Durum: Onaylı**
 - [ ] Faz 3: Kritik DEC'ler `Accepted`, `ODC.md` tam dolu
 - [ ] Faz 4: İlk EPIC seti `ready`, `srs_refs` dolu
-- [ ] Faz 5: Her görev sonunda `status` + `PROJECT_STATE.md` +
+- [ ] Faz 5: Her görev sonunda `status` + `METNEX_STATE.md` +
       `PROGRESS_LOG.md` güncel (döngüsel, sürekli kontrol)
 - [ ] Faz 6: MVP kabul kriterleri tamam, `stage: released`
 - [ ] Faz 7: `stage: continuous`, periyodik PO gözden geçirmesi
@@ -229,7 +213,7 @@ uygulanır).
 | Konu | Dosya |
 |---|---|
 | Discovery/SRS detay kuralları | `REQUIREMENTS_DISCOVERY_AND_SRS_RUNBOOK.md` |
-| Evreler ve makine-okunabilir durum kontratı | `PROJECT_LIFECYCLE_AND_STATUS_RUNBOOK.md` |
+| Evreler ve makine-okunabilir durum kontratı | `METNEX_LIFECYCLE_AND_STATUS_RUNBOOK.md` |
 | Agent rolleri ve zorunlu kurallar | `../AI_Governance/AGENT_BOOTSTRAP.md` |
 | Dış araç raporlama yüzeyi | `../opendevcon/README.md` |
 | Kalite kapıları | `../AI_Governance/QUALITY_GATES.md` |

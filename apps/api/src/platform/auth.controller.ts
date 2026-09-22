@@ -17,6 +17,8 @@ import { CurrentUser } from './current-user.decorator'
 import { validateLoginAttempt } from './domain/auth.domain'
 import { validateChangeOwnPassword, validateLoginBody } from './domain/platform-input.domain'
 import { toSessionUserView, type SessionUserLike } from './domain/user-projection.domain'
+import { RequireMfaSetupComplete } from './decorators/require-mfa-setup-complete.decorator'
+import { MfaEnforcementGuard } from './guards/mfa-enforcement.guard'
 import { JwtAuthGuard } from './jwt-auth.guard'
 
 interface LoginBody {
@@ -35,8 +37,8 @@ interface AuthUser {
   impersonatorUserId?: string | null
 }
 
-const REFRESH_COOKIE = 'metnex_refresh_token'
-const COOKIE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000
+export const REFRESH_COOKIE = 'metnex_refresh_token'
+export const COOKIE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000
 
 @Controller('auth')
 export class AuthController {
@@ -125,7 +127,8 @@ export class AuthController {
    * apply without locking anyone out of their own account.
    */
   @Post('change-password')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, MfaEnforcementGuard)
+  @RequireMfaSetupComplete()
   @HttpCode(HttpStatus.OK)
   async changePassword(@Body() body: ChangePasswordBody, @CurrentUser() user: AuthUser) {
     const shape = validateChangeOwnPassword(body)

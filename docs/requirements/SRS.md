@@ -6,9 +6,9 @@
 |---|---|
 | Proje / Ürün Adı | Metnex — MİP Çok Kiracılı Operasyon, SCADA/DMS Analiz Platformu |
 | Doküman | Software Requirements Specification (SRS) |
-| Sürüm | 1.2 |
-| Tarih | 2026-09-17 |
-| Durum | Review — Birleştirilmiş migration wave planı |
+| Sürüm | 1.3 |
+| Tarih | 2026-09-22 |
+| Durum | Review — DEC-0014 ürün sınırı güncellemesi |
 | Kaynak Discovery Dokümanı | `docs/requirements/DISCOVERY.md` |
 | Hazırlayan | AI0 / AI1 Pipeline |
 | Gözden Geçiren | Product Governance Agent (AI1) |
@@ -47,7 +47,7 @@ Metnex, mevcut Next.js + NestJS + PostgreSQL stack'i üzerinde kurumsal seviyede
 **FR-002:** Kiracı izolasyonu relational `parentId` ve `customerRootId` alanları üzerinden sıkı şekilde uygulanmalıdır.  
 **BR-001:** Bir `STANDARD` kiracı yalnızca ait olduğu `customerRootId` altındaki verilere erişebilir.
 
-**FR-002A:** MİP customer root tenant; MOSB, MOSEDAŞ ve MOSBİO bu root tenant'ın child tenant'ları olarak modellenmelidir.  
+**FR-002A (DEC-0014 ile superseded):** MİP root altında yalnızca operasyonel erişim sınırı olan işletmeler tenant olarak modellenir. Güncel hedefte MOSB Enerji ve MOSBIO ayrı operasyon tenantlarıdır; MOSB ve MOSEDAŞ Metnex operasyon tenantı değildir.
 **FR-002B:** MİP root tenant kapsamındaki aggregate analiz, yalnızca ilgili permission, `canAggregateChildren` yetkisi ve çözümlenmiş data scope birlikte sağlandığında yapılabilmelidir.  
 **BR-001A:** Bir işletme tenant'ı varsayılan olarak başka bir işletme tenant'ının verisini görememelidir.
 
@@ -451,11 +451,11 @@ criterion oluşturmaz.
 ## MOD-007 — Elektrik Üretim Siparişi ve Üretim Planlama
 
 **FR-067:** MOSEDAŞ tarafından üretim yapan şirket/şirketlere elektrik üretim siparişi oluşturulabilmelidir.  
-**FR-068:** Yetkili üretim operasyon kullanıcısı üretim siparişine dayanarak çalıştırılacak üretim kaynaklarını ve üretim planını Metnex'te oluşturabilmelidir.  
-**FR-069:** Üretim planlamasının System of Record'u Metnex olmalıdır.  
-**FR-070:** Onaylı üretim planı sonucunda Netsis içinde gerekli üretim/ERP süreci entegrasyonla tetiklenebilmelidir.  
-**FR-071:** Gerçekleşen üretim sonuçları Metnex'te izlenebilmeli ve gerekli sonuç/veriler Netsis'e aktarılabilmelidir.  
-**BR-008:** Netsis üretim planlamasının ana sistemi olarak kullanılmamalıdır.
+**FR-068 (DEC-0014 ile superseded):** MOSEDAŞ üretim planı ve üretim emrini oluşturmalı; Metnex emri teknik/operasyonel olarak doğrulayıp kabul veya reddetmelidir.
+**FR-069 (DEC-0014):** Üretim planı ve emirlerinin System of Record'u ayrı MOSEDAŞ uygulamasıdır; Metnex operasyon yürütme ve gerçekleşme System of Record'udur.
+**FR-070 (DEC-0014):** Metnex kabul edilen emri vardiyalar arasında yürütebilmeli, koşullar bozulduğunda `PAUSED` veya `EXECUTION_BLOCKED` üretebilmelidir.
+**FR-071 (DEC-0014):** Metnex gerçekleşme, sapma ve operasyon olaylarını kalıcılaştırıp asenkron ve idempotent biçimde MOSEDAŞ'a bildirebilmelidir.
+**BR-008 (DEC-0014):** MOSEDAŞ'ın pazar, fiyat, optimizasyon ve tedarikçi planlama fonksiyonları Metnex'te yeniden geliştirilmemelidir.
 
 ### Üretim Kaynakları
 
@@ -522,11 +522,81 @@ criterion oluşturmaz.
 
 ---
 
+## 9.1 DEC-0014 Ürün Sınırı ve Yeni Uygulama Programı
+
+Bu bölüm 2026-09-22 tarihli DEC-0014 ile onaylanan ürün sınırını tanımlar. Eski
+üretim planlama SoR ifadeleri superseded edilmiştir; MOSEDAŞ plan ve üretim
+emrinin, Metnex ise operasyon yürütme ve gerçekleşmenin System of Record'udur.
+
+### 9.1.1 System of Record ve tenant sınırı
+
+- MOSEDAŞ ayrı bir uygulamadır; Metnex'te tenantı yoktur.
+- MOSB Enerji ve MOSBIO MİP root altında ayrı operasyon tenantlarıdır.
+- MOSB varlık sahibi olarak Metnex operasyon tenantı değildir.
+- Varlık ana verisi ve sahiplik BEAM/ERP'de kalır; Metnex sınırlı dış ID ve
+  operasyonel referans/snapshot tutabilir.
+- Kömür Kazanı MOSB Enerji altında tesis/ünite operasyon referansıdır.
+
+#### FEAT-023 — Vardiya Operasyon Merkezi ve Üretim Yürütme
+
+Vardiya, üretim emri, gerçekleşme, kapasite, operasyon olayı ve olay geri
+bildirimi aynı operasyon sınırı içinde ele alınır; üretim emri vardiya kaydına
+gömülmez.
+
+#### FEAT-024 — Parametrik Laboratuvar
+
+Analiz tanımı, parametre, numune, sonuç, onay, kilitleme ve revizyon yaşam
+döngüsüyle manuel laboratuvar verisi yönetilir.
+
+#### FEAT-025 — Parametrik İşletme Verisi
+
+İşletmede elle girilen operasyonel değerler ayrı domain ve altyapı üzerinden
+form, onay, kilitleme, revizyon, audit ve raporlama ile yönetilir.
+
+### 9.1.2 Üretim emri ve olay sözleşmesi
+
+- Metnex emri teknik ve operasyonel olarak doğrular, kabul/ret eder ve yürütür.
+- MOSEDAŞ plan/emir durumlarının, Metnex operasyon durumlarının sahibidir.
+- Emir versiyonlu, idempotent ve çoklu vardiyaya yayılabilir olmalıdır.
+- Koşullar bozulduğunda Metnex `PAUSED` veya `EXECUTION_BLOCKED` üretir.
+- Gerçekleşme ve olaylar önce Metnex'te kalıcılaşır, sonra asenkron gönderilir.
+- Olaylar `CRITICAL`, `HIGH`, `NORMAL` önceliklerine göre kuyruklanır.
+- Teknik alındı ile işleme sonucu ayrıdır (`DELIVERED`, `ACCEPTED`, `REJECTED`,
+  `FAILED`, `RETRYING`).
+
+### 9.1.3 Entegrasyon güvenliği
+
+- Üretimde mTLS + OAuth2 client credentials birlikte kullanılır.
+- Kullanıcı JWT'si, `isSystemAdmin`, `TENANT_ADMIN` ve impersonation B2B kimliği
+  değildir.
+- MOSEDAŞ hedefleri external-system allowlist'i üzerinden tesis/makine düzeyinde
+  doğrulanır; payload tek başına erişim vermez.
+- Credential ve sertifika yönetimi iki tarafın kendi sorumluluğundadır.
+
+### 9.1.4 Kapasite ve bakım etkisi
+
+- Operasyonel kapasite ve kullanılabilirlik modeli Metnex'e aittir.
+- BEAM/ERP nominal ana verisi ve bakım kaydı SoR olarak kalır.
+- Metnex bakım/duruş/arıza/vardiya etkisini kapasite snapshot'ına uygular ve
+  nedeni audit'ler.
+
+### 9.1.5 Yeni modül sırası
+
+1. Domain/API/veri sözleşmeleri ve mapping.
+2. Vardiya Operasyon Merkezi: özet, vardiya, üretim emri ve olay ekranları.
+3. Laboratuvar: parametrik analiz, numune, sonuç, onay/kilit/revizyon.
+4. İşletme: ayrı parametrik form, veri girişi, onay/kilit/revizyon.
+
+Laboratuvar ve İşletme ayrı altyapı, domain, permission ve audit sınırlarına
+sahiptir. Wave 2 ve Wave 3 bu yeni programa dahil değildir.
+
+---
+
 # 10. Metnex System of Record Gereksinimleri
 
 **BR-013:** Beam varlık ve bakım yönetiminin System of Record'u olarak kalmalıdır.  
 **BR-014:** OpenMs tetkik, aksiyon, uygunsuzluk, yetkinlik ve ilgili ISO süreçlerinin System of Record'u olarak kalmalıdır.  
-**BR-015:** Üretim planlamasının System of Record'u Metnex olmalıdır.  
+**BR-015 (superseded by DEC-0014):** Üretim planlama SoR'u MOSEDAŞ; Metnex operasyon yürütme ve gerçekleşme SoR'udur.
 **BR-016:** Netsis'te sahipliği net aktif ERP fonksiyonları Metnex'te paralel ana sistem olarak yeniden geliştirilmemelidir.  
 **BR-017:** Yeni bir ihtiyaç önce `entegrasyon`, `gerçek domain modülü` veya `hafif no-code form` sınıflarından biriyle değerlendirilmelidir.
 

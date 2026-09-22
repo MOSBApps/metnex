@@ -206,7 +206,7 @@ Her satır: AI2 önerisi · gerekçe · etkilenen endpoint/service · etkilenen 
 | **027.45** (sıradaki) | Salt-okunur ön kontrol raporu (global `TENANT_ADMIN`, bayrak↔rol drift'i, sistem yöneticisi sayısı — gerçek ortam AI1/Ops) **+** canonical kaynak (`SYSTEM_ADMIN` rol ataması) + `isSystemAdmin` türetilmiş/cache + tek servis fonksiyonu + drift kontrolü + tek son-yönetici invariant'ı | 3 (ön kontrol), 5, 9 | Başlatılmadı |
 | **027.46** | `assignRole` sertleştirmesi: global `TENANT_ADMIN` yasağı, privilege tavanı (etkin izin kümesi), impersonation'da privilege değişikliği yasağı (+ teyit edilirse tenant-kapsamlı atamada ROOT+`TENANT_ADMIN`) | 3, 4, 6 | Başlatılmadı |
 | **027.47** | Eş sistem yöneticisi kuralı (parola/rol yasağı, deactivation serbest) **+ sistem yöneticisi kimlik bilgisi rotasyon yolu** (§14.5-A) **+ break-glass/rollback prosedürü** | 2, 10 | Başlatılmadı |
-| **027.48** | MFA geçiş kararı ve global privilege işlemlerinde MFA (Q-DP22b/c ile) | 7 | Başlatılmadı |
+| **027.48** | MFA geçiş kararı ve global privilege işlemlerinde MFA (Q-DP22b/c ile) | 7 | Tamamlandı (2026-09-22, bkz. §14.12) |
 | **027.49** | Tenant-rol delegasyonu: yeni permission (katalog onayı önce), endpoint, kapsam/üst sınır/audit | 8 | Başlatılmadı |
 
 (Numaralar AI1'in; AI2 önerilen kapsam dağılımını sunar, AI1 değiştirebilir.)
@@ -309,3 +309,29 @@ AI1, TASK-027.47 teslimini **`done` olarak onaylamadı** ve `review` durumunda t
 Test scripti geçicidir, repoya eklenmedi (scratch dosyası olarak çalıştırıldı ve silindi). Container, test bitiminde `docker stop` ile durduruldu (`--rm` ile başlatıldığı için otomatik silindi); kalıcı volume hiç oluşturulmadı, `down -v`/prune gerekmedi. Bu artık **açık bir madde değildir.**
 
 **Testler:** `system-admin-credential-rotation-and-break-glass.spec.ts` 36 → **56 test** (yeni: expired/malformed-expiry/future-expiry token, rate-limit eşiği/pencere-sıfırlama, tek-kullanımlık defter — admin-count'tan bağımsız, claim'in tek karşılıklı-dışlama noktası olduğu, impersonation'ın self-servis parolayı değiştiremediği, controller'ın impersonation bağlamını ilettiği + genişletilmiş statik mutasyon kontrolleri). **5 mutasyon kontrolü** manuel çalıştırıldı ve dosyalar geri yüklendi: tek-kullanım kontrolü kaldırılınca 2 test, hız sınırlama kısa-devre edilince 17 test, audit'e yeni parola sızdırılınca 1 test, break-glass oturum iptali kaldırılınca 1 test kırıldı (ayrıca TASK-027.47'nin orijinal 4 kontrolü de bu teslimde tekrar doğrulandı — bkz. §14.9). `pnpm --filter api exec tsc --noEmit` temiz; `pnpm --filter api exec jest platform --runInBand` 16 suite / 909 test; `pnpm --filter api exec jest src/db --runInBand` 2 suite / 40 test (yeni tablo şeması tenant-izolasyon/bağlantı-güvenliği testlerini bozmadı). `./scripts/check.sh --skip-docker` PASS (exit 0) — API 53 suite / 1501 test, web 8 dosya / 117 test. **Ek olarak, kullanıcı onayıyla, break-glass geçici/izole bir yerel Postgres'e karşı gerçekten çalıştırıldı** (yukarıdaki smoke test paragrafı) — 15/15 senaryo geçti, gerçek paralel yarış dahil. Gerçek production DB/HTTP/MFA sağlayıcısı/production secret hiç kullanılmadı.
+
+### 14.12 Implementation sınırı — TASK-027.48 (2026-09-22)
+
+Q-DP22b/c (MFA policy + admin reset kararları) kullanıcı tarafından kapatıldı ve uygulandı —
+detaylar `docs/migration/METNEX_AUTHORIZATION_ENDPOINT_AUDIT_AND_MFA_POLICY_DECISION.md` §5.3/§6.1
+ve `docs/runbooks/MFA_ENFORCEMENT_ROUTE_MATRIX.md`'de.
+
+Bu paketin daha önce açık bıraktığı iki nokta netleşti:
+
+- **Satır 199 ("sistem yöneticisi impersonate edilemez", Q-DP22c) hâlâ karara bağlanmadı** —
+  TASK-027.48 bunu değiştirmedi. Impersonation'ın kendisi hâlâ mümkün
+  (`AuthService.issueImpersonationAccessToken` değişmedi); yalnızca *privilege işlemleri*
+  (027.46'dan beri) ve şimdi *MFA admin reset'in `mfaVerified` şartı* impersonation oturumlarında
+  zaten reddediliyordu — bu task yeni bir impersonation kısıtı eklemedi, yalnızca admin reset'e
+  aktörün kendi MFA doğrulama durumu şartını ekledi (§6.1 Q1).
+- **Satır 200 / 209 ("global privilege değişikliğinde MFA zorunluluğu"):** bu paket MFA
+  enforcement'ın *global privilege işlemlerine özel* bir şart olarak mı yoksa *tüm korumalı
+  route'larda genel* bir şart olarak mı devreye gireceğini açık bırakmıştı. Kullanıcı kararı
+  ikincisiydi: `MfaEnforcementGuard`, global privilege işlemleriyle sınırlı kalmadı, aşağıdaki
+  route matrisindeki tüm korumalı yüzeye uygulandı (bkz.
+  `docs/runbooks/MFA_ENFORCEMENT_ROUTE_MATRIX.md` §3). Bu, satır 200'ün "MFA ayrı karar ve geçiş
+  task'ından önce zorunlu yapılmaz" notunu karşılar — geçiş task'ı (027.48) tamamlandı, kilitlenme
+  riski web tarafında eksik olan MFA setup UI'ının aynı task'ta eklenmesiyle kapatıldı.
+
+Yeni izin kodu icat edilmedi; admin reset ve policy route'ları hâlâ geçici `isSystemAdmin` kuralını
+kullanıyor (kalıcı model Q-DP22a'da açık).

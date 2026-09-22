@@ -128,7 +128,7 @@ export default function RolesPage() {
       <PageIntro
         eyebrow="Platform"
         title="Roller"
-        description="Yerleşik roller önce, özel roller sonra gelecek şekilde sıralanır. Bu ekran openbm tarafındaki rol yönetimi mantığının iskelet sürümüdür."
+        description="Yerleşik roller önce, özel roller sonra gelecek şekilde sıralanır."
       />
 
       <section className="grid gap-4 md:grid-cols-3">

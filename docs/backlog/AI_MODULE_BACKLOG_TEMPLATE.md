@@ -1,4 +1,4 @@
-# Open Mas — AI Module Backlog Template
+# Metnex — AI Module Backlog Template
 
 **Status:** Planning Only
 

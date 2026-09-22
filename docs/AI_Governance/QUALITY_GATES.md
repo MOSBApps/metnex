@@ -144,13 +144,13 @@ See: `docs/README.md` for the full documentation map and category guidance.
 
 Before marking any task complete, AI1/AI2 must confirm all of the following
 (see `AGENT_BOOTSTRAP.md` Reporting Rule and
-`docs/runbooks/PROJECT_LIFECYCLE_AND_STATUS_RUNBOOK.md` §4, §6, §7):
+`docs/runbooks/METNEX_LIFECYCLE_AND_STATUS_RUNBOOK.md` §4, §6, §7):
 
 - [ ] The relevant `backlog/EPIC-*.md` (or Feature/Story/Task) `status` field
       is updated to one of `backlog | ready | in_progress | review | blocked | done`
 - [ ] That file's `srs_refs` frontmatter field is present and points back into
       the traceability chain (`F-xxx → FEAT-xxx → FR-xxx → BR-xxx → AC-xxx → TC-xxx`)
-- [ ] `docs/opendevcon/PROJECT_STATE.md` is updated (`stage`, `active_epics`,
+- [ ] `docs/opendevcon/METNEX_STATE.md` is updated (`stage`, `active_epics`,
       `blocked_epics`, `updated_at`, `updated_by`)
 - [ ] A new entry is appended to `docs/opendevcon/PROGRESS_LOG.md` (append-only
       — prior entries are never edited or removed)

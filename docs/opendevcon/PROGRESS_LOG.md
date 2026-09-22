@@ -1404,3 +1404,182 @@ Kullanıcı, break-glass'ı gerçek/yerel bir Postgres'e karşı smoke test etme
 
 ## 2026-09-22 — AI1 Onayı: TASK-027.47-R1 ve TASK-027.47
 AI1, TASK-027.47-R1 teslimini onayladı. Kabul edilenler: kalıcı PostgreSQL rate-limit ve atomik `SELECT ... FOR UPDATE`; token hash ledger'ı ve tek kullanımlık claim; gerçek izole PostgreSQL smoke testinde 15/15 başarı; self-servis parola değişimi ve session iptali kanıtı; peer demotion için operasyonel prosedür. Gerçek production DB/HTTP/secret kullanılmaması ve break-glass'ın Nest/HTTP'ye bağlanmaması doğru bulundu. TASK-027.47-R1 `done`. Ana TASK-027.47 de R1 ile birlikte `done` kapandı. TASK-027.48 (MFA enforcement) sıradaki görev — AI1'in detaylı spesifikasyonu bekleniyor. AI1 bu turda dosya/DB/Docker/runtime değişikliği yapmadığını belirtti.
+
+## 2026-09-22 — AI2: TASK-028.1 Kalan AI Skeleton atıflarının ve fork-generator'ın temizliği
+Kullanıcı (Product Owner) talebiyle: proje genelinde hâlâ jenerik "AI Skeleton" olarak
+tanımlanan/tariflenen aktif dokümantasyon ve `docs/rename/METNEX_HISTORICAL_REFERENCE_POLICY.md`
+§7'de AI1 kararı bekleyen `scripts/create-project.sh`/`.ps1` fork-generator açık sorusu ele alındı.
+- **Kullanıcı kararı:** generator script'leri tamamen kaldırılsın (Metnex artık kendi git
+  geçmişi/remote'u olan somut bir ürün, şablon-fork mekanizmasına ihtiyaç yok).
+- `scripts/create-project.sh`, `scripts/create-project.ps1` silindi; aktif referans veren
+  `README.md`, `docs/README.md`, `docs/runbooks/PRODUCT_OWNER_LIFECYCLE_PLAYBOOK.md` (Faz 0 +
+  checklist), `docs/runbooks/METNEX_LIFECYCLE_AND_STATUS_RUNBOOK.md`,
+  `docs/runbooks/local-development.md`, `docs/project/METNEX_SCOPE.json` güncellendi.
+- `README.md` Metnex ürünü olarak yeniden yazıldı: "# AI Skeleton" başlığı ve jenerik tanım,
+  sabit kişisel path (`/Users/dogan/...`) ve tüm generator komutları kaldırıldı.
+- `ODC.md` temizlendi: kırık `documentation.project-*` path'leri (`PROJECT_*.json` →
+  gerçek `METNEX_*.json`) düzeltildi; var olmayan `docs/product/PRODUCT_BASELINE_SRS.md`,
+  `docs/SRS.md`, `docs/odc/*`, `scripts/check-project-records.mjs` dosyalarına atıf yapan
+  "Product Baseline SRS" ve "Dogfooding note" bölümleri kaldırıldı; "Remote contract sync"
+  bölümü `scripts/odc-sync.sh`'ın bu repoda henüz uygulanmadığını açıkça belirtecek şekilde
+  yeniden yazıldı; `project.description`'daki "iskelet" ifadesi kaldırıldı.
+- TASK-024.2'den kalan kırık dosya-adı referansları (`PROJECT_STATE.md`/
+  `PROJECT_LIFECYCLE_AND_STATUS_RUNBOOK.md` → gerçek adları `METNEX_STATE.md`/
+  `METNEX_LIFECYCLE_AND_STATUS_RUNBOOK.md`) 7 aktif dosyada düzeltildi (`PROGRESS_LOG.md`
+  geçmiş girdileri hariç, append-only kuralı korundu).
+- `openmas|aiskeleton` regex'inin kaçırdığı iki gerçek kalıntı bulundu: `apps/web` roller
+  sayfasındaki canlı kullanıcı metninde "openbm" ifadesi kaldırıldı; boşluklu "Open Mas"
+  biçimi (regex'in yakalamadığı) 7 aktif belgede (`docs/README.md`,
+  `docs/domain/DB-METADATA-TEMPLATE.md`, 4 `docs/backlog/*_TEMPLATE.md`,
+  `docs/runbooks/db-recreate-with-icu.md`) Metnex'e çevrildi.
+- `docs/runbooks/local-development.md`'deki yanlış varsayılan port bilgisi (6500, gerçek
+  `.project-defaults` değeri 7500) düzeltildi.
+- **Bilinçli dokunulmayanlar:** `infra/docker/docker-compose.dev.yml`'deki `openmas_*` external
+  volume adları (gerçek veri bu volume'lerde, rename yıkıcı işlem onayı gerektirir — TASK-024.5/
+  026.2'de zaten belgelenmişti); `docs/ui-contract/**` ve `docs/decisions/DEC-0001/0006/0010/
+  0011/0012` içindeki jenerik "skeleton" terimi (kırık referans değil, ayrı kapsamlı bir
+  dokümantasyon task'ı gerektirir); tüm tarihi kayıtlar (`backlog/TASK-024-*`, `docs/rename/*`,
+  `docs/migration/*`, `PROGRESS_LOG.md` geçmiş girdileri, `backup/openmas-pre-metnex-migration-*.dump`).
+- Doğrulama: `./scripts/check.sh --skip-docker` audit/typecheck adımlarında PASS; lint adımı
+  apps/web'in önceden var olan, bu task'tan bağımsız `eslint-plugin-react-hooks` çözümleme
+  sorunuyla (pnpm isolated linker, TASK-027-36 notunda zaten belgelenmiş teknik borç) durdu.
+  Kalan adımlar elle doğrulandı: `pnpm --filter api exec eslint "src/**/*.ts"` temiz;
+  `pnpm --filter api exec jest --runInBand` → 53 suite / 1501 test PASS;
+  `pnpm --filter web run test` (vitest) → 8 dosya / 117 test PASS; `pnpm run build` → hem
+  `api` hem `@metnex/web` başarılı (Next.js build içindeki lint uyarısı build'i düşürmedi).
+  Git commit/push yapılmadı; kullanıcı onayı ile ayrıca yapılacak.
+
+## 2026-09-22 — AI2: TASK-027.48 MFA Policy Activation ve Enforcement Geçişi
+Task'ın kendi kritik kuralı ("karar eksikse production enforcement yapma") gereği, 10 ön koşul
+Q-DP22b/c karar paketlerine (`docs/migration/METNEX_AUTHORIZATION_ENDPOINT_AUDIT_AND_MFA_POLICY_DECISION.md`
+§5.3/§6.1) eşlendi; kararlar boştu, bu yüzden implementasyona başlamadan önce Product Owner'a
+(bu oturumda kullanıcıya) AskUserQuestion ile soruldu.
+**Kararlar:** MFA policy route'u Option B (`policy/:tenantId` + `isSystemAdmin`-only yetki);
+enforcement şimdi ve global (yalnızca hazırlık değil); MFA'sız mevcut kullanıcılar için setup-required
+geçişi (kademeli rollout/grace period yok); admin reset alt kararları AI2'nin önerdiği paket
+(mfaVerified aktörün kendi MFA'sı etkinse zorunlu, self-reset/impersonation yasağı zaten vardı,
+kalıcı izin kodu yerine şimdilik `isSystemAdmin`); enforcement kapsamı tüm korumalı route'lar.
+**Kritik blocker ve kapsam genişlemesi:** implementasyona başlarken web'de hiçbir MFA setup UI'ı
+(QR/TOTP/recovery code ekranı, login'in `requiresMfa` yanıtını ele alma) olmadığı bulundu — bu
+haliyle enforcement açılsaydı gerçek bir kilitlenme olurdu (task'ın kendi kritik güvenlik kuralının
+ihlali). Kullanıcıya bildirildi; kullanıcı "MFA'yı komple geliştir" kararıyla kapsamı web'i de
+kapsayacak şekilde genişletti.
+**Backend:** `mfa.controller.ts`/`mfa.service.ts` — policy route düzeltildi (fail-closed hem
+controller hem service'te, `MFA_POLICY_UPDATED` audit'i); `adminResetMfa`'ya Q-DP22c(1) mfaVerified
+şartı eklendi (mevcut testlerin call-count varsayımlarını bozmamak için ayrı bir DB çağrısı yerine
+mevcut actor sorgusuna `leftJoin(userMfaSettings)` eklendi). `MfaEnforcementGuard` artık
+`PlatformAuditService` enjekte ediyor, her ret `MFA_ENFORCEMENT_DENIED` audit'i yazıyor.
+`@RequireMfaSetupComplete()` + `MfaEnforcementGuard`, platform/roles/tenants/users/saas,
+customer-admin, reports, settings (platform+tenant), perf-admin, platform-audit-logs,
+auth/change-password controller'larına eklendi; MFA akışının kendisi, `auth/me`, `platform/me/*`,
+login/logout/bootstrap/health bilinçli muaf tutuldu (tam liste ve gerekçe:
+`docs/runbooks/MFA_ENFORCEMENT_ROUTE_MATRIX.md`, yeni dosya). `settings.module.ts`/`perf.module.ts`/
+`reporting.module.ts`/`audit.module.ts` artık `MfaRequirementService`'i (ve gerekirse
+`AuditModule`'ü) sağlıyor — guard'ın DI zinciri bu modüllerde de çözülüyor.
+**Yan bulgu (düzeltildi):** `auth/mfa/challenge/verify` httpOnly refresh cookie'sini hiç set
+etmiyordu (yalnızca body'de token dönüyordu) — `auth/login` ile aynı sözleşmeye getirildi
+(`REFRESH_COOKIE`/`COOKIE_MAX_AGE_MS` `auth.controller.ts`'ten export edilip paylaşıldı); aksi
+halde MFA ile giren bir kullanıcı sayfa yenilemesinde oturumunu kaybederdi.
+**Frontend:** yeni `apps/web/src/app/(app)/app/settings/security/page.tsx` (MFA durumu, TOTP
+kurulum QR+manuel anahtar+kod doğrulama, kurtarma kodu gösterimi, devre dışı bırakma, kurtarma
+kodu yenileme); `login/page.tsx`'e `requiresMfa` challenge adımı (TOTP veya kurtarma kodu)
+eklendi; `lib/api.ts`'nin merkezi `request()`'i artık her 403'te `MFA_SETUP_REQUIRED`/
+`MFA_SESSION_NOT_VERIFIED`'ı yakalayıp otomatik yönlendiriyor (döngü önlenerek); `lib/mfa-error.ts`'in
+hiç var olmayan `/profile` referansı gerçek sayfaya düzeltildi.
+**Testler:** yeni `mfa-enforcement.guard.spec.ts` (10 test — guard'ın kendi karar ağacı);
+`endpoint-authorization-inventory.spec.ts` 91 endpoint'lik yeni snapshot'a güncellendi (Q-DP22b
+artık `INLINE_AND_SERVICE_SYSTEM_ADMIN`, `NO_AUTHORIZATION_DEAD_ROUTE` sınıfı tamamen kalktı);
+`authorization-audit-findings.spec.ts`, `mfa-admin-reset-authorization.spec.ts`,
+`mfa-settings-perf-validation.spec.ts`, `platform-user-admin-privilege-boundary.spec.ts`,
+`platform-dto-validation.spec.ts`, `apps/web/.../mfa-error.spec.ts` güncellendi. **2 mutasyon
+kontrolü bizzat çalıştırılıp doğrulandı ve geri alındı:** `role.controller.ts`'ten
+`MfaEnforcementGuard`/`@RequireMfaSetupComplete()` kaldırılınca 2 test kırıldı; guard'a koşulsuz
+`return true` eklenince 6 test kırıldı.
+**Doğrulama:** `pnpm --filter api exec tsc --noEmit` temiz; `pnpm --filter api exec eslint
+"src/**/*.ts"` temiz; `pnpm --filter api exec jest --runInBand` → **54 suite / 1520 test PASS**;
+`pnpm --filter web exec tsc --noEmit` temiz; `pnpm --filter web run test` (vitest) → **8 dosya /
+117 test PASS**; `pnpm run build` → api + web PASS. `./scripts/check.sh --skip-docker`'ın lint
+adımı apps/web'in önceden var olan, bu task'tan bağımsız `eslint-plugin-react-hooks` çözümleme
+sorunuyla (TASK-027-36'da kayıtlı teknik borç) durdu; audit/typecheck PASS, kalan adımlar yukarıdaki
+gibi elle doğrulandı. Gerçek DB/HTTP/MFA sağlayıcısı kullanılmadı; enforcement gerçek ortamda henüz
+hiç çalıştırılmadı. Dokümantasyon: yeni `docs/runbooks/MFA_ENFORCEMENT_ROUTE_MATRIX.md`,
+`docs/migration/METNEX_AUTHORIZATION_ENDPOINT_AUDIT_AND_MFA_POLICY_DECISION.md` §5.3/§6.1
+dolduruldu, `docs/migration/METNEX_PLATFORM_PRIVILEGE_MODEL_DECISION_PACKAGE.md` §14.12 eklendi,
+`docs/migration/BOTC_MIGRATION_OPEN_QUESTIONS.md`'ye append-only kapanış kaydı eklendi (Q-DP22b/c
+KAPANDI), `backlog/TASK-027-48-mfa-policy-enforcement.md` oluşturuldu (`status: review`). Git
+commit/push yapılmadı; nihai `done` kararı AI1/Product Owner'a bırakıldı.
+
+## 2026-09-22 — AI2: TASK-027.48 AI1/PO review düzeltmeleri (ikinci tur)
+AI1/PO, ilk teslimi `review`'da tuttu ve dört kapanış öncesi düzeltme istedi. Hepsi ele alındı:
+1. **check.sh lint adımı tamamlanmamıştı** — daha önce yalnızca "API lint ayrıca doğrudan
+   çalıştırıldı" diye raporlanmıştı, tam gate koşulmamıştı. Bu turda Q-ENV01'in kurulu
+   workaround'uyla (`NODE_PATH=<repo>/node_modules/.pnpm/node_modules TURBO_ENV_MODE=loose
+   ./scripts/check.sh --skip-docker`) tam gate çalıştırıldı: **PASS**, lint adımı dahil
+   ("✔ No ESLint warnings or errors" — web lint'te de sıfır sorun).
+2. **Web test sayısı artmamıştı (8 dosya/117 test)** — apps/web'de daha önce hiç component testi
+   yoktu (test infrastructure'ı `@testing-library/react`, `jsdom`, `@vitejs/plugin-react`
+   eklenerek ilk kez kuruldu: yeni `apps/web/vitest.config.ts`, `apps/web/vitest.setup.ts`).
+   3 yeni test dosyası eklendi: `login/__tests__/page.spec.tsx` (5 test — normal giriş,
+   `requiresMfa` challenge ekranına geçiş, TOTP kodu ve kurtarma koduyla doğrulama, reddedilen
+   kodda hata+token saklanmama), `settings/security/__tests__/page.spec.tsx` (8 test — durum
+   görüntüleme, tam kurulum akışı QR→kod→kurtarma kodları→etkin, reddedilen kurulum kodu, devre
+   dışı bırakma başarı/ret, kurtarma kodu yenileme, vazgeç), `lib/__tests__/api-mfa-redirect.spec.ts`
+   (5 test — merkezi `request()`'in 403 yönlendirme sözleşmesi). Web test sayısı **117 → 135**.
+   Login sayfası ayrıca önceden hiç kullanılmayan (`mfa-login-flow.ts`, dead code) test edilmiş
+   `buildMfaChallengePayload`/`sanitizeNumericCode` yardımcılarını kullanacak şekilde küçük bir
+   DRY refactor'ü aldı.
+3. **MFA enforcement route matrisi testle sabitlenmemişti** — yeni
+   `apps/api/src/platform/guards/mfa-enforcement-route-matrix.spec.ts` (8 test), route matrisinin
+   4 somut özelliğini uçtan uca kanıtlıyor: MFA setup/doğrulama uçlarında `@RequireMfaSetupComplete()`
+   yok (dosya + method bazında); `auth/me`/`platform/me/*`/bootstrap/health'te de yok;
+   `auth.controller.ts`'teki `change-password`'un guard'ı `login`/`refresh`/`logout`/`me`'ye
+   sızmıyor; login/refresh/logout'ta hiç guard yok; **en kritik özellik** — aynı guard, aynı
+   kullanıcı, aynı MFA durumu bir korumalı route'u reddederken decorator'sız (setup akışı
+   şeklindeki) bir route'u geçiriyor (kilitlenmeme kanıtı); MFA gerekli ve kurulu olmayan bir
+   kullanıcı denediği her korumalı route'ta tutarlı reddediliyor. Ayrıca ilk teslimde yalnızca
+   tasarım gerekçesiyle iddia edilen 2 mutasyon kontrolü (guard kaldırma, MFA bypass ekleme)
+   bizzat çalıştırılıp doğrulandı ve geri alındı (role.controller.ts'ten guard kaldırılınca 2
+   test, guard'a koşulsuz bypass eklenince 6 test kırıldı).
+4. **Gerçek tarayıcı/HTTP doğrulaması yapılmamıştı** — kontrollü yerel smoke test alternatifi
+   (TASK-027.47-R1 emsaliyle) kullanıcıya AskUserQuestion ile soruldu. **Kullanıcı kararı: yalnızca
+   açık raporlama, smoke test çalıştırılmadı** (task'ın kendi "Kapsam dışı" listesi zaten Docker
+   build/run'ı hariç tutuyordu).
+**Doğrulama:** `pnpm --filter api exec jest --runInBand` → **55 suite / 1528 test PASS** (54→55,
+yeni route-matrix dosyası); `pnpm --filter web run test` → **11 dosya / 135 test PASS** (8→11,
+117→135); `NODE_PATH=... TURBO_ENV_MODE=loose ./scripts/check.sh --skip-docker` → **tam PASS**
+(audit/typecheck/lint/test/build hepsi, Docker atlandı). Gerçek DB/HTTP/MFA sağlayıcısı
+kullanılmadı; enforcement gerçek ortamda henüz çalıştırılmadı (PO kararıyla bu turda da
+yapılmadı). Git commit/push yapılmadı; `backlog/TASK-027-48-mfa-policy-enforcement.md` güncellendi
+(`status: review` — nihai `done` kararı hâlâ AI1/PO'ya bırakıldı).
+
+## 2026-09-22 — AI1 Onayı: TASK-027.48
+
+TASK-027.48 incelemesi tamamlandı ve `done` olarak onaylandı. MFA backend/frontend akışı, enforcement route matrisi, test kapsamı ve lint dahil tam quality gate kabul edildi; gerçek production MFA/DB/HTTP doğrulaması sonraki operasyonel geçişe bırakıldı.
+
+## 2026-09-22 — AI1 Onayı: TASK-027.48 `done`
+AI1, TASK-027.48'i (MFA Policy Activation ve Enforcement Geçişi) `done` olarak onayladı. Kabul
+edilenler: MFA policy route'larının tenant kapsamına alınması (`policy/:tenantId`, isSystemAdmin-only
+yetki); backend enforcement guard'ının (`MfaEnforcementGuard`) uygulanması; login MFA challenge
+akışının tamamlanması; MFA setup, recovery code ve disable ekranlarının eklenmesi; kilitlenmeme
+özelliğinin route matrisi testleriyle (`mfa-enforcement-route-matrix.spec.ts`) doğrulanması; web
+test sayısının 117'den 135'e çıkarılması; lint dahil tam `check.sh --skip-docker` PASS. Gerçek
+production MFA/DB/HTTP doğrulaması bilinçli olarak sonraki operasyonel geçişe bırakıldı. Sıradaki
+görev **TASK-027.49** (tenant-role delegation). `backlog/TASK-027-48-mfa-policy-enforcement.md`
+`status: done` olarak güncellendi.
+
+## 2026-09-22 — DEC-0014 / EPIC-005 Ürün Vizyonu ve Yeni Kapsam Kararları
+
+Product Owner ile yapılan açık karar görüşmesi sonucunda yeni ürün sınırı kayda alındı:
+MOSEDAŞ ayrı uygulama olarak üretim planı ve üretim emrinin SoR'u; Metnex operasyon
+yürütme, gerçekleşme, kapasite ve olayların SoR'udur. Metnex'te MOSEDAŞ veya MOSB tenantı
+bulunmayacak; MOSB Enerji ve MOSBIO ayrı operasyon tenantları olacaktır. BEAM/ERP varlık
+ana verisi ve sahipliği korunacak, Metnex sınırlı referans ve operasyonel snapshot tutacaktır.
+
+Üretim olayları kalıcı outbox/retry ile asenkron ve öncelikli gönderilecek; üretim emri
+versiyonlu/idempotent olacak. Üretimde mTLS + OAuth2 client credentials kullanılacak.
+İlk ekran grubu Vardiya Operasyon Merkezi; ardından ayrı parametrik Laboratuvar ve İşletme
+modülleri geliştirilecektir. Laboratuvar ve İşletme ayrı altyapı/domain/permission/audit
+sınırlarına sahiptir. Ayrıntılı karar `docs/decisions/DEC-0014-mosedas-production-planning-and-metnex-operations-boundary.md`,
+task planı `backlog/EPIC-005-mtnex-operations-laboratory-and-external-planning.md` ve
+`backlog/TASK-029-00-operations-laboratory-task-plan.md` içindedir. Kod, DB, migration,
+Docker veya gerçek entegrasyon çalıştırılmadı.

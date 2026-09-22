@@ -122,6 +122,11 @@ export const tenantRoles = pgTable(
     description: text('description'),
     isActive: boolean('isActive').notNull().default(true),
     requiresMfa: boolean('requiresMfa').notNull().default(false),
+    // TASK-027.49 (Q-DP-tenant-role-delegation): marks a role as this tenant's "administrator"
+    // role for the last-tenant-admin floor invariant — the last ACTIVE assignment of an
+    // isAdminRole-flagged role in a tenant cannot be revoked (mirrors the last-system-admin
+    // invariant, scoped to tenant roles instead of the SYSTEM_ADMIN system role).
+    isAdminRole: boolean('isAdminRole').notNull().default(false),
     createdAt: timestamp('createdAt', { precision: 3 }).notNull().defaultNow(),
     updatedAt: timestamp('updatedAt', { precision: 3 })
       .notNull()

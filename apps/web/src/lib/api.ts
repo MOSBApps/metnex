@@ -1,6 +1,7 @@
 import { logout } from './auth'
 import { getApiBase } from './api-base'
 import { endImpersonation, isImpersonating } from './impersonation'
+import { getMfaErrorGuidance } from './mfa-error'
 import { coordinatedRefresh } from './refresh'
 import { getActiveTenantId } from './tenant-context'
 
@@ -65,7 +66,12 @@ async function request<T>(
 
   if (!res.ok) {
     const data = (await res.json().catch(() => ({}))) as Record<string, unknown>
-    throw new ApiError(errorMessage(data, res.status), res.status, data)
+    const error = new ApiError(errorMessage(data, res.status), res.status, data)
+    const mfaGuidance = getMfaErrorGuidance(error)
+    if (mfaGuidance && typeof window !== 'undefined' && window.location.pathname !== mfaGuidance.ctaHref) {
+      window.location.href = mfaGuidance.ctaHref
+    }
+    throw error
   }
 
   if (res.status === 204) return undefined as T

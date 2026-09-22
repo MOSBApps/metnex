@@ -107,21 +107,21 @@ describe('MFA bodies are validated at the controller before any MFA/DB/audit wor
     { challengeToken: 't', recoveryCode: NOSQL }, { challengeToken: 't', recoveryCode: ['ABCD-EF23'] }, { challengeToken: 't', recoveryCode: RECOVERY, code: NOSQL },
   ])('challenge/verify rejects %j', async body => {
     const { controller, service } = mfa()
-    await rejects(() => controller.verifyChallenge(body as never))
+    await rejects(() => controller.verifyChallenge(body as never, undefined as never))
     noMfaCalls(service)
   })
-  it.each([undefined, null, 'true', 1, 0, NOSQL, ['true']])('policy rejects mfaRequired %j', async mfaRequired => {
+  it.each([undefined, null, 'true', 1, 0, NOSQL, ['true']])('policy rejects mfaRequired %j (system administrator, valid tenant id)', async mfaRequired => {
     const { controller, service } = mfa()
-    await rejects(() => controller.setPolicy(uid, undefined as never, { mfaRequired } as never))
+    await rejects(() => controller.setPolicy(sysadmin, 'tenant-1', { mfaRequired } as never))
     noMfaCalls(service)
   })
   it.each(BAD_BODIES)('every MFA body endpoint rejects the non-object body %j', async body => {
     const { controller, service } = mfa()
     await rejects(() => controller.verifySetup(uid, body as never))
     await rejects(() => controller.disableTotp(uid, body as never))
-    await rejects(() => controller.verifyChallenge(body as never))
+    await rejects(() => controller.verifyChallenge(body as never, undefined as never))
     await rejects(() => controller.regenerateRecoveryCodes(uid, body as never))
-    await rejects(() => controller.setPolicy(uid, undefined as never, body as never))
+    await rejects(() => controller.setPolicy(sysadmin, 'tenant-1', body as never))
     noMfaCalls(service)
   })
   it.each(['', 'a b', "x';--", 'u'.repeat(101), '../etc'])('admin reset rejects path id %j', async userId => {
@@ -129,10 +129,16 @@ describe('MFA bodies are validated at the controller before any MFA/DB/audit wor
     await rejects(() => controller.adminReset(userId, sysadmin))
     noMfaCalls(service)
   })
-  it.each(['a b', "x';--", 'u'.repeat(101)])('policy rejects tenant id %j', async tenantId => {
+  it.each(['a b', "x';--", 'u'.repeat(101)])('policy rejects tenant id %j (system administrator)', async tenantId => {
     const { controller, service } = mfa()
-    await rejects(() => controller.getPolicy(tenantId))
-    await rejects(() => controller.setPolicy(uid, tenantId, { mfaRequired: true }))
+    await rejects(() => controller.getPolicy(sysadmin, tenantId))
+    await rejects(() => controller.setPolicy(sysadmin, tenantId, { mfaRequired: true }))
+    noMfaCalls(service)
+  })
+  it.each(['', 'a b', "x';--", 'u'.repeat(101), '../etc'])('policy rejects non-system-administrator regardless of tenant id shape %j', async tenantId => {
+    const { controller, service } = mfa()
+    const forbidden = await controller.getPolicy(uid, tenantId).catch(e => e)
+    expect(forbidden).toBeInstanceOf(ForbiddenException)
     noMfaCalls(service)
   })
 
@@ -142,16 +148,17 @@ describe('MFA bodies are validated at the controller before any MFA/DB/audit wor
     expect(service.verifySetup).toHaveBeenCalledWith('user-1', null, CODE)
     await controller.disableTotp(uid, { password: 'pw', code: CODE })
     expect(service.disableTotp).toHaveBeenCalledWith('user-1', null, 'pw', CODE)
-    await controller.verifyChallenge({ challengeToken: 'tok', code: CODE })
+    const res = { cookie: jest.fn() }
+    await controller.verifyChallenge({ challengeToken: 'tok', code: CODE }, res as never)
     expect(service.verifyChallenge).toHaveBeenCalledWith('tok', { code: CODE, recoveryCode: undefined })
-    await controller.verifyChallenge({ challengeToken: 'tok', recoveryCode: RECOVERY })
+    await controller.verifyChallenge({ challengeToken: 'tok', recoveryCode: RECOVERY }, res as never)
     expect(service.verifyChallenge).toHaveBeenLastCalledWith('tok', { code: undefined, recoveryCode: RECOVERY })
     await controller.regenerateRecoveryCodes(uid, { code: CODE })
     expect(service.regenerateRecoveryCodes).toHaveBeenCalledWith('user-1', null, CODE)
     await controller.adminReset('target-1', sysadmin)
-    expect(service.adminResetMfa).toHaveBeenCalledWith('admin-1', null, 'target-1', { impersonation: false, impersonatorUserId: null })
-    await expect(controller.setPolicy(uid, undefined as never, { mfaRequired: true })).resolves.toEqual({ mfaRequired: false })
-    expect(service.setTenantPolicy).not.toHaveBeenCalled() // pre-existing: no :tenantId in the route (see report)
+    expect(service.adminResetMfa).toHaveBeenCalledWith('admin-1', null, 'target-1', { impersonation: false, impersonatorUserId: null, actorMfaVerified: false })
+    await expect(controller.setPolicy(sysadmin, 'tenant-1', { mfaRequired: true })).resolves.toEqual({ mfaRequired: true })
+    expect(service.setTenantPolicy).toHaveBeenCalledWith('admin-1', 'tenant-1', true) // Q-DP22b Option B: the route is now real
   })
 
   it('errors never contain the OTP, recovery code, token or password that was sent', async () => {
@@ -159,7 +166,7 @@ describe('MFA bodies are validated at the controller before any MFA/DB/audit wor
     const errors = [
       await rejects(() => controller.verifySetup(uid, { code: `${LEAK}` } as never)),
       await rejects(() => controller.disableTotp(uid, { password: NOSQL, code: LEAK } as never)),
-      await rejects(() => controller.verifyChallenge({ challengeToken: NOSQL, code: LEAK, recoveryCode: `${LEAK}-x` } as never)),
+      await rejects(() => controller.verifyChallenge({ challengeToken: NOSQL, code: LEAK, recoveryCode: `${LEAK}-x` } as never, undefined as never)),
     ]
     for (const error of errors) expect(JSON.stringify(error.getResponse())).not.toMatch(/Leaky|Marker/)
   })
@@ -279,7 +286,7 @@ describe('X-Tenant-Id header on tenant settings', () => {
   it('the guard runs after authentication and before every database-backed guard on both tenant settings controllers', () => {
     for (const file of ['tenant-settings-smtp.controller.ts', 'tenant-settings-ai.controller.ts']) {
       const source = readFileSync(join(__dirname, '..', 'settings', file), 'utf8')
-      expect(source).toContain('@UseGuards(JwtAuthGuard, TenantHeaderFormatGuard, TenantMembershipGuard, PermissionGuard)')
+      expect(source).toContain('@UseGuards(JwtAuthGuard, TenantHeaderFormatGuard, TenantMembershipGuard, PermissionGuard, MfaEnforcementGuard)')
     }
   })
 

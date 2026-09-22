@@ -309,7 +309,7 @@ minio console=base+5
 jasper renderer=base+6
 ```
 
-Bu skeleton repo icin varsayilan baslangic `6500`'dur. Yeni projeler farkli bir blok secmelidir.
+Bu repo icin varsayilan baslangic `7500`'dur (`.project-defaults`).
 
 ## 9. Uretilen Local Dosyalar
 
@@ -329,7 +329,6 @@ Bu dosyalar commit edilmez. Sablon icin `infra/docker/.env.example` kullanilir.
 
 | Script | Amac | macOS native | Linux native | Windows WSL2 Debian | Windows native PowerShell/CMD |
 | --- | --- | --- | --- | --- | --- |
-| `scripts/create-project.sh` | Yeni proje uretme | Evet | Evet | Evet | Hayir |
 | `dev.sh` | Local infra/env bootstrap | Evet | Evet | Evet | Hayir |
 | `scripts/setup-hooks.sh` | Git hook kurulum | Evet | Evet | Evet | Hayir |
 | `scripts/check.sh` | Quality gate | Evet | Evet | Evet | Hayir |

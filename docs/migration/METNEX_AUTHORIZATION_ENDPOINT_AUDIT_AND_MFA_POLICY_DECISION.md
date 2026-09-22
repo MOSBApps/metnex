@@ -208,12 +208,16 @@ Sütunlar: kimlik doğrulama · permission · tenant/root kapsamı · servis-iç
 
 **AI2 önerisi (özet):** bugün **A**'da kal (davranış değiştirme, route'ları erişilebilir kılma); yetki tasarımı (Q-DP22a) ve "politika gerçekten uygulanacak mı?" (enforcement wiring) kararları verilince **D (veya B)** ile ayrı görevde uygula: önce authorization + tenant kapsamı + audit, **sonra** enforcement. Politika istenmiyorsa **C**. Karar verilmeden route'ları erişilebilir kılmak yetkisiz politika yazımını açacağından **önerilmez**.
 
-### 5.3 AI1/PO karar alanı (BOŞ)
-- Seçim (A/B/C/D): ______
-- Yetki modeli (izin kodu / sysadmin-only / customer-root TENANT_ADMIN): ______
-- Enforcement (`MfaEnforcementGuard` hangi endpoint'lere; login davranışı): ______
-- Audit gereksinimi: ______
-- Zamanlama/görev numarası: ______
+### 5.3 AI1/PO karar alanı (KAPANDI — TASK-027.48, 2026-09-22)
+- Seçim (A/B/C/D): **B** — route `policy/:tenantId` olarak düzeltildi, gerçek yetki eklendi.
+- Yetki modeli: **sysadmin-only** (yeni izin kodu uydurulmadı; Q-DP22a kalıcı model kararına kadar geçici).
+- Enforcement: `MfaEnforcementGuard` + `@RequireMfaSetupComplete()`, korumalı route'ların büyük
+  çoğunluğuna (bkz. `docs/runbooks/MFA_ENFORCEMENT_ROUTE_MATRIX.md`) uygulandı; login davranışı
+  değişmedi (login hâlâ yalnızca kullanıcının kendi MFA'sına bakar), enforcement giriş SONRASI
+  erişimi kapsar.
+- Audit gereksinimi: `MFA_POLICY_UPDATED` (policy değişikliği, actor+tenant+eski/yeni bayrak) ve
+  `MFA_ENFORCEMENT_DENIED` (her ret, best-effort) eklendi.
+- Zamanlama/görev numarası: TASK-027.48.
 
 ## 6. MFA admin reset karar paketi (Q-DP22c)
 
@@ -230,15 +234,26 @@ Bugünkü durum (TASK-027.40-R1, kabul edildi): yalnızca **ACTIVE sistem yönet
 
 Ek riskler: F4 ile aynı kural ailesi (hedef sysadmin ise actor sysadmin); admin reset'in kendi audit'i var, ancak F6 ile diğer yönetsel işlemlerin yok.
 
-### 6.1 AI1/PO karar alanı (BOŞ)
-- Q1 `mfaVerified`: ______ · Q2 self-reset: ______ · Q3 impersonation: ______ · Q4 tenant-admin reset: ______ · Q5 permission kodu: ______ · Q6 geçici sınır süresi: ______
+### 6.1 AI1/PO karar alanı (KAPANDI — TASK-027.48, 2026-09-22)
+- Q1 `mfaVerified`: **(c)** aktörün kendi MFA'sı etkinse zorunlu; etkin değilse geçici izin + audit
+  uyarısı (`actorMfaBypassWarning: 'ACTOR_HAS_NO_MFA_ENABLED'`).
+- Q2 self-reset: **(b)** yasak — zaten TASK-027.47'den beri `SELF_CHANGE` reddiyle korunuyordu,
+  bu task'ta değişmedi (yalnızca teyit edildi).
+- Q3 impersonation: **(b)** yasak — zaten TASK-027.46'dan beri `IMPERSONATION` reddiyle
+  korunuyordu, bu task'ta değişmedi (yalnızca teyit edildi).
+- Q4 tenant-admin reset: **(a) şimdilik hayır** — yalnızca sysadmin.
+- Q5 permission kodu: **(c) şimdilik sysadmin-only kalır** — Q-DP22a kalıcı model kararına kadar.
+- Q6 geçici sınır süresi: **(b)** Q-DP22a kararı verilene/uygulanana kadar korunur.
 
 ## 7. Doğrulama ve sınırlar
 - Yeni testler: `endpoint-authorization-inventory.spec.ts` (11 test; 90 endpoint snapshot + yapısal kurallar), `authorization-audit-findings.spec.ts` (16 test; F1–F4 karakterizasyonu, MFA policy no-op, R1 kontrollerinin korunması, yetkisiz endpoint'lerde servis/DB/audit çağrısı olmaması).
 - **Karakterizasyon testleri bugünkü açık davranışı sabitler**; remediation görevi bunları tersine çevirecek/silecektir. Bunlar hiçbir davranış değiştirmez.
 - Gerçek HTTP/DB/MFA sağlayıcısı kullanılmadı; bulgular mock'lu servis testleri ve kod okumasıyla kanıtlıdır — gerçek ortamda yeniden üretme yapılmadı.
 - `./scripts/check.sh --skip-docker` sonucu ve Q-ENV01 workaround'u backlog teslim raporundadır.
-- Bu belge Q-DP22b/c'yi **kapatmaz**.
+- Bu belge Q-DP22b/c'yi **kapatmaz** (denetim anındaki durum).
+  > **Güncelleme (TASK-027.48, 2026-09-22):** Q-DP22b ve Q-DP22c, §5.3/§6.1'deki kararlarla
+  > kapatıldı ve uygulandı. Uygulama detayları ve route matrisi:
+  > `docs/runbooks/MFA_ENFORCEMENT_ROUTE_MATRIX.md`.
 
 ## 8. R1 remediation güncellemesi (TASK-027.41-R1, 2026-09-21)
 

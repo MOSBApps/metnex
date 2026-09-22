@@ -1,7 +1,7 @@
 ---
 stage: development
-updated_at: 2026-09-17
-updated_by: Product Governance Agent (AI1)
+updated_at: 2026-09-22
+updated_by: Engineering Executor (AI2)
 active_epics: [EPIC-001, EPIC-002, EPIC-003]
 blocked_epics: []
 last_release: v1.0.0
@@ -873,11 +873,81 @@ notes: >
   kalmıştır. ./scripts/check.sh --skip-docker PASS (kod değişikliği yok).
   TASK-027.12'nin implementation'ı AI1'in bu R1'i onaylamasından sonra
   başlatılabilir.
+  TASK-028.1 (bkz. backlog/TASK-028-1-metnex-skeleton-framing-and-generator-cleanup.md,
+  status: done, parent_epic: EPIC-003): Product Owner kararıyla
+  scripts/create-project.sh/.ps1 fork-generator script'leri kaldırıldı (Metnex
+  artık şablon değil, somut ürün). README.md yeniden yazıldı (jenerik "AI
+  Skeleton" tanımı, sabit kişisel path, generator komutları kaldırıldı).
+  ODC.md temizlendi: kırık documentation.project-* path'leri (PROJECT_*.json
+  → METNEX_*.json) düzeltildi, var olmayan dosyalara atıf yapan "Product
+  Baseline SRS" ve "Dogfooding note" bölümleri kaldırıldı, "Remote contract
+  sync" bölümü scripts/odc-sync.sh'ın henüz uygulanmadığını açıkça belirtecek
+  şekilde yeniden yazıldı. TASK-024.2'den kalan kırık dosya-adı referansları
+  (PROJECT_STATE.md/PROJECT_LIFECYCLE_AND_STATUS_RUNBOOK.md → gerçek adları
+  METNEX_STATE.md/METNEX_LIFECYCLE_AND_STATUS_RUNBOOK.md) 7 aktif dokümanda
+  düzeltildi (PROGRESS_LOG.md geçmiş girdileri hariç, append-only).
+  openmas/aiskeleton regex'inin kaçırdığı iki kalıntı bulundu ve düzeltildi:
+  apps/web roles sayfasında canlı kullanıcı metninde "openbm" kalıntısı; ve
+  boşluklu "Open Mas" biçimi 7 aktif dokümanda. ./scripts/check.sh
+  --skip-docker lint adımında apps/web'in önceden var olan, bu task'tan
+  bağımsız eslint-plugin-react-hooks çözümleme sorunu (pnpm isolated linker,
+  bkz. TASK-027-36 notu) nedeniyle durdu; audit/typecheck/api-lint/test
+  (api 53 suite 1501 test + web 8 suite 117 test)/build adımları elle
+  doğrulandı ve PASS.
+  TASK-027.48 (bkz. backlog/TASK-027-48-mfa-policy-enforcement.md, status: review,
+  parent_epic: EPIC-004): Q-DP22b/c karar paketleri kullanıcıdan AskUserQuestion ile
+  alındı (karar eksikken production enforcement yapılmadı — task'ın kendi kuralı).
+  MFA policy route'u policy/:tenantId olarak düzeltildi (isSystemAdmin-only, fail-closed
+  hem controller hem service'te). Admin MFA reset'e Q-DP22c(1) mfaVerified şartı eklendi
+  (aktörün kendi MFA'sı etkinse zorunlu, değilse geçici izin + audit uyarısı).
+  MfaEnforcementGuard + @RequireMfaSetupComplete() kullanıcı kararıyla korumalı
+  route'ların büyük çoğunluğuna (platform/roles/tenants/users/saas, customer-admin,
+  reports, settings, perf, audit-logs, change-password) global olarak bağlandı — MFA
+  akışının kendisi, auth/me, platform/me/* ve login/logout bilinçli muaf. Implementasyon
+  sırasında web'de hiç MFA setup UI'ı olmadığı (kilitlenme riski) bulundu; kullanıcı
+  kararıyla kapsam genişletildi: apps/web'e MFA setup/disable/recovery-code sayfası
+  (app/settings/security) ve login'in MFA challenge adımı eklendi, api.ts merkezi
+  403 MFA_SETUP_REQUIRED/MFA_SESSION_NOT_VERIFIED yakalayıp yönlendiriyor. Yan bulgu:
+  auth/mfa/challenge/verify httpOnly refresh cookie'sini hiç set etmiyordu (login ile
+  aynı sözleşmeye getirildi). Yeni mfa-enforcement.guard.spec.ts (10 test) + 91
+  endpoint'lik güncellenmiş authorization snapshot + 5 mutasyon kontrolü (ikisi bizzat
+  çalıştırılıp doğrulandı: guard kaldırılınca 2 test, guard'a koşulsuz bypass eklenince
+  6 test kırıldı, sonra geri alındı). pnpm --filter api exec jest --runInBand → 54
+  suite / 1520 test PASS; api eslint temiz; web tsc temiz; web vitest 8/117 PASS;
+  pnpm run build (api+web) PASS. check.sh'in lint adımı yine apps/web'in önceden var
+  olan eslint-plugin-react-hooks sorunuyla durdu (bu task'tan bağımsız, kayıtlı teknik
+  borç). Git commit/push yapılmadı; nihai done kararı AI1/PO'ya bırakıldı.
+  AI1/PO, TASK-027.48'i review'da tuttu ve 4 kapanış öncesi düzeltme istedi. Hepsi
+  ele alındı: (1) check.sh'in lint adımı Q-ENV01 workaround'uyla (NODE_PATH +
+  TURBO_ENV_MODE=loose) tam koşuldu, PASS (lint dahil, "No ESLint warnings or
+  errors"). (2) Web test sayısı 117'den 135'e çıkarıldı (18 yeni test, 3 yeni
+  dosya: login MFA challenge, security sayfası kurulum/devre dışı/kurtarma kodu
+  akışları, api.ts merkezi 403 yönlendirmesi) — bunun için apps/web'e ilk kez
+  @testing-library/react + jsdom + @vitejs/plugin-react eklendi (yeni
+  vitest.config.ts/vitest.setup.ts). (3) Yeni
+  mfa-enforcement-route-matrix.spec.ts (8 test) route matrisinin "kilitlenme
+  yok" iddiasını uçtan uca kanıtlıyor: aynı guard+kullanıcı+durum korumalı bir
+  route'u reddederken setup akışını geçiriyor. Kalan 3 mutasyon kontrolü de
+  bizzat çalıştırılıp doğrulandı (toplam artık hepsi doğrulanmış). (4) Gerçek
+  tarayıcı/HTTP doğrulaması için kontrollü yerel smoke test alternatifi
+  soruldu; PO kararı: yalnızca açık raporlama, smoke test çalıştırılmadı.
+  Sonuç: pnpm --filter api exec jest --runInBand → 55 suite / 1528 test PASS;
+  web vitest 11 dosya / 135 test PASS; NODE_PATH+TURBO_ENV_MODE=loose
+  ./scripts/check.sh --skip-docker → tam PASS (lint dahil). Git commit/push
+  yapılmadı; nihai done kararı hâlâ AI1/PO'ya bırakıldı.
+  AI1, TASK-027.48'i `done` olarak onayladı (2026-09-22). Kabul edilenler: MFA
+  policy route'larının tenant kapsamına alınması, backend enforcement
+  guard'ının uygulanması, login MFA challenge akışının tamamlanması, MFA
+  setup/recovery-code/disable ekranlarının eklenmesi, kilitlenmeme özelliğinin
+  route matrisi testleriyle doğrulanması, web test sayısının 117'den 135'e
+  çıkarılması, lint dahil tam check.sh --skip-docker PASS. Gerçek production
+  MFA/DB/HTTP doğrulaması bilinçli olarak sonraki operasyonel geçişe
+  bırakıldı. Sıradaki görev: TASK-027.49 (tenant-role delegation).
 ---
 
 Bu dosya tek kaynak özet durumdur. Detay/kanıt kaynağı `backlog/EPIC-*.md`
 dosyalarıdır; çelişki halinde EPIC dosyaları esas alınır ve bu dosya
-düzeltilir. Süreç: `../runbooks/PROJECT_LIFECYCLE_AND_STATUS_RUNBOOK.md`.
+düzeltilir. Süreç: `../runbooks/METNEX_LIFECYCLE_AND_STATUS_RUNBOOK.md`.
 
 ## 2026-09-17 — TASK-027.12-R1 AI1 Onayı
 
@@ -1811,6 +1881,10 @@ AI1'in dört kapanış engelini ele aldı. **Kod tarafında kapatılanlar:** (1)
 **Doğrulama:** `system-admin-credential-rotation-and-break-glass.spec.ts` 36 → 56 test. **5 mutasyon kontrolü** manuel çalıştırıldı, dosyalar geri yüklendi: tek-kullanım kontrolü kaldırılınca 2, hız sınırlama kısa-devre edilince 17, audit'e yeni parola sızdırılınca 1, break-glass oturum iptali kaldırılınca 1 test kırıldı. `pnpm --filter api exec tsc --noEmit` temiz; `pnpm --filter api exec jest platform --runInBand` 16 suite / 909 test; `pnpm --filter api exec jest src/db --runInBand` 2 suite / 40 test; **`./scripts/check.sh --skip-docker` PASS (exit 0)** — API **53 suite / 1501 test**, web 8 dosya / 117 test. Migration: `apps/api/drizzle/migrations/0003_break_glass_hardening.sql` (drizzle-kit `generate` ile, canlı DB'ye bağlanmadan, yalnızca şema-snapshot diff'i üzerinden üretildi). Gerçek production DB/HTTP/MFA sağlayıcısı/production secret hiç kullanılmadı.
 **Sıradaki:** TASK-027.48 (MFA enforcement), TASK-027.49 (tenant-rol delegasyonu). Backlog `TASK-027-47-R1-break-glass-security-hardening.md` oluşturuldu, `status: review`. Nihai `done` AI1'de.
 
+## 2026-09-22 — AI1 Onayı: TASK-027.48
+
+TASK-027.48 `done` olarak onaylandı. MFA policy route'ları, enforcement guard'ı, login challenge, setup/recovery ekranları ve kilitlenmeme route matrisi tamamlandı; lint dahil tam quality gate ve web testleri geçti. Gerçek production MFA/DB/HTTP doğrulaması sonraki operasyonel geçişe bırakıldı. Sıradaki implementation taskı TASK-027.49 tenant-role delegation'dır.
+
 ## 2026-09-22 — AI1 Onayı: TASK-027.47-R1 ve TASK-027.47 birlikte `done`
 
 AI1, TASK-027.47-R1 teslimini onayladı: kalıcı PostgreSQL rate-limit (atomik `SELECT ... FOR UPDATE`), token hash ledger'ı ve tek kullanımlık claim, gerçek izole PostgreSQL smoke testinde 15/15 başarı, self-servis parola değişimi/session iptali kanıtı ve peer demotion operasyonel prosedürü kabul edildi; gerçek production DB/HTTP/secret kullanılmaması ve break-glass'ın Nest/HTTP'ye bağlanmaması doğrulandı. **TASK-027.47-R1 `done`; ana TASK-027.47 de R1 ile birlikte `done` kapandı.** Backlog: `TASK-027-47-R1-break-glass-security-hardening.md` ve `TASK-027-47-second-source-comparison.md` (TASK-027.47) her ikisi `review` → `done`. AI1, dosya/DB/Docker/runtime değişikliği yapmadığını belirtti. **Sıradaki görev: TASK-027.48 (MFA enforcement)** — AI1'in detaylı spesifikasyonu bekleniyor.
@@ -1827,3 +1901,17 @@ Bu not şu an implementation kapsamı değildir; domain keşfi, veri sözleşmes
 ## Marka Anlamı — Metnex
 
 `Metnex`, **Metis** ve **Nexus** isimlerinin birleşimidir. Metis; bilgi, akıl ve analizi, Nexus ise bağlantı, merkez ve entegrasyonu temsil eder. Ürün adı; Metnex'in SCADA, DMS, laboratuvar, işletme ve raporlama verilerini analiz eden ve farklı işletme sistemlerini ortak bir merkezde birleştiren platform vizyonunu ifade eder.
+
+## 2026-09-22 — DEC-0014 ve EPIC-005 Ürün Sınırı Onayı
+
+AI0 ürün vizyonu değerlendirmesi ve Product Owner ile yapılan karar görüşmesi sonucunda
+üretim planlama SoR'unun ayrı MOSEDAŞ uygulaması olduğu, Metnex'in ise operasyon yürütme,
+gerçekleşme, kapasite ve olay geri bildirimi SoR'u olduğu kesinleştirildi. MOSEDAŞ ve MOSB
+Metnex operasyon tenantı değildir; MOSB Enerji ve MOSBIO ayrı operasyon tenantlarıdır.
+Varlık sahipliği BEAM/ERP'de kalır; Metnex sınırlı tesis/makine referansı ve operasyonel
+kapasite snapshot'ı kullanır.
+
+DEC-0014 bu sınırı ve mTLS + OAuth2 B2B entegrasyon kararını kayda alır. İlk ürün sırası:
+Vardiya Operasyon Merkezi ekranları, parametrik ve ayrı Laboratuvar modülü, ardından ayrı
+İşletme modülüdür. Yeni iş planı `EPIC-005` ve `TASK-029.00` altında planned olarak
+oluşturuldu; implementation task'ları henüz ready değildir.
