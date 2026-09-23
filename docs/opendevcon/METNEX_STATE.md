@@ -1,6 +1,6 @@
 ---
 stage: development
-updated_at: 2026-09-22
+updated_at: 2026-09-23
 updated_by: Engineering Executor (AI2)
 active_epics: [EPIC-001, EPIC-002, EPIC-003]
 blocked_epics: []
@@ -943,6 +943,50 @@ notes: >
   çıkarılması, lint dahil tam check.sh --skip-docker PASS. Gerçek production
   MFA/DB/HTTP doğrulaması bilinçli olarak sonraki operasyonel geçişe
   bırakıldı. Sıradaki görev: TASK-027.49 (tenant-role delegation).
+  TASK-027.49 (bkz. backlog/TASK-027-49-tenant-role-delegation.md, status: review,
+  parent_epic: EPIC-004): zorunlu başlangıç kapısı gereği permission katalogu
+  incelendi, onaylı bir TENANT:ROLE:* kodu olmadığı doğrulandı, kod uydurulmadan
+  10 karar sorusu Product Owner'a soruldu. Kararlar: yeni TENANT:ROLE:VIEW/
+  ASSIGN/REVOKE kodları; atama yetkisi o customer root'un TENANT_ADMIN'i +
+  sistem yöneticisi; kendine atama izinli (ceiling sınırlı); yalnızca root
+  düzeyi kapsam; son tenant yöneticisi koruması gerekli (yeni
+  tenant_roles.isAdminRole kolonu, migration 0004). Yeni tenant-role.
+  {controller,service}.ts + domain/tenant-role-ceiling.domain.ts
+  (SYSTEM_ADMIN/TENANT_ADMIN ceiling modeli değiştirilmedi, ayrı pure
+  fonksiyon); CustomerAccessService.assertCustomerAdminScope yeniden
+  kullanıldı. Bilinçli kapsam dışı: tenant rolü oluşturma/düzenleme endpoint'i
+  ve web UI (task'ta istenmedi). 40 yeni test (13 domain + 27 servis) + 96
+  endpoint'lik güncellenmiş authorization snapshot + E1/E3 privilege-model-
+  evidence güncellemesi (30→33 katalog). 4 mutasyon kontrolü bizzat
+  çalıştırılıp doğrulandı (scope→12, impersonation→2, ceiling→2,
+  duplicate→1 test kırıldı, geri alındı). pnpm --filter api exec jest
+  --runInBand → 57 suite / 1570 test PASS; eslint/tsc temiz. Gerçek DB/HTTP
+  kullanılmadı; migration canlı ortama uygulanmadı. Git commit/push
+  yapılmadı; nihai done kararı AI1/PO'ya bırakıldı.
+  AI1, TASK-027.49'u review'da tuttu, genel mimariyi doğru buldu ama iki
+  teknik düzeltme istedi: (1) son-tenant-yöneticisi sayımı kullanıcı
+  status'unu filtrelemiyordu (pasif/kilitli kullanıcının ataması "hâlâ
+  yönetici var" sayılabiliyordu); (2) kontrol ile silme arasında atomiklik
+  yoktu (paralel revoke yarışı, son iki yönetici birlikte kaldırılabilirdi).
+  Düzeltmeler: son-yönetici sayımı artık users.status='ACTIVE' filtreli;
+  isAdminRole yolu artık tek bir db.transaction() içinde, SELECT ... FOR
+  UPDATE ile kilitli (break-glass'ın TASK-027.47 deseniyle aynı). 3 yeni
+  test + 2 mutasyon kontrolü bizzat çalıştırılıp doğrulandı (status filtresi
+  kaldırılınca 1, FOR UPDATE kaldırılınca 1 test kırıldı). pnpm --filter api
+  exec jest --runInBand → 57 suite / 1573 test PASS; NODE_PATH+
+  TURBO_ENV_MODE=loose ./scripts/check.sh --skip-docker → tam PASS (lint
+  dahil). Gerçek Postgres'te paralel revoke smoke testi bu turda
+  yapılmadı (bilinçli, ayrı onay gerektirir). Git commit/push yapılmadı;
+  nihai done kararı hâlâ AI1/PO'ya bırakıldı.
+  AI1, TASK-027.49'u teknik olarak onayladı, done'a çekti. Kapatılan
+  kritik noktalar: son tenant yöneticisi hesabında yalnızca ACTIVE
+  kullanıcılar sayılıyor; kontrol ve silme aynı transaction içinde; admin
+  atamaları FOR UPDATE ile kilitleniyor; mutasyon testleri düzeltmelerin
+  gerçekten gerekli olduğunu kanıtlıyor; tam kalite kapısı PASS (API 57
+  suite / 1573 test). Canlı PostgreSQL paralel yarış testi kullanıcı
+  kararıyla yapılmadı, belgelenmiş açık risk olarak kabul edildi, done
+  kararını engellemedi. backlog/TASK-027-49-tenant-role-delegation.md
+  status: done. Sıradaki görev henüz atanmadı.
 ---
 
 Bu dosya tek kaynak özet durumdur. Detay/kanıt kaynağı `backlog/EPIC-*.md`
@@ -1915,3 +1959,460 @@ DEC-0014 bu sınırı ve mTLS + OAuth2 B2B entegrasyon kararını kayda alır. �
 Vardiya Operasyon Merkezi ekranları, parametrik ve ayrı Laboratuvar modülü, ardından ayrı
 İşletme modülüdür. Yeni iş planı `EPIC-005` ve `TASK-029.00` altında planned olarak
 oluşturuldu; implementation task'ları henüz ready değildir.
+
+## 2026-09-22 — TASK ID Normalizasyonu
+
+MFA enforcement `TASK-027.48` olarak korunmuştur. Tenant-role delegation
+`TASK-027.49` olarak korunmuştur. Wave 5 grafik ve export/test zinciri
+`TASK-027.54`–`TASK-027.59` olarak yeniden numaralandırıldı. Tarihsel kayıtlar
+append-only kuralı nedeniyle değiştirilmedi.
+
+## 2026-09-22 — TASK-027.54 (Reporting Web Analysis Screen) — `review`
+
+TASK-027.54'ün tarif ettiği gerçek SCADA/SQL Server kaynak/kolon seçimi ve çoklu
+seri henüz mevcut değil (SQL Server read-only adapter — TASK-027.58 kapsamı);
+bu boşluk AI1'e bildirildi ve kapsam daraltıldı. Reporting core'a additive bir
+JSON veri endpoint'i (`GET /reports/:code/data`, `REPORT:ARTIFACT:VIEW`) ve
+reporting'in ilk kayıtlı dataset provider'ı (`DemoAnalysisDatasetProvider`,
+tenant başına deterministik sentetik veri, gerçek domain tablosuna dokunmuyor)
+eklendi; mevcut `render`/`export` akışı değişmedi. Web tarafında yeni bir
+`apps/web/.../reports/[id]/analysis/` ekranı: Recharts (yeni onaylı bağımlılık)
+ile zaman serisi grafiği, durum dağılımı, sıralanabilir/sayfalanan tablo,
+tenant-switch temizleme, güvenli hata mesajları. Yeni testler: API 17
+(9 dataset provider + 8 service), web 14 (7 pure veri dönüşümü + 7 ekran
+davranışı). `pnpm --filter api exec jest --runInBand` (58/1576 PASS),
+`pnpm --filter web exec vitest run` (13/149 PASS), `tsc --noEmit` (api/web,
+temiz), `NODE_PATH=<repo>/node_modules/.pnpm/node_modules TURBO_ENV_MODE=loose
+./scripts/check.sh --skip-docker` (Q-ENV01 workaround'u gerekti) PASS — `next
+build` yeni route'u başarıyla derledi. Tarayıcı/E2E doğrulaması yapılmadı
+(headless oturum). Detaylı teslim notu:
+`backlog/TASK-027-54-reporting-web-analysis-screen.md`. Backlog `planned` →
+`review`. Nihai `done` AI1'de. Git commit/push yapılmadı.
+
+## 2026-09-22 — AI1 Reddi ve Düzeltme: TASK-027.54'te DEC-0012 İhlali Düzeltildi
+
+AI1, yukarıdaki teslimi haklı olarak reddetti: `DemoAnalysisDatasetProvider` ve
+`ReportingService.onModuleInit` demo artifact seed'i, `docs/decisions/DEC-0012-demo-operations-removal.md`
+kararının doğrudan ihlaliydi (DEC-0012, tam olarak bu şekli — otomatik demo
+provider + demo artifact seed — kasıtlı olarak kaldırmıştı) ve task'ın kendi
+talimatı da yeni demo dataset/domain oluşturulmamasını zaten söylüyordu. AI2
+düzeltme turunda: demo provider/seed tamamen silindi, `REPORT_DATASET_PROVIDERS`
+tekrar literal boş diziye döndü, ekran artık provider'sız durumda "Veri kaynağı
+yapılandırılmamış" boş-durumunu gösteriyor (fixture'larla test edilen, production'da
+sentetik veri üretmeyen bir davranış). Bunu statik olarak kanıtlayan iki yeni test
+eklendi: `reporting.service.spec.ts` (servis `onModuleInit` implement etmiyor,
+`db.insert` hiç çağrılmıyor) ve yeni `reporting.module.spec.ts` (provider dizisi
+literal `[]`, providers listesinde `Seed`/`Demo` yok, demo provider dosyası
+mevcut değil). Reporting'in tenant-isolation davranışı (`loadData`'nın `tenantId`'yi
+filtrelerden bağımsız, değiştirmeden provider'a iletmesi, iki farklı tenant
+çağrısı arasında paylaşılan state olmaması) ayrıca test edildi. Recharts
+bağımlılığının onay kaydı (`"Recharts olsun ... Grafik bizim en can alıcı
+noktamız"`) backlog dosyasına resmi olarak eklendi. Yeniden çalıştırılan tam
+kalite kapısı: API 58 suite/1571 test PASS, web 13 suite/149 test PASS,
+`tsc --noEmit` temiz, `NODE_PATH=<repo>/node_modules/.pnpm/node_modules
+TURBO_ENV_MODE=loose ./scripts/check.sh --skip-docker` tam PASS. Backlog
+`status: review` olarak kaldı — nihai `done` kararı AI1'de. Detaylı düzeltme
+notu: `backlog/TASK-027-54-reporting-web-analysis-screen.md` ("R1: AI1 düzeltme
+turu uygulandı" bölümü). Git commit/push yapılmadı.
+
+## 2026-09-22 — AI1 Onayı: TASK-027.54 `done`
+
+AI1, R1 düzeltme turunu inceledi ve onayladı: demo provider/startup seed'in
+kaldırılmış olması, provider listesinin boş kalması ve production'da sentetik
+veri üretilmemesi, `/data` 404'ünün güvenli boş ekranla yönetilmesi, tenant
+izolasyonunun testlerle doğrulanmış olması, Recharts kullanımının kayıtlı
+onaya dayanması ve `check.sh --skip-docker`'ın tam PASS olması kabul edildi.
+Tarayıcı/E2E doğrulamasının yapılmamış olması açık risk olarak not edildi;
+kapanmayı engellemedi. **TASK-027.54 `done`.** Backlog
+`backlog/TASK-027-54-reporting-web-analysis-screen.md` `review` → `done`.
+AI1 dosya/status/Git değişikliği yapmadı. Sıradaki görev henüz atanmadı
+(Wave 5 sırasına göre bir sonraki aday TASK-027.55 — CSV/PNG export).
+
+## 2026-09-23 — TASK-027.54-R2 (Reporting Navigation ve Analysis Entry Point) — `review`
+
+TASK-027.54'ün analiz ekranına web uygulaması içinden erişilebilir bir giriş
+noktası eklendi: `apps/web/src/lib/nav-config.ts`'e mevcut `REPORT:ARTIFACT:VIEW`
+koduyla korunan yeni bir `Raporlar` sidebar modülü (yeni permission kodu
+uydurulmadı) ve yeni bir `/app/reports` liste route'u
+(`reports-list-client.tsx`) eklendi — mevcut `GET /reports/artifacts` sözleşmesi
+yeterli bulundu, **backend değiştirilmedi**. Liste ekranı başlık/kod/aktif-pasif
+durumu gösterir; yalnızca aktif artifact'lar için `/app/reports/{code}/analysis`
+bağlantısı (kod URL-encode edilerek) üretir; boş durumda "Henüz kullanılabilir
+bir rapor tanımlanmamış." gösterir; 401/403/5xx'te ham backend hatası sızdırmaz;
+tenant değişiminde temizlenip yeniden yüklenir. DEC-0012 sınırı bu turda da
+korundu — yeni demo provider/seed/hardcoded artifact eklenmedi; bunu statik
+olarak doğrulayan bir test eklendi. TASK-027.54'ün analiz route'unun bu turda
+bozulmadığını doğrulayan bir regresyon testi de eklendi. Yeni testler: 13
+(`pnpm --filter web exec vitest run` → 15 suite / 161 test PASS). `tsc --noEmit`
+(web, api) temiz; `NODE_PATH=<repo>/node_modules/.pnpm/node_modules
+TURBO_ENV_MODE=loose ./scripts/check.sh --skip-docker` (Q-ENV01 workaround'u
+gerekti) tam PASS — `next build` yeni `/app/reports` route'unu (1.19 kB) ve
+mevcut analiz route'unu (110 kB, değişmedi) başarıyla derledi. Tarayıcı/E2E
+doğrulaması yapılmadı (headless oturum). Detaylı teslim notu:
+`backlog/TASK-027-54-R2-reporting-navigation.md`; TASK-027.54 dosyasına R2
+referansı eklendi. Backlog `status: review`. Nihai `done` AI1'de. Git
+commit/push yapılmadı.
+
+## 2026-09-23 — AI1 Onayı: TASK-027.54-R2 `done`
+
+AI1, TASK-027.54-R2'yi inceledi ve onayladı: Raporlar menüsünün eklenmiş olması,
+`/app/reports` liste ekranının oluşturulmuş olması, aktif artifact'ların analiz
+ekranına doğru bağlanması, `REPORT:ARTIFACT:VIEW` yetkisinin korunması, tenant
+değişiminde listenin yenilenmesi, demo provider/seed/hardcoded artifact
+eklenmemiş olması, boş provider durumunun güvenli şekilde gösterilmesi, web
+testlerinin ve tam `check.sh --skip-docker`'ın başarılı olması kabul edildi.
+**TASK-027.54-R2 `done`.** Backlog `backlog/TASK-027-54-R2-reporting-navigation.md`
+`review` → `done`. Git commit/push yapılmadı. Sıradaki görev henüz atanmadı.
+
+## 2026-09-23 — TASK-027.60 (Local Auth/DB Health ve Hesap Durumu Düzeltmesi) — `review`
+
+Yerel geliştirme ortamında login sonrası görünen "Hesap devre dışı" (403)
+uyarısının kök nedeni kanıtlandı: **DB/port/env sorunu değil, kod hatası.**
+Port/env matrisi (`.project-defaults` DEV_PORT_BASE=7500, web PORT=3000,
+`NEXT_PUBLIC_API_URL`=3001, API PORT=3001, `DATABASE_URL` portu=7502, çalışan
+Postgres container'ının host portu=7502) tamamen tutarlı bulundu. DB'de
+salt-okunur sorgu: tek kullanıcı (`admin@example.com`), `status=ACTIVE`. Taze
+bir login ile alınan JWT'nin `sub` claim'i DB `id`'siyle eşleşti. Buna rağmen
+aynı ACTIVE kullanıcı, gerçek bir MFA-korumalı route'a (`GET /reports/artifacts`)
+istek attığında "Hesap devre dışı" alıyordu. Kök neden:
+`apps/api/src/platform/guards/mfa-enforcement.guard.ts`'nin `user.sub` okuması
+— ama `request.user` (`JwtStrategy.validate()` → `AuthService.validateJwtPayload()`
+çıktısı) `id` taşıyor, `sub` hiç taşımıyor; `user.sub` her zaman `undefined`
+idi, bu yüzden bu guard her kullanıcı için her zaman "Hesap devre dışı"
+üretiyordu, DB durumundan bağımsız olarak. `mfa.controller.ts` bu ambiguity'yi
+zaten `sub ?? id` fallback'iyle biliyordu; bu guard'a uygulanmamıştı. Guard'ın
+kendi testi `request.user`'ı hatalı `{ sub: ... }` şekliyle kurguladığı için bu
+regresyon hiç yakalanamamıştı. **Kanıtlanmış minimal düzeltme yapıldı**
+(`user.sub ?? user.id` fallback'i, 4 kullanım yeri), canlı olarak doğrulandı
+(düzeltme öncesi 403 "Hesap devre dışı" → düzeltme sonrası 200). Guard'ın
+testleri gerçek `request.user` şekliyle yeniden yazıldı ve gerçek mutasyon
+testiyle (düzeltme geri alınıp 16 testten 10'unun başarısız olduğu, geri
+getirilince 16/16 PASS olduğu) doğrulandı. Yeni `mfa-requirement.service.spec.ts`
+eklendi (ACTIVE/INACTIVE/LOCKED/kullanıcı-yok, önceden hiç test yoktu). DB'de
+hiçbir değişiklik yapılmadı (yalnızca salt-okunur SELECT). "Kullanıcı bulunamadı"
+ile "INACTIVE/LOCKED" mesaj ayrımı yapılması gerekip gerekmediği ayrı bir
+karar maddesi olarak AI1/Product Owner'a bırakıldı, kod değiştirilmedi.
+**Doğrulama:** `tsc --noEmit` (api, web) temiz; `pnpm --filter api exec jest
+platform --runInBand` → 21 suite/991 test PASS; `pnpm --filter web exec vitest
+run` → 15 suite/162 test PASS; `NODE_PATH=<repo>/node_modules/.pnpm/node_modules
+TURBO_ENV_MODE=loose ./scripts/check.sh --skip-docker` → tam PASS (59 suite/1581
+test). Detaylı rapor: `backlog/TASK-027-60-local-auth-db-health.md`. Backlog
+`status: review`. Nihai `done` AI1'de. Git commit/push yapılmadı.
+
+## 2026-09-23 — AI1 Onayı: TASK-027.60 `done`
+
+AI1, kök neden teşhisini ve düzeltmeyi inceledi ve onayladı: `request.user`
+içinde `sub` yerine `id` bulunduğu; MFA guard'ın yalnızca `user.sub` okuduğu
+için ACTIVE kullanıcıların yanlışlıkla devre dışı göründüğü; `user.sub ??
+user.id` düzeltmesinin uygulandığı; öncesi 403/sonrası 200'ün gerçek API
+akışında doğrulandığı; mutasyon testinin başarılı olduğu; API/web testlerinin
+ve tam `check.sh --skip-docker`'ın başarılı olduğu; DB'de kullanıcı status'unun
+değiştirilmediği kabul edildi. "Kullanıcı bulunamadı" ile "INACTIVE/LOCKED"
+mesajlarının ayrıştırılması ayrı bir karar olarak açık bırakıldı — kapanmaya
+engel değil. **TASK-027.60 `done`.** Backlog
+`backlog/TASK-027-60-local-auth-db-health.md` `review` → `done`. Git
+commit/push yapılmadı. Sıradaki görev henüz atanmadı.
+
+## 2026-09-23 — TASK-027.55 (Development Reporting Fixtures ve CSV/PNG Export) — `review`
+
+Reporting analiz ekranına iki bağımsız yetenek eklendi, ikisi de backend'e
+yeni endpoint eklemeden: (A) development-only bir simülasyon veri kaynağı ve
+(B/C) ekrandaki tablo/grafiğin CSV/PNG export'u. **Bölüm A, DEC-0012/TASK-027.54
+R1'in kök nedenini tekrarlamamak için hem simülasyon verisini hem de onu
+barındıran artifact kaydını tamamen bellek-içi tuttu** — `DevFixtureDatasetProvider`
+(yeni, gerçek `ReportDatasetProvider` sözleşmesi, tenant başına deterministik)
+ve `DEV_FIXTURE_ARTIFACT` (DB'ye hiç yazılmayan bir sabit), ikisi de yalnızca
+`NODE_ENV=development` **VE** `REPORTING_DEV_FIXTURES=true` olduğunda devreye
+giriyor — `reporting.module.ts`'de bu sınıf o dışında Nest DI container'ına
+hiç eklenmiyor (davranışsal `Reflect.getMetadata` testleriyle 4 env
+senaryosunda ayrıca kanıtlandı), `ReportingService`'te hiçbir zaman `db.insert`
+çağrılmıyor. Bölüm B/C tamamen frontend'de: `csv-export.ts` (CSV injection
+escape, RFC 4180 quoting, güvenli dosya adı) ve `png-export.ts` (yeni
+bağımlılık eklenmeden — yalnızca native `XMLSerializer`/`Image`/`Canvas` —
+Recharts'ın kendi `<svg>`'ini PNG'ye çevirir, başlık/filtre/simülasyon
+etiketini görsele gömer). Her ikisi de ekranda zaten yüklü olan veriden
+üretiliyor; mevcut `REPORT:ARTIFACT:VIEW` guard zincirinin ötesine geçmiyor,
+yeni permission kodu eklenmedi. Yeni testler: backend 27 (dev-fixture provider
+15 + module +5 + service +7), frontend 39 (csv-export 22 + png-export 9 +
+report-analysis-client +9 net); `vitest.setup.ts`'e (tüm suite'i etkileyen)
+sabit boyutlu bir `ResizeObserver` polyfill'i eklendi (jsdom'da Recharts'ın
+`<svg>`'i hiç render etmemesi sorununu çözdü). Beş ayrı mutasyon kontrolü
+gerçekten çalıştırıldı (kod bozulup testler kırmızıya döndü, sonra geri
+alındı): production'da fixture kaydı engeli, tenant izolasyonu, CSV injection
+escape, simülasyon etiketi — dördü de testleri kırdı; çift-export engeli
+mutasyonu testi kırmadı, araştırma sonucu asıl korumanın native `disabled`
+attribute'u olduğu ortaya çıktı ve bu şeffafça raporlandı (ref+cooldown ek
+savunma katmanı). **Doğrulama:** `tsc --noEmit` (api, web) temiz; `pnpm
+--filter web exec vitest run` → 17 suite/204 test PASS; `pnpm --filter api
+exec jest --runInBand` → 60 suite/1610 test PASS; `NODE_PATH=<repo>/node_modules/.pnpm/node_modules
+TURBO_ENV_MODE=loose ./scripts/check.sh --skip-docker` → tam PASS. Gerçek
+DB/production verisi kullanılmadı. Tarayıcı/E2E doğrulaması yapılmadı
+(headless oturum) — özellikle PNG'nin gerçek piksel çıktısı yalnızca
+mock'lanmış orkestrasyon seviyesinde test edildi. Detaylı teslim notu:
+`backlog/TASK-027-55-csv-png-export.md`; TASK-027.54 dosyasına referans
+eklendi. Backlog `status: review`. Nihai `done` AI1'de. Git commit/push
+yapılmadı.
+
+## 2026-09-23 — TASK-027.55 R1 Düzeltme Turu (AI1 review sonrası) — `review`
+
+AI1, ilk teslimde iki eksik belirledi: PNG'nin gerçek çıktı olarak
+doğrulanmamış olması ve çift-export mutasyon kontrolünün başarısız olması
+(koruma yalnızca UI `disabled` attribute'una dayanıyordu). İkisi de çözüldü.
+**PNG:** `apps/web`'e `canvas` (node-canvas) devDependency olarak eklendi —
+jsdom artık gerçek `Canvas`/`Context2D` rasterizasyonu kullanıyor (production
+bundle'a girmiyor). `png-export.spec.ts`'e canvas/context'in hiç mock'lanmadığı
+yeni bir test bloğu eklendi: gerçek PNG magic number, gerçek IHDR
+genişlik/yükseklik (caption-offset formülüyle birebir), 200+ bayt gerçek
+içerik. Tek kalan sınır (şeffafça belgelendi): node-canvas'ın `Image` sınıfı bu
+sandbox'ta SVG decode etmiyor (blob:/data: ikisi de doğrudan denendi, hiçbiri
+onload tetiklemiyor — muhtemelen librsvg eksik); bu adım gerçek bir
+`HTMLCanvasElement`'in (düz mock değil) "decode edilmiş görüntü" yerine
+geçmesiyle atlatıldı, canvas boyutlandırma/caption/encoding zincirinin tamamı
+gerçek. Mutasyon testiyle kanıtlandı (caption-height formülü bozulunca 3 test
+kırıldı). **Çift-export:** `export-guard.ts` (yeni) — React/DOM'dan tamamen
+bağımsız, saf bir single-flight kilit (`tryRun`/`tryRunAsync`); eski ref+setTimeout
+mantığının yerini aldı; `export-guard.spec.ts` (9 test, sıfır DOM/React)
+doğrudan test ediyor. Mutasyon testiyle kanıtlandı. **Ayrıca doğrudan
+kanıtlandı:** CSV/PNG butonlarının `disabled` attribute'u geçici olarak
+kaldırılıp çift-tıklama testleri tekrar çalıştırıldı — guard tek başına
+yeterli olduğu için ikisi de hâlâ geçti; bu, korumanın artık export
+fonksiyonunun kendi çağrı yolunda yaşadığının doğrudan kanıtı. **Doğrulama:**
+`tsc --noEmit` temiz; `pnpm --filter web exec vitest run` → 18 suite/216 test
+PASS (12 yeni); `./scripts/check.sh --skip-docker` tam PASS, sıfır lint
+uyarısı. Detaylı düzeltme notu: `backlog/TASK-027-55-csv-png-export.md`
+("R1 düzeltme turu" bölümü). Backlog `status: review` olarak kaldı. Git
+commit/push yapılmadı.
+
+## 2026-09-23 — AI1 Onayı: TASK-027.55 `done`
+
+AI1, R1 düzeltme turunu inceledi ve onayladı: gerçek PNG rasterizasyonunun
+magic number ve IHDR boyutlarıyla doğrulanması, caption yükseklik hesabının
+mutasyon testiyle güvence altına alınması, çift export korumasının artık
+DOM/React `disabled` durumundan bağımsız saf single-flight guard ile
+sağlanması, guard'ın doğrudan test edilmiş ve UI `disabled` kaldırıldığında da
+çalıştığının kanıtlanmış olması, web testlerinin 18 suite/216 test olarak
+geçmesi ve tam `check.sh`'ın başarılı olması kabul edildi. node-canvas'ın SVG
+decode sınırı belgelenmiş kabul edildi — task'ın doğrulanmış canvas/PNG
+zincirini engellemiyor. **TASK-027.55 `done`.** Backlog
+`backlog/TASK-027-55-csv-png-export.md` `review` → `done`. Git commit/push
+yapılmadı. Sıradaki görev henüz atanmadı.
+
+## 2026-09-23 — TASK-027.56 (PDF/XLSX Jasper Export) — `review`
+
+Reporting analiz ekranına PDF/XLSX export eklendi, mevcut sözleşme tamamen
+korunarak: `GET /reports/:code/export/:format` (zaten mevcut,
+`REPORT:ARTIFACT:EXPORT`), `ReportingService.exportReport` (zaten
+Jasper-configured/fallback ayrımını yapıyordu), `ReportRenderService` (zaten
+timeout/abort/payload limitleri/502 dönüşümünü içeriyordu) — **hiçbiri
+değiştirilmedi, yeni endpoint eklenmedi**. İki küçük additive backend
+ayarlaması yapıldı: `DEV_FIXTURE_ARTIFACT.supportedOutputFormats`'ın `[]`'den
+`['PDF','XLSX']`'e güncellenmesi (bellek-içi, DB yazımı yok — export
+butonlarının bu ortamda gerçek uçtan uca test edilebilmesi için) ve
+`exportReport`'un, fixture aktifken dataset satırlarının başına "Geliştirme
+simülasyon verisi" metnini taşıyan sentetik bir satır eklemesi — JRXML/Jasper
+Java değişikliği kapsam dışı olduğu için, mevcut Jasper generic template'inin
+gönderilen her satırı olduğu gibi tabloladığı **gerçek çalışan dev Jasper
+container'ına karşı doğrulanarak** (curl ile ön-doğrulama + kalıcı bir jest
+testi) bu yöntem seçildi. Bu sırada fallback PDF satır formatındaki bir eksiklik
+(`row.label` hiç kullanılmıyordu) da düzeltildi. Frontend: analiz ekranına
+"PDF indir"/"XLSX indir" butonları eklendi, TASK-027.55 R1'in `export-guard.ts`'i
+(React/DOM'dan bağımsız single-flight kilit) aynen yeniden kullanıldı, dosya
+backend'den (Content-Disposition) geliyor, aktif filtreler query param olarak
+aktarılıyor, 401/403/404/502/5xx için güvenli mesajlar var. Yeni testler:
+backend ~20 (exportReport mock testleri + gerçek Jasper container'a karşı
+dev-fixture etiket testi), frontend 32. Dört mutasyon kontrolü gerçekten
+çalıştırıldı (kod bozulup testler kırmızıya döndü, geri alındı): supportedOutputFormats
+kontrolü, dev-fixture etiket gate'i, tenant scope kontrolü — üçü de testleri
+kırdı; çift-export guard'ı kaldırma denemesi ilk seferde testleri kırmadı
+(native `disabled` attribute'u koruyordu, TASK-027.55 R1'deki aynı bulgu) —
+guard'ı bırakıp `disabled`'ı kaldırarak yeniden test edildi, guard'ın tek
+başına yeterli olduğu doğrulandı. **Doğrulama:** `tsc --noEmit` (api, web)
+temiz; `pnpm --filter api exec jest --runInBand` → 60 suite/1630 test PASS;
+`pnpm --filter web exec vitest run` → 18 suite/230 test PASS;
+`NODE_PATH=<repo>/node_modules/.pnpm/node_modules TURBO_ENV_MODE=loose
+./scripts/check.sh --skip-docker` → tam PASS. Gerçek Jasper container testi
+zaten çalışan dev ortamına karşı yapıldı, yeni Docker build/run yok. Gerçek
+DB/production verisi kullanılmadı. Tarayıcı/E2E doğrulaması yapılmadı
+(headless oturum). Detaylı teslim notu: `backlog/TASK-027-56-pdf-xlsx-jasper-export.md`;
+TASK-027.55 dosyasına referans eklendi. Backlog `status: review`. Nihai
+`done` AI1'de. Git commit/push yapılmadı.
+
+## 2026-09-23 — AI1 Onayı: TASK-027.56 `done`
+
+AI1, teslimi inceledi ve onayladı: mevcut export endpoint ve permission
+sözleşmesi korunmuş; PDF/XLSX butonları analiz ekranına eklenmiş; aktif
+filtreler export'a aktarılıyor; Jasper ve fallback yolları korunmuş;
+development fixture etiketi yalnızca development koşulunda ekleniyor; tenant
+scope ve `supportedOutputFormats` kontrolleri testli; single-flight export
+guard'ının `disabled` olmadan da çalıştığı doğrulanmış; API 60 suite/1630
+test, web 18 suite/230 test başarılı; tam `check.sh --skip-docker` başarılı.
+**TASK-027.56 `done`.** Backlog `backlog/TASK-027-56-pdf-xlsx-jasper-export.md`
+`review` → `done`. Git commit/push yapılmadı. Sıradaki görev henüz atanmadı.
+
+## 2026-09-23 — TASK-027.57 (Export Permission ve Audit) — `review`
+
+CSV/PNG/PDF/XLSX export'larının mevcut permission/tenant-scope/audit
+sözleşmesi üzerinden izlenebilir olması sağlandı — **yeni permission code,
+yeni audit tablosu/migration, yeni endpoint eklenmedi**.
+`REPORT:ARTIFACT:EXPORT` (PDF/XLSX) ve `REPORT:ARTIFACT:VIEW` (CSV/PNG'nin
+veri kaynağı `/data`) zaten ayrı permission'lardı. `PermissionGuard`'a dar
+kapsamlı bir allowlist (`AUDITED_DENIAL_PERMISSIONS = {'REPORT:ARTIFACT:EXPORT'}`)
+eklenerek export reddi `REPORT_EXPORT_DENIED` olarak, `ForbiddenException`
+fırlatılmadan önce, best-effort audit'leniyor — guard'ın kapsadığı diğer
+endpoint'lerin reddi audit'lenmiyor (bilinçli dar kapsam). `ReportingService.exportReport`'a
+`actorId` parametresi eklendi; Jasper/fallback render tek bir try/catch'e
+alındı: başarı sadece dosya bytes'ı üretildikten sonra `REPORT_EXPORT_SUCCEEDED`,
+hata `REPORT_EXPORT_FAILED` (ham exception mesajı asla audit'e sızmıyor —
+sabit `reasonCode` kümesine eşleniyor, orijinal hata her zaman yeniden
+fırlatılıyor). Audit metadata sadece `tenantId`/`artifactCode`/`format`/
+`result`/`reasonCode`/`rendererMode`/(fixture ise)`simulation:true` taşıyor —
+credential/token/SQL/satır verisi asla yok. Frontend: PDF/XLSX butonları
+`useTenantPermissions().can('REPORT:ARTIFACT:EXPORT')` false iken hiç render
+edilmiyor (UX-only — gerçek sınır hâlâ `PermissionGuard`); CSV/PNG butonları
+bu kontrolden bağımsız (sadece VIEW'e bağlı, zaten veri gelmişse görünür).
+**CSV/PNG sınırı açıkça dokümante edildi:** backend'de ayrı export endpoint'i
+yok, veri `/data` (VIEW-gated) üzerinden geliyor — yetkisiz kullanıcı veriye
+hiç ulaşamıyor ama "CSV/PNG'ye tıklandı" olayının kendisi audit'lenmiyor
+(PDF/XLSX'in aksine); yeni bir client-audit endpoint'i eklemek onaysız yeni
+endpoint yasağına takıldığından eklenmedi, bu bir blocker değil açık bir
+kapsam kararı olarak raporlandı. Yeni testler: `permission.guard.spec.ts`
+(yeni dosya, 11 test — guard'ın daha önce hiç kendine ait testi yoktu),
+`reporting.service.spec.ts`'e 13 audit testi + pasif artifact kontrolünün
+güçlendirilmesi, `reporting.jasper-integration.spec.ts` güncellemesi,
+frontend'de 2 yeni görünürlük-sözleşmesi testi. Dokuz mutasyon kontrolü
+gerçekten çalıştırıldı (kod bozulup testler kırmızıya döndü, geri alındı):
+export permission kontrolü, tenant scope kontrolü, pasif artifact kontrolü
+(bu sonuncusu ilk denemede yanıltıcı şekilde geçti — `ReportDatasetResolver.resolve()`'ın
+konfigüre edilmemiş provider'ı reddetmesi `isActive` kontrolünü maskeliyordu;
+`provider.supports.mockReturnValue(true)` eklenerek test gerçek anlamda
+`isActive` kontrolünü hedefler hale getirildi ve mutation'ı gerçekten yakaladı),
+başarılı/red/başarısız export audit'i, credential redaksiyonu, audit-hatası-asla-sonucu-değiştirmez
+kontrolü, Jasper/fallback path audit kontrolü. **Doğrulama:** `tsc --noEmit`
+(api, web) temiz; `pnpm --filter api exec jest reporting platform audit --runInBand`
+→ 30 suite/1112 test PASS; `pnpm --filter web exec vitest run` → 18 suite/232
+test PASS; `NODE_PATH=<repo>/node_modules/.pnpm/node_modules TURBO_ENV_MODE=loose
+./scripts/check.sh --skip-docker` → 61 suite/1651 test + web/api build tam
+PASS. Gerçek (mock olmayan) doğrulama: kullanıcının kendi çalışan dev
+sunucusu üzerinden bir gerçek authenticated export çağrısı → gerçek Jasper
+render → Postgres'te `psql` ile doğrulanan temiz, credential'sız
+`REPORT_EXPORT_SUCCEEDED` satırı; **sadece başarı yolu** canlı doğrulandı, red
+ve hata yolları unit/mutation seviyesinde kaldı. Tarayıcı/E2E ve Docker
+build/run yapılmadı. Detaylı teslim notu: `backlog/TASK-027-57-export-permission-audit.md`;
+TASK-027.56'ya referans var. Backlog `status: review`. Nihai `done` AI1'de.
+Git commit/push yapılmadı.
+
+## 2026-09-23 — TASK-027.61 (Metnex Platform Branding ve Logo Entegrasyonu) — `review`
+
+Metnex marka görselleri (repo kökündeki `metnex_transparent.png` — yazılı
+logo+logomark, ve `metnex_png.png` — koyu hero görseli, **ikisi de
+değiştirilmeden korundu**) web uygulamasına entegre edildi. `apps/web/public`
+dizini hiç yoktu, favicon/`icon.png` de yoktu — ikisi de bu task'ta ilk kez
+oluşturuldu. Üretilen asset'ler (`apps/web/public/brand/metnex-logo.png`,
+`metnex-mark.png`, `metnex-login.png`, `apps/web/src/app/icon.png`) zaten
+projede devDependency olan `node-canvas` ile tek seferlik bir betikle
+üretildi (**yeni bağımlılık eklenmedi**); `metnex-logo.png`/`metnex-login.png`
+kaynaklarının birebir kopyası, `metnex-mark.png`/`icon.png` ise ayrı bir
+logomark-only kaynak verilmediği için alfa-kanalı bounding-box taraması ile
+**türetildi** (bu türetme teslim notunda açıkça belgeleniyor). Paylaşılan
+`BrandLogo` bileşeni (`apps/web/src/components/brand-logo.tsx`) hem yazılı
+logo hem logomark varyantını render ediyor, görsel yüklenemezse düz metin
+"Metnex" fallback'ine düşüyor (next/image `onError`). Login ekranına
+(`apps/web/src/app/login/page.tsx`) form başlığında logo ve arkasında
+dekoratif (aria-hidden, boş alt) hero arka planı eklendi — form kartı zaten
+opak olduğu için okunabilirlik etkilenmedi. Gerçekte render edilen
+sidebar/topbar (`glass-console/console-shell.tsx` — `app-sidebar.tsx` adında
+ayrı bir bileşen de var ama hiçbir yerde import edilmiyor, dokunulmadı) marka
+alanına Link + iki `BrandLogo` eklendi (`md+`'de yazılı logo, `<md`'de
+logomark — masaüstünde ayrı bir collapse/icon-rail state'i olmadığı için bu
+mevcut responsive kırılma noktasına eşlendi, açık bir varsayım olarak
+belgelendi), sabit açık renkli bir "chip" arka planı üzerinde (koyu console
+temasında da okunaklı kalması için — `bg-white` değil `bg-[#f8fafc]`
+kullanıldı, çünkü `globals.css`'in `.dark .bg-white` kuralı `bg-white`'ı
+otomatik olarak koyu bir renge çeviriyor ve bu keşfedildi). Favicon
+`app/icon.png` dosya sözleşmesiyle otomatik + `layout.tsx`'e açık
+`metadata.icons` eklendi (title/description/lang/tema script'i değişmedi).
+Yeni testler: `brand-logo.spec.tsx` (5), login sayfasına eklenen 4 yeni test,
+`console-shell.spec.tsx` (yeni, 4 — CSS breakpoint görünürlüğü jsdom'da
+gerçek anlamda test edilemediği için işaretleme sözleşmesi test edildi, bu
+sınırlama açıkça not edildi), `layout.spec.ts` (2), `brand-assets.spec.ts`
+(6 — dosya sistemi seviyesinde asset bütünlüğü + orijinal kaynakların
+korunduğu kontrolü). Yan bulgu: login sayfası artık bir `<Image>` render
+ettiği için mevcut `login/__tests__/page.spec.tsx`'in `window.location` mock'u
+(`href: ''` ile başlıyordu) next/image'ın dev-mode defter tutma mekanizmasını
+çökertiyordu — mock, gerçek `Location.href` setter semantiğini taklit eden bir
+accessor'a çevrilerek düzeltildi, mevcut 10 testin hiçbiri anlamca değişmedi,
+hepsi PASS durumda kaldı. **Doğrulama:** `tsc --noEmit` temiz; `vitest run` →
+22 suite/253 test PASS; `next build` → başarılı, `/icon.png` build çıktısında
+statik route olarak listelendi; `NODE_PATH=<repo>/node_modules/.pnpm/node_modules
+TURBO_ENV_MODE=loose ./scripts/check.sh --skip-docker` → API 61 suite/1651
+test + web 22 suite/253 test + build tam PASS. **Browser/E2E doğrulaması
+yapılamadı** (bu oturumda tarayıcı aracı yok, ayrıca kullanıcının kendi dev
+sunucusu yönetiliyor) — statik PNG incelemesi ve CSS token analizi ile elle
+doğrulandı, kullanıcıya kendi ortamında görsel kontrol için işaretler
+bırakıldı. Detaylı teslim notu: `backlog/TASK-027-61-platform-branding-logo.md`.
+Backlog `status: review`. Nihai `done` AI1'de. Git commit/push yapılmadı.
+
+## 2026-09-23 — AI1 Onayı: TASK-027.57 `done`
+
+AI1, teslimi inceledi ve onayladı: export permission kontrolleri ve frontend
+görünürlük testleri tamamlanmış; pasif artifact kontrolü gerçek mutasyon
+testiyle doğrulanmış (yanıltıcı ilk sonucun düzeltilmesi dahil); başarı, ret
+ve hata audit yolları güvenli metadata ile testli; CSV/PNG'nin frontend-only
+audit sınırı açıkça belgelenmiş; API 30 suite/1112 test, web 18 suite/232 test
+başarılı; tam `check.sh --skip-docker` başarılı. Gerçek ortamda sadece başarı
+yolunun doğrulanmış olması, red/hata yollarının unit/mutation seviyesinde
+kalması kabul edilebilir bulundu; Docker ve browser/E2E yapılmaması açık sınır
+olarak kabul edildi. **TASK-027.57 `done`.** Backlog
+`backlog/TASK-027-57-export-permission-audit.md` `review` → `done`. Git
+commit/push yapılmadı. Sıradaki görev henüz atanmadı.
+
+## 2026-09-23 — AI1 Onayı: TASK-027.61 `done`
+
+AI1, teslimi inceledi ve onayladı: orijinal logo dosyaları korunmuş; şeffaf
+logo ve logomark asset'leri doğru şekilde türetilmiş; login, sidebar, topbar
+ve favicon entegrasyonu tamamlanmış; açık/koyu tema uyumu dikkate alınmış;
+fallback text ve layout-shift koruması mevcut; 22 suite/253 web testi
+başarılı; `next build` ve tam `check.sh --skip-docker` başarılı. Browser/E2E
+yapılamaması açık sınır olarak belgelenmiş, kapanmaya engel görülmedi.
+**TASK-027.61 `done`.** Backlog `backlog/TASK-027-61-platform-branding-logo.md`
+`review` → `done`. Git commit/push yapılmadı. Sıradaki görev henüz atanmadı.
+
+## 2026-09-23 — AI1 Onayı: TASK-027.61-R1 `done`
+
+AI1/Product Governance, TASK-027.61-R1 teslimini inceledi ve onayladı:
+- Login hero arka planında `object-contain` ile tam kompozisyon sağlanmış.
+- Login form logosu 40 px → 72 px büyütülmüş (~1.8x).
+- Topbar logosu 18 px → 24 px büyütülmüş (~1.33x).
+- Geniş/dar görünüm responsive yapısı ve tema kontrastı korunmuş.
+- `./scripts/check.sh --skip-docker` ön planda (foreground) çalıştırılmış ve **Exit Code: 0 (PASS)** (API 61/61 suite, 1651/1651 test; Web 22/22 suite, 253/253 test; typecheck & build PASS) ile tamamlanmıştır.
+- Browser/E2E doğrulaması yapılmaması açık sınır olarak belgelenmiş ve kabul edilmiştir.
+**TASK-027.61-R1 `done`.** Backlog `backlog/TASK-027-61-R1-logo-layout-scaling.md` `review` → `done`. Git commit/push yapılmadı. Sıradaki görev henüz atanmadı.
+
+## 2026-09-23 — AI1 Onayı: TASK-027.61-R2 `done`
+
+AI1/Product Governance, TASK-027.61-R2 teslimini inceledi ve onayladı:
+- Geniş ve dar topbar logoları 24 px → 48 px (2.0x) büyütülmüş.
+- Header yüksekliği `h-12` → `h-16` (64 px) olarak dikey hizalanmış.
+- Breadcrumb, hamburger, tenant switcher ve kullanıcı alanlarının dikey ortalanması korunmuş.
+- Mobil drawer offset'i `top-16` olarak güncellenmiş.
+- Login logosu ve hero görseli değiştirilmemiş.
+- API 61/61 suite (1651 test), Web 22/22 suite (253 test), build ve lint başarılı.
+- Foreground `./scripts/check.sh --skip-docker` sonucu **Exit Code: 0 (PASS)**.
+**TASK-027.61-R2 `done`.** Backlog `backlog/TASK-027-61-R2-logo-topbar-scale.md` `review` → `done`. Git commit/push yapılmadı.
+
+## 2026-09-23 — AI1 Onayı: TASK-027.61-R3 `done`
+
+AI1/Product Governance, TASK-027.61-R3 teslimini ve kullanıcı talebi doğrultusundaki logo büyütme (`height={120}`, ~208 px genişlik) / "Platform foundation starter" altyazı kaldırma düzenlemelerini inceledi ve onayladı:
+- `/Metnex_Firma.png` kaynak görseli orijinal haliyle korunmuş.
+- Login formundaki eski logo kaldırılmış, `metnex-firma.png` entegre edilmiş.
+- Form logosu `height={120}` px seviyesine büyütülmüş, `max-w-full h-auto object-contain` ile kart çerçevesine uyarlanmış, "Platform foundation starter" metni kaldırılmıştır.
+- Fallback text ve accessibility (`alt="Metnex"`) korunmuş.
+- Login hero, topbar logoları ve auth/MFA akışlarına dokunulmamış.
+- Web 22/22 suite (255 test), API 61/61 suite (1651 test), typecheck ve Next.js build başarılı.
+- Foreground `./scripts/check.sh --skip-docker` sonucu **Exit Code: 0 (PASS)**.
+**TASK-027.61-R3 `done`.** Backlog `backlog/TASK-027-61-R3-login-firma-logo.md` `review` → `done`. Git commit/push yapılmadı. Sıradaki görev henüz atanmadı.
+
+
+
+
+

@@ -6,8 +6,11 @@ import * as dotenv from 'dotenv'
 // to reach the real renderer container this repo's dev environment already has running.
 dotenv.config({ path: path.resolve(__dirname, '../../.env') })
 
+import { inflateSync } from 'node:zlib'
 import type { Response } from 'express'
+import { PlatformAuditService } from '../audit/platform-audit.service'
 import { buildMockDb, chain } from '../db/test-helpers/drizzle-mock'
+import { DEV_FIXTURE_ARTIFACT_CODE, DevFixtureDatasetProvider } from './dataset/dev-fixture-dataset.provider'
 import type { ReportDataset, ReportDatasetProvider } from './dataset/report-dataset.contract'
 import { ReportDatasetResolver } from './dataset/report-dataset.resolver'
 import { ReportingController } from './reporting.controller'
@@ -84,12 +87,15 @@ async function isRendererReachable(renderEndpoint: string, timeoutMs = 2000): Pr
   }
 }
 
+const ACTOR = { id: 'actor-1' }
+
 function buildController() {
   const db = buildMockDb()
   const reportRender = new ReportRenderService()
   const templateRegistry = new TemplateRegistryService()
   const datasetResolver = new ReportDatasetResolver([new FixtureDatasetProvider()])
-  const service = new ReportingService(db as never, datasetResolver, reportRender, templateRegistry)
+  const auditService = new PlatformAuditService(db as never)
+  const service = new ReportingService(db as never, datasetResolver, reportRender, templateRegistry, auditService)
   const controller = new ReportingController(service, reportRender)
   return { controller, service, db }
 }
@@ -126,7 +132,7 @@ describe('Reporting → real Jasper renderer, via the API controller/service (TA
     db.select.mockReturnValueOnce(chain([ALLOWLISTED_ARTIFACT]))
     const { res, headers, getBody } = fakeResponse()
 
-    await controller.export('tenant-1', ALLOWLISTED_ARTIFACT.code, 'PDF', res)
+    await controller.export('tenant-1', ALLOWLISTED_ARTIFACT.code, 'PDF', res, ACTOR)
 
     expect(headers['Content-Type']).toBe('application/pdf')
     expect(headers['Content-Disposition']).toContain('.pdf')
@@ -141,7 +147,7 @@ describe('Reporting → real Jasper renderer, via the API controller/service (TA
     db.select.mockReturnValueOnce(chain([ALLOWLISTED_ARTIFACT]))
     const { res, headers, getBody } = fakeResponse()
 
-    await controller.export('tenant-1', ALLOWLISTED_ARTIFACT.code, 'XLSX', res)
+    await controller.export('tenant-1', ALLOWLISTED_ARTIFACT.code, 'XLSX', res, ACTOR)
 
     expect(headers['Content-Type']).toBe('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
     const body = getBody()
@@ -167,7 +173,7 @@ describe('Reporting → real Jasper renderer, via the API controller/service (TA
     }) as typeof fetch
 
     try {
-      await controller.export('tenant-1', ALLOWLISTED_ARTIFACT.code, 'PDF', res)
+      await controller.export('tenant-1', ALLOWLISTED_ARTIFACT.code, 'PDF', res, ACTOR)
     } finally {
       global.fetch = originalFetch
     }
@@ -185,7 +191,7 @@ describe('Reporting → real Jasper renderer, via the API controller/service (TA
 
     // Rejected by the API's own TemplateRegistryService before any network call to the renderer —
     // the renderer would also reject it (own allowlist), but the API fails closed first.
-    await expect(controller.export('tenant-1', UNKNOWN_TEMPLATE_ARTIFACT.code, 'PDF', res)).rejects.toMatchObject({
+    await expect(controller.export('tenant-1', UNKNOWN_TEMPLATE_ARTIFACT.code, 'PDF', res, ACTOR)).rejects.toMatchObject({
       status: 404,
     })
   })
@@ -199,11 +205,69 @@ describe('Reporting → real Jasper renderer, via the API controller/service (TA
     const originalToken = process.env.REPORT_RENDER_INTERNAL_TOKEN
     process.env.REPORT_RENDER_INTERNAL_TOKEN = 'deliberately-wrong-token'
     try {
-      await expect(controller.export('tenant-1', ALLOWLISTED_ARTIFACT.code, 'PDF', res)).rejects.toMatchObject({
+      await expect(controller.export('tenant-1', ALLOWLISTED_ARTIFACT.code, 'PDF', res, ACTOR)).rejects.toMatchObject({
         status: 502,
       })
     } finally {
       process.env.REPORT_RENDER_INTERNAL_TOKEN = originalToken
     }
+  })
+
+  /**
+   * TASK-027.56 — real proof (against the same already-running dev Jasper container, no new
+   * Docker build/run) that the dev-fixture "Geliştirme simülasyon verisi" export label row is not
+   * just sent in the request payload (already covered by the mocked reporting.service.spec.ts
+   * suite) but is actually visible in the renderer's real, FlateDecode-compressed PDF output — the
+   * exact thing a human opening the downloaded file would see. Decompression mirrors the manual
+   * verification done during implementation (`node -e` against a raw curl response).
+   */
+  describe('dev fixture export label row — real Jasper output', () => {
+    const ORIGINAL_ENV = { ...process.env }
+
+    afterEach(() => {
+      process.env = { ...ORIGINAL_ENV }
+    })
+
+    function findTextInPdfStreams(buffer: Buffer, needle: string): boolean {
+      const text = buffer.toString('latin1')
+      const streamRegex = /stream\r?\n([\s\S]*?)endstream/g
+      let match: RegExpExecArray | null
+      while ((match = streamRegex.exec(text))) {
+        try {
+          const inflated = inflateSync(Buffer.from(match[1] as string, 'latin1')).toString('utf8')
+          if (inflated.includes(needle)) return true
+        } catch {
+          // not every stream is FlateDecode-compressed text (fonts, etc.) — skip and keep scanning
+        }
+      }
+      return false
+    }
+
+    it('the real Jasper-rendered PDF for the dev fixture visibly contains the simulation label text', async () => {
+      if (skipIfRendererUnavailable()) return
+      process.env.NODE_ENV = 'development'
+      process.env.REPORTING_DEV_FIXTURES = 'true'
+
+      const db = buildMockDb()
+      const reportRender = new ReportRenderService()
+      const templateRegistry = new TemplateRegistryService()
+      const datasetResolver = new ReportDatasetResolver([new DevFixtureDatasetProvider()])
+      const auditService = new PlatformAuditService(db as never)
+      const service = new ReportingService(db as never, datasetResolver, reportRender, templateRegistry, auditService)
+      const controller = new ReportingController(service, reportRender)
+      const { res, getBody } = fakeResponse()
+
+      await controller.export('tenant-1', DEV_FIXTURE_ARTIFACT_CODE, 'PDF', res, ACTOR)
+
+      const body = getBody()
+      expect(body).toBeDefined()
+      expect(body!.subarray(0, 5).toString('utf8')).toBe('%PDF-')
+      expect(findTextInPdfStreams(body!, 'Geli')).toBe(true) // ASCII-safe substring of "Geliştirme"
+      // TASK-027.57 — the only db.select call left is PlatformAuditService.log()'s actor-snapshot
+      // lookup (for the REPORT_EXPORT_SUCCEEDED audit write); getArtifact itself still never
+      // touches report_artifacts for the fixture — it substituted the in-memory fixture, per
+      // TASK-027.55.
+      expect(db.select).toHaveBeenCalledTimes(1)
+    })
   })
 })

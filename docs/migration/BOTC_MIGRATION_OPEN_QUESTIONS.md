@@ -1293,3 +1293,96 @@ commit/push yapılmadı.
 Açık: Q-DP22a (kalıcı permission modeli), TASK-027.49 (tenant-rol delegasyonu), F6'nın kalan audit
 kapsamı, Q-DP21d, Q-DP17, Q-DP04, Q-ENV01, dev ROOT backfill, formal SYSTEM_ADMIN demotion yolu,
 `BREAK_GLASS_RECOVERY_TOKEN` üretimi/saklanması ve runbook onayı.
+
+## Task ID Normalizasyonu — 2026-09-22
+
+`TASK-027.49` tenant-role delegation kimliği olarak korunmuştur. Aynı kimliği
+kullanan export placeholder'ları kaldırılmış, Wave 5 grafik/export zinciri
+`TASK-027.54`–`TASK-027.59` aralığına normalize edilmiştir.
+Önceki tarihsel kayıtlar append-only kuralı gereği değiştirilmedi.
+
+---
+
+## Tenant-Role Delegation ve Tenant Permission Yönetimi — Q-DP24 madde 8 KAPANDI (TASK-027.49, 2026-09-22)
+
+Task'ın kendi "zorunlu başlangıç kapısı" gereği implementasyondan önce gerçek permission
+katalogu ve `PermissionGuard` çözümleme mantığı incelendi: **tenant-role delegation için onaylı
+bir permission kodu yoktu** (`TENANT:ROLE:*` katalogda yoktu; bu belgede tekrar tekrar "açık"
+olarak listelenmişti — bkz. yukarıdaki tüm "Açık:" satırları). Task kuralı gereği kod
+uydurulmadı; 10 karar sorusu Product Owner'a AskUserQuestion ile soruldu, kararlar alındıktan
+sonra implementasyon başladı.
+
+**Kararlar (Product Owner):** permission kodları `TENANT:ROLE:VIEW`/`ASSIGN`/`REVOKE` (mevcut
+`PLATFORM:ROLE:*` deseniyle tutarlı, üç ayrı kod); atama yetkisi o customer root'un
+`TENANT_ADMIN`'i + sistem yöneticisi (gerçek delegasyon — `assertCustomerAdminScope` yeniden
+kullanıldı); kendine atama izinli (yalnızca ceiling ile sınırlı); tenant rolleri yalnızca
+customer root düzeyinde (child tenant'a özel rol yönetimi yok); rol kaldırma için "son tenant
+yöneticisi" invariant'ı **gerekli** — yeni `tenant_roles.isAdminRole` boolean kolonu (migration
+`0004_tenant_role_admin_flag.sql`) ile işaretlenen rolün bir tenant'taki son ACTIVE ataması
+kaldırılamaz.
+
+**Uygulama:** yeni `apps/api/src/platform/tenant-role.{controller,service}.ts`,
+`domain/tenant-role-ceiling.domain.ts` (SYSTEM_ADMIN/TENANT_ADMIN ceiling modelinden ayrı, pure
+fonksiyon — TASK-027.46'nın `privilege-ceiling.domain.ts`'i değiştirilmedi). Route:
+`tenant-roles[/assignable|/users/:userId[/:assignmentId]]`, `X-Tenant-Id` header ile (mevcut
+`settings/*` deseni), tam guard zinciri + TASK-027.48 MFA enforcement kapsamına da eklendi. Her
+mutasyon impersonation reddi → actor DB'den ACTIVE yeniden okuma → `assertCustomerAdminScope` ile
+bağımsız scope teyidi → işleme-özel kural sırasıyla fail-closed. Duplicate atama, DB'nin gerçek
+unique constraint'i (`user_tenant_role_assignments_userId_roleId_key`) üzerinden
+`onConflictDoNothing()` ile race-safe şekilde 409'a çevriliyor (uygulama-seviyesi check-then-insert
+değil).
+
+**Bilinçli kapsam dışı:** tenant rolü oluşturma/düzenleme endpoint'i (task'ın kendi sözleşmesi
+yalnızca listeleme/atama/kaldırmayı istiyordu — `tenant_roles` satırları hâlâ ayrı bir
+mekanizmayla oluşturulmalı); web UI (task metninde MFA'daki gibi açık bir UI talebi yoktu, ikisi
+de ayrı follow-up olabilir); Global role/SYSTEM_ADMIN/TENANT_ADMIN sistem-rol ataması (bu yüzey
+yalnızca `tenant_roles`/`user_tenant_role_assignments` tablolarına dokunuyor, `system_roles`/
+`user_system_role_assignments` hiç dokunulmadı — yapısal olarak erişilemez).
+
+**Doğrulama:** yeni `tenant-role-ceiling.domain.spec.ts` (13 test), `tenant-role.service.spec.ts`
+(27 test) + `endpoint-authorization-inventory.spec.ts`/`privilege-model-evidence.spec.ts`
+güncellendi (E1: 30→33 katalog; E3 "tenant roles have no management surface" artık "tenant-role
+management surface" olarak yeniden yazıldı — TenantRoleService'in tek yazıcı olduğunu doğruluyor).
+**4 mutasyon kontrolü bizzat çalıştırılıp doğrulandı ve geri alındı:** scope kontrolü kaldırılınca
+12 test, impersonation reddi kaldırılınca 2 test, privilege ceiling kaldırılınca 2 test, duplicate/
+idempotency kontrolü kaldırılınca 1 test kırıldı. `pnpm --filter api exec jest --runInBand` → **57
+suite / 1570 test PASS**; api eslint/tsc temiz. Gerçek DB/HTTP kullanılmadı (tüm testler mock'lu);
+migration `drizzle-kit generate` ile üretildi, gerçek ortama uygulanmadı. Git commit/push
+yapılmadı.
+
+Açık: F6'nın kalan audit kapsamı, Q-DP21d, Q-DP17, Q-DP04, Q-ENV01, dev ROOT backfill, formal
+SYSTEM_ADMIN demotion yolu, `BREAK_GLASS_RECOVERY_TOKEN` üretimi/saklanması ve runbook onayı,
+tenant rolü oluşturma/düzenleme endpoint'i (bu task'ın bilinçli kapsam dışı bıraktığı, ayrı bir
+follow-up gerektiren madde).
+
+---
+
+## Tenant-Role Delegation — AI1 review düzeltmeleri (TASK-027.49, ikinci tur, 2026-09-22)
+
+TASK-027.49'un ilk teslimi AI1 tarafından `review`'da tutuldu; genel mimari doğru bulundu ama iki
+teknik nokta düzeltme olarak istendi: (1) son-tenant-yöneticisi sayımı kullanıcının `status`'unu
+filtrelemiyordu — pasif/kilitli bir kullanıcının `isAdminRole` ataması "hâlâ bir yönetici var"
+sanılabiliyordu; (2) kontrol ile silme arasında atomiklik yoktu — paralel iki revoke isteği aynı
+anda kontrolü geçip son iki yöneticiyi birlikte kaldırabilirdi.
+
+**Düzeltmeler:** `revokeRole`'daki son-yönetici sayımı artık kilitli atamaların sahibi
+kullanıcıları ayrıca `users.status = 'ACTIVE'` ile sorguluyor. `isAdminRole` yolunda tüm kontrol +
+silme artık tek bir `db.transaction()` içinde; tenant'taki tüm `isAdminRole` atamaları
+`SELECT ... FOR UPDATE` ile kilitleniyor (break-glass'ın TASK-027.47'de kurduğu aynı desen).
+Admin-flagged olmayan revoke'lar için transaction/kilit yükü eklenmedi.
+
+**Doğrulama:** 3 yeni test (pasif kullanıcı sayılmıyor, `status='ACTIVE'` filtresinin statik
+kontrolü, transaction+FOR UPDATE'in statik+davranışsal kontrolü). 2 mutasyon kontrolü bizzat
+çalıştırılıp doğrulandı ve geri alındı: `eq(users.status,...)` kaldırılınca 1 statik test,
+`.for('update')` kaldırılınca 1 test kırıldı. `pnpm --filter api exec jest --runInBand` → **57
+suite / 1573 test PASS**; `NODE_PATH=... TURBO_ENV_MODE=loose ./scripts/check.sh --skip-docker`
+→ tam PASS (lint dahil).
+
+**Açık kalan (bilinçli, onay bekliyor):** gerçek Postgres'te paralel iki revoke isteğinin
+gerçekten serileştiği canlı bir smoke test (TASK-027.47-R1'deki break-glass smoke testine benzer,
+geçici/izole bir Postgres container'ı gerektirir) bu turda çalıştırılmadı — istenirse ayrı bir
+kullanıcı onayıyla eklenebilir.
+
+Açık: F6'nın kalan audit kapsamı, Q-DP21d, Q-DP17, Q-DP04, Q-ENV01, dev ROOT backfill, formal
+SYSTEM_ADMIN demotion yolu, `BREAK_GLASS_RECOVERY_TOKEN` üretimi/saklanması ve runbook onayı,
+tenant rolü oluşturma/düzenleme endpoint'i, gerçek Postgres paralel-revoke smoke testi onayı.

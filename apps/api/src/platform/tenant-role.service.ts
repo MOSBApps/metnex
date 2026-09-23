@@ -1,5 +1,5 @@
 import { BadRequestException, ConflictException, ForbiddenException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common'
-import { and, eq, ne } from 'drizzle-orm'
+import { and, eq, inArray } from 'drizzle-orm'
 import { PlatformAuditService } from '../audit/platform-audit.service'
 import { DB, type Db } from '../db/db.module'
 import { tenantRolePermissions, tenantRoles, userTenantRoleAssignments, users } from '../db/schema'
@@ -201,17 +201,45 @@ export class TenantRoleService {
     if (!assignment) throw new NotFoundException('Atama bulunamadı')
 
     if (assignment.isAdminRole) {
-      const otherAdminAssignments = await this.db
-        .select({ id: userTenantRoleAssignments.id })
-        .from(userTenantRoleAssignments)
-        .innerJoin(tenantRoles, eq(userTenantRoleAssignments.roleId, tenantRoles.id))
-        .where(and(eq(userTenantRoleAssignments.tenantId, customerRootId), eq(tenantRoles.isAdminRole, true), ne(userTenantRoleAssignments.id, assignmentId)))
-      if (wouldRemoveLastTenantAdmin({ roleIsAdminRole: true, otherActiveAdminAssignmentsInTenant: otherAdminAssignments.length })) {
-        return this.deny({ ...op, reason: 'LAST_TENANT_ADMIN' }, { code: 'LAST_TENANT_ADMIN', message: 'Bu tenant\'ın son yönetici rolü ataması kaldırılamaz' })
-      }
-    }
+      // Last-tenant-admin floor, made atomic against concurrent revokes (AI1 review, 2026-09-22):
+      // every admin-role assignment in this tenant is locked FOR UPDATE for the duration of this
+      // transaction, so a second, parallel revoke of a DIFFERENT admin-role assignment in the
+      // SAME tenant blocks here until this transaction commits or rolls back — it can never
+      // observe a stale "another admin still exists" count and let two concurrent revokes each
+      // remove one of the last two admins. Only an ACTIVE user's assignment counts as a
+      // surviving admin (a revoked/inactive/locked user must not keep the tenant "covered").
+      const deniedReason = await this.db.transaction(async tx => {
+        const adminRoles = await tx
+          .select({ id: tenantRoles.id })
+          .from(tenantRoles)
+          .where(and(eq(tenantRoles.tenantId, customerRootId), eq(tenantRoles.isAdminRole, true)))
+        const adminRoleIds = adminRoles.map(r => r.id)
+        const lockedAssignments = adminRoleIds.length
+          ? await tx
+              .select({ id: userTenantRoleAssignments.id, userId: userTenantRoleAssignments.userId })
+              .from(userTenantRoleAssignments)
+              .where(and(eq(userTenantRoleAssignments.tenantId, customerRootId), inArray(userTenantRoleAssignments.roleId, adminRoleIds)))
+              .for('update')
+          : []
+        const otherAssignments = lockedAssignments.filter(a => a.id !== assignmentId)
+        const otherUserIds = [...new Set(otherAssignments.map(a => a.userId))]
+        const activeUserIds = otherUserIds.length
+          ? new Set((await tx.select({ id: users.id }).from(users).where(and(inArray(users.id, otherUserIds), eq(users.status, 'ACTIVE')))).map(u => u.id))
+          : new Set<string>()
+        const otherActiveAdminAssignmentsInTenant = otherAssignments.filter(a => activeUserIds.has(a.userId)).length
 
-    await this.db.delete(userTenantRoleAssignments).where(eq(userTenantRoleAssignments.id, assignmentId))
+        if (wouldRemoveLastTenantAdmin({ roleIsAdminRole: true, otherActiveAdminAssignmentsInTenant })) {
+          return 'LAST_TENANT_ADMIN' as const
+        }
+        await tx.delete(userTenantRoleAssignments).where(eq(userTenantRoleAssignments.id, assignmentId))
+        return null
+      })
+      if (deniedReason) {
+        return this.deny({ ...op, reason: deniedReason }, { code: deniedReason, message: 'Bu tenant\'ın son yönetici rolü ataması kaldırılamaz' })
+      }
+    } else {
+      await this.db.delete(userTenantRoleAssignments).where(eq(userTenantRoleAssignments.id, assignmentId))
+    }
 
     await this.auditOutcome({
       actorId, action: op.action, entityId: targetUserId, summary: `Tenant rolü kaldırıldı: ${targetUserId}`,

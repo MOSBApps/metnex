@@ -136,6 +136,7 @@ const SNAPSHOT = [
     'POST /platform/users/:id/memberships | addMembership | class=JwtAuthGuard,PermissionGuard,MfaEnforcementGuard | method= | perm=PLATFORM:USER:MANAGE_MEMBERSHIP',
     'DELETE /platform/users/:id/memberships/:membershipId | removeMembership | class=JwtAuthGuard,PermissionGuard,MfaEnforcementGuard | method= | perm=PLATFORM:USER:MANAGE_MEMBERSHIP',
     'GET /reports/artifacts | listArtifacts | class=JwtAuthGuard,PermissionGuard,MfaEnforcementGuard | method= | perm=REPORT:ARTIFACT:VIEW',
+    'GET /reports/:code/data | data | class=JwtAuthGuard,PermissionGuard,MfaEnforcementGuard | method= | perm=REPORT:ARTIFACT:VIEW',
     'GET /reports/:code/render | render | class=JwtAuthGuard,PermissionGuard,MfaEnforcementGuard | method= | perm=REPORT:ARTIFACT:VIEW',
     'GET /reports/:code/export/:format | export | class=JwtAuthGuard,PermissionGuard,MfaEnforcementGuard | method= | perm=REPORT:ARTIFACT:EXPORT',
     'GET /reports/renderer/health | health | class=JwtAuthGuard,PermissionGuard,MfaEnforcementGuard | method= | perm=REPORT:ARTIFACT:VIEW',
@@ -154,8 +155,7 @@ const SNAPSHOT = [
     'GET /settings/smtp/effective | getEffective | class=JwtAuthGuard,TenantHeaderFormatGuard,TenantMembershipGuard,PermissionGuard,MfaEnforcementGuard | method= | perm=SETTINGS:SMTP:VIEW',
     'GET /settings/smtp/override | getOverride | class=JwtAuthGuard,TenantHeaderFormatGuard,TenantMembershipGuard,PermissionGuard,MfaEnforcementGuard | method= | perm=SETTINGS:SMTP:VIEW',
     'PUT /settings/smtp/override | upsertOverride | class=JwtAuthGuard,TenantHeaderFormatGuard,TenantMembershipGuard,PermissionGuard,MfaEnforcementGuard | method= | perm=SETTINGS:SMTP:MANAGE',
-    'DELETE /settings/smtp/override | deleteOverride | class=JwtAuthGuard,TenantHeaderFormatGuard,TenantMembershipGuard,PermissionGuard,MfaEnforcementGuard | method= | perm=SETTINGS:SMTP:MANAGE',
-]
+    'DELETE /settings/smtp/override | deleteOverride | class=JwtAuthGuard,TenantHeaderFormatGuard,TenantMembershipGuard,PermissionGuard,MfaEnforcementGuard | method= | perm=SETTINGS:SMTP:MANAGE',]
 
 /** Endpoints reachable without a session, on purpose. */
 const PUBLIC = new Set([

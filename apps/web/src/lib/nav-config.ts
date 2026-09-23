@@ -66,6 +66,13 @@ export const NAV_MODULES: NavModuleConfig[] = [
       },
     ],
   },
+  {
+    key: 'REPORTING',
+    label: 'Raporlar',
+    scope: 'TENANT',
+    requiredPermission: 'REPORT:ARTIFACT:VIEW',
+    sections: [{ section: 'GENERAL', links: [{ label: 'Dashboard', href: '/app/reports' }] }],
+  },
 ]
 
 /** Platform-console module tree. Only ever rendered when the active tenant is PLATFORM_ROOT. */

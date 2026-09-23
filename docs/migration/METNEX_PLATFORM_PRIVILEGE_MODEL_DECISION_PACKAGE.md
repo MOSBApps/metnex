@@ -207,7 +207,7 @@ Her satır: AI2 önerisi · gerekçe · etkilenen endpoint/service · etkilenen 
 | **027.46** | `assignRole` sertleştirmesi: global `TENANT_ADMIN` yasağı, privilege tavanı (etkin izin kümesi), impersonation'da privilege değişikliği yasağı (+ teyit edilirse tenant-kapsamlı atamada ROOT+`TENANT_ADMIN`) | 3, 4, 6 | Başlatılmadı |
 | **027.47** | Eş sistem yöneticisi kuralı (parola/rol yasağı, deactivation serbest) **+ sistem yöneticisi kimlik bilgisi rotasyon yolu** (§14.5-A) **+ break-glass/rollback prosedürü** | 2, 10 | Başlatılmadı |
 | **027.48** | MFA geçiş kararı ve global privilege işlemlerinde MFA (Q-DP22b/c ile) | 7 | Tamamlandı (2026-09-22, bkz. §14.12) |
-| **027.49** | Tenant-rol delegasyonu: yeni permission (katalog onayı önce), endpoint, kapsam/üst sınır/audit | 8 | Başlatılmadı |
+| **027.49** | Tenant-rol delegasyonu: yeni permission (katalog onayı önce), endpoint, kapsam/üst sınır/audit | 8 | Tamamlandı (2026-09-22, bkz. §14.13) |
 
 (Numaralar AI1'in; AI2 önerilen kapsam dağılımını sunar, AI1 değiştirebilir.)
 
@@ -335,3 +335,52 @@ Bu paketin daha önce açık bıraktığı iki nokta netleşti:
 
 Yeni izin kodu icat edilmedi; admin reset ve policy route'ları hâlâ geçici `isSystemAdmin` kuralını
 kullanıyor (kalıcı model Q-DP22a'da açık).
+
+### 14.13 Implementation sınırı — TASK-027.49 (2026-09-22)
+
+Karar 8'de öngörülen şekilde uygulandı: **yeni permission kodları** (`TENANT:ROLE:VIEW`,
+`TENANT:ROLE:ASSIGN`, `TENANT:ROLE:REVOKE` — kataloğa eklendi, 30→33), **yetkili** yalnızca o
+customer root'un `TENANT_ADMIN`'i (mevcut `PermissionGuard`'ın `tenantAdminAssignment` kısa
+devresiyle örtük olarak "everything non-PLATFORM:*" alır, ayrıca yeni koda özel bir izin listesi
+eklemeye gerek yoktu) veya sistem yöneticisi, **yalnızca kendi root'unda**
+(`CustomerAccessService.assertCustomerAdminScope` yeniden kullanıldı, tekrar yazılmadı).
+
+Ek kullanıcı kararları (bu paketin karar 8'inde açık bırakılmış ayrıntılar):
+- Kendine atama: izin verilir, yalnızca ceiling ile sınırlı (`domain/tenant-role-ceiling.domain.ts`).
+- Kapsam seviyesi: yalnızca customer root düzeyi (child tenant'lara özel rol yönetimi yok).
+- Son yönetici koruması: yeni `tenant_roles.isAdminRole` kolonu (migration `0004_tenant_role_admin_flag.sql`)
+  ile işaretli bir rolün bir tenant'taki son ACTIVE ataması kaldırılamaz.
+
+Yeni dosyalar: `apps/api/src/platform/tenant-role.controller.ts`,
+`apps/api/src/platform/tenant-role.service.ts`,
+`apps/api/src/platform/domain/tenant-role-ceiling.domain.ts` (ayrı, SYSTEM_ADMIN/TENANT_ADMIN
+modelini — bu dosyanın kendisi — değiştirmeyen pure ceiling fonksiyonu). Route:
+`GET/POST/DELETE tenant-roles[/assignable|/users/:userId[/:assignmentId]]`,
+`X-Tenant-Id` header ile (mevcut `settings/*` controller deseniyle aynı), tam guard zinciri
+(`JwtAuthGuard, TenantHeaderFormatGuard, TenantMembershipGuard, PermissionGuard,
+MfaEnforcementGuard` + `@RequireMfaSetupComplete()` — TASK-027.48 enforcement kapsamına da girdi).
+
+**Kapsam dışı kalan (bilinçli):** tenant rolü **oluşturma/düzenleme** endpoint'i bu task'ta
+yapılmadı (task'ın kendi endpoint sözleşmesi yalnızca listeleme/atama/kaldırmayı istiyordu) —
+`tenant_roles` satırları hâlâ elle/ayrı bir mekanizmayla oluşturulmalı; web UI da yapılmadı (task
+metninde MFA'daki gibi açık bir UI talebi yoktu). İkisi de ayrı, daha küçük bir follow-up task
+olabilir.
+
+#### 14.13.1 AI1 review düzeltmeleri (2026-09-22, ikinci tur)
+
+İlk teslim `review`'da tutuldu; iki güvenlik açığı bulundu ve düzeltildi:
+
+1. Son-yönetici sayımı hedef kullanıcının `status`'unu filtrelemiyordu (pasif/kilitli bir
+   kullanıcının ataması "hâlâ bir yönetici var" sayılabiliyordu) — düzeltildi, artık yalnızca
+   `ACTIVE` kullanıcıların ataması sayılıyor.
+2. Kontrol (son-yönetici sayımı) ile silme arasında atomiklik yoktu — iki paralel revoke isteği
+   aynı anda kontrolü geçip son iki yöneticiyi birlikte kaldırabilirdi. Düzeltildi: tüm
+   `isAdminRole` yolu artık tek bir `db.transaction()` içinde, o tenant'taki tüm `isAdminRole`
+   atamaları `SELECT ... FOR UPDATE` ile kilitleniyor (break-glass'ın TASK-027.47'de kurduğu aynı
+   desen — `break-glass-recovery.service.ts`).
+
+İki mutasyon da bizzat çalıştırılıp doğrulandı (`eq(users.status,...)` kaldırılınca 1 statik test,
+`.for('update')` kaldırılınca 1 test kırıldı). Gerçek Postgres'te paralel iki revoke'un
+gerçekten serileştiği canlı bir smoke test (break-glass'ın TASK-027.47-R1 smoke testine benzer)
+**bu turda yapılmadı** — kod incelemesi + mock'lu testler + Postgres'in `FOR UPDATE`
+serileştirme garantisi bilgisine dayanıyor.

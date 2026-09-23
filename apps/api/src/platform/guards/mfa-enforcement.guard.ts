@@ -6,7 +6,20 @@ import { DB, type Db } from '../../db/db.module'
 import { userMfaSettings } from '../../db/schema'
 import { REQUIRE_MFA_SETUP_COMPLETE_KEY } from '../decorators/require-mfa-setup-complete.decorator'
 import { MfaRequirementService } from '../mfa-requirement.service'
-import type { JwtPayload } from '../auth.service'
+
+/**
+ * The object `JwtStrategy.validate()` actually attaches to `request.user` is
+ * `AuthService.validateJwtPayload()`'s return value — a spread of the `users` row plus a few JWT
+ * claims — which carries `id`, not `sub` (`sub` only exists on the raw, pre-validation JWT
+ * payload). Reading `user.sub` here always resolved to `undefined`, so every MFA-enforced request
+ * from every real user hit the `isActorActive(undefined)` → no matching row → "Hesap devre dışı"
+ * path, regardless of the user's actual DB status (TASK-027.60 root cause). `mfa.controller.ts`
+ * already guards against this ambiguity with the same `sub ?? id` fallback — mirrored here.
+ */
+interface RequestUser {
+  id: string
+  sub?: string
+}
 
 /**
  * Applied to every controller in scope for TASK-027.48 enforcement (see
@@ -32,16 +45,18 @@ export class MfaEnforcementGuard implements CanActivate {
     ])
     if (!required) return true
 
-    const request = context.switchToHttp().getRequest<{ user: JwtPayload }>()
+    const request = context.switchToHttp().getRequest<{ user: RequestUser & { mfaVerified?: boolean } }>()
     const user = request.user
     if (!user) return false
+    const userId = user.sub ?? user.id
+    if (!userId) return false
 
-    const isActive = await this.mfaRequirement.isActorActive(user.sub)
+    const isActive = await this.mfaRequirement.isActorActive(userId)
     if (!isActive) {
       throw new ForbiddenException('Hesap devre dışı')
     }
 
-    const mfaRequired = await this.mfaRequirement.isRequired(user.sub)
+    const mfaRequired = await this.mfaRequirement.isRequired(userId)
     if (!mfaRequired) return true
 
     if (user.mfaVerified) return true
@@ -49,11 +64,11 @@ export class MfaEnforcementGuard implements CanActivate {
     const [mfaSettings] = await this.db
       .select({ isEnabled: userMfaSettings.isEnabled })
       .from(userMfaSettings)
-      .where(eq(userMfaSettings.userId, user.sub))
+      .where(eq(userMfaSettings.userId, userId))
       .limit(1)
 
     if (!mfaSettings?.isEnabled) {
-      await this.writeDenialAudit(user.sub, 'MFA_SETUP_REQUIRED', context)
+      await this.writeDenialAudit(userId, 'MFA_SETUP_REQUIRED', context)
       throw new ForbiddenException({
         statusCode: 403,
         error: 'MFA_SETUP_REQUIRED',
@@ -61,7 +76,7 @@ export class MfaEnforcementGuard implements CanActivate {
       })
     }
 
-    await this.writeDenialAudit(user.sub, 'MFA_SESSION_NOT_VERIFIED', context)
+    await this.writeDenialAudit(userId, 'MFA_SESSION_NOT_VERIFIED', context)
     throw new ForbiddenException({
       statusCode: 403,
       error: 'MFA_SESSION_NOT_VERIFIED',

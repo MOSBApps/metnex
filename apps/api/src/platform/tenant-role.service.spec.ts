@@ -256,26 +256,43 @@ describe('revokeRole', () => {
     expect(revokeBody).toContain('eq(userTenantRoleAssignments.tenantId, customerRootId)')
   })
 
-  it('removing the last admin-flagged role assignment in the tenant is refused (last-tenant-admin floor)', async () => {
+  it('removing the last admin-flagged role assignment in the tenant is refused (last-tenant-admin floor) — locks the admin set, finds no other ACTIVE admin', async () => {
     const h = harness()
     queueActor(h, { isSystemAdmin: false })
     queueScopeSuccess(h, { isSystemAdmin: false, tenantAdminAssignment: true })
     h.db.select
-      .mockReturnValueOnce(chain([{ id: 'assign-1', userId: TARGET, roleId: 'admin-role', isAdminRole: true }]))
-      .mockReturnValueOnce(chain([])) // no OTHER active admin-flagged assignment in this tenant
+      .mockReturnValueOnce(chain([{ id: 'assign-1', userId: TARGET, roleId: 'admin-role', isAdminRole: true }])) // assignment lookup
+      .mockReturnValueOnce(chain([{ id: 'admin-role' }])) // tx: admin-flagged roles in this tenant
+      .mockReturnValueOnce(chain([{ id: 'assign-1', userId: TARGET }])) // tx: locked admin-role assignments FOR UPDATE — only this one
     const error = await h.service.revokeRole(ACTOR, ROOT, TARGET, 'assign-1', {}).catch(e => e)
     expect(error).toBeInstanceOf(ForbiddenException)
     expect(h.db.delete).not.toHaveBeenCalled()
     expect(h.audit.log).toHaveBeenCalledWith(expect.objectContaining({ metadata: expect.objectContaining({ reason: 'LAST_TENANT_ADMIN' }) }))
   })
 
-  it('removing an admin-flagged assignment succeeds when another admin-flagged assignment remains in the tenant', async () => {
+  it('an admin-flagged assignment held by an INACTIVE user does not count as a surviving admin (AI1 review fix)', async () => {
     const h = harness()
     queueActor(h, { isSystemAdmin: false })
     queueScopeSuccess(h, { isSystemAdmin: false, tenantAdminAssignment: true })
     h.db.select
-      .mockReturnValueOnce(chain([{ id: 'assign-1', userId: TARGET, roleId: 'admin-role', isAdminRole: true }]))
-      .mockReturnValueOnce(chain([{ id: 'assign-2' }])) // one other admin-flagged assignment
+      .mockReturnValueOnce(chain([{ id: 'assign-1', userId: TARGET, roleId: 'admin-role', isAdminRole: true }])) // assignment lookup
+      .mockReturnValueOnce(chain([{ id: 'admin-role' }])) // tx: admin-flagged roles
+      .mockReturnValueOnce(chain([{ id: 'assign-1', userId: TARGET }, { id: 'assign-2', userId: 'inactive-user' }])) // tx: locked assignments — a second one exists, but its user is inactive
+      .mockReturnValueOnce(chain([])) // tx: ACTIVE users among {inactive-user} — none
+    const error = await h.service.revokeRole(ACTOR, ROOT, TARGET, 'assign-1', {}).catch(e => e)
+    expect(error).toBeInstanceOf(ForbiddenException)
+    expect(h.db.delete).not.toHaveBeenCalled()
+  })
+
+  it('removing an admin-flagged assignment succeeds when another ACTIVE admin-flagged assignment remains in the tenant', async () => {
+    const h = harness()
+    queueActor(h, { isSystemAdmin: false })
+    queueScopeSuccess(h, { isSystemAdmin: false, tenantAdminAssignment: true })
+    h.db.select
+      .mockReturnValueOnce(chain([{ id: 'assign-1', userId: TARGET, roleId: 'admin-role', isAdminRole: true }])) // assignment lookup
+      .mockReturnValueOnce(chain([{ id: 'admin-role' }])) // tx: admin-flagged roles
+      .mockReturnValueOnce(chain([{ id: 'assign-1', userId: TARGET }, { id: 'assign-2', userId: 'other-admin' }])) // tx: locked assignments
+      .mockReturnValueOnce(chain([{ id: 'other-admin' }])) // tx: ACTIVE users among {other-admin}
     h.db.delete.mockReturnValueOnce(chain(undefined))
     await expect(h.service.revokeRole(ACTOR, ROOT, TARGET, 'assign-1', {})).resolves.toEqual({ success: true })
   })
@@ -284,6 +301,36 @@ describe('revokeRole', () => {
     const h = harness()
     expect(await h.service.revokeRole(ACTOR, ROOT, 'a b', 'assign-1', {}).catch(e => e)).toBeInstanceOf(BadRequestException)
     expect(h.db.select).not.toHaveBeenCalled()
+  })
+
+  it("the last-admin count query filters by users.status = 'ACTIVE' (AI1 review: a mock can't prove this behaviourally — it returns whatever is configured regardless of the real WHERE clause — so this is a static check of the source)", () => {
+    const source = require('node:fs').readFileSync(require('node:path').join(__dirname, 'tenant-role.service.ts'), 'utf8')
+    const revokeBody = source.slice(source.indexOf('async revokeRole'))
+    const activeUsersQuery = revokeBody.slice(revokeBody.indexOf('const activeUserIds ='), revokeBody.indexOf('const otherActiveAdminAssignmentsInTenant ='))
+    expect(activeUsersQuery).toContain("eq(users.status, 'ACTIVE')")
+  })
+
+  it('the last-admin check and the delete run inside the SAME transaction, with the admin-role assignments locked FOR UPDATE (AI1 review: atomicity against a concurrent revoke)', async () => {
+    const h = harness()
+    queueActor(h, { isSystemAdmin: false })
+    queueScopeSuccess(h, { isSystemAdmin: false, tenantAdminAssignment: true })
+    h.db.select
+      .mockReturnValueOnce(chain([{ id: 'assign-1', userId: TARGET, roleId: 'admin-role', isAdminRole: true }]))
+      .mockReturnValueOnce(chain([{ id: 'admin-role' }]))
+    const lockedChain = chain([{ id: 'assign-1', userId: TARGET }])
+    h.db.select.mockReturnValueOnce(lockedChain)
+    h.db.delete.mockReturnValueOnce(chain(undefined))
+    await h.service.revokeRole(ACTOR, ROOT, TARGET, 'assign-1', {}).catch(() => undefined)
+    expect(h.db.transaction).toHaveBeenCalledTimes(1)
+    expect(lockedChain.for).toHaveBeenCalledWith('update')
+    // Non-admin-flagged revokes need no locking/transaction at all — only the admin-floor path does.
+    const h2 = harness()
+    queueActor(h2, { isSystemAdmin: false })
+    queueScopeSuccess(h2, { isSystemAdmin: false, tenantAdminAssignment: true })
+    h2.db.select.mockReturnValueOnce(chain([{ id: 'assign-2', userId: TARGET, roleId: 'role-x', isAdminRole: false }]))
+    h2.db.delete.mockReturnValueOnce(chain(undefined))
+    await h2.service.revokeRole(ACTOR, ROOT, TARGET, 'assign-2', {})
+    expect(h2.db.transaction).not.toHaveBeenCalled()
   })
 })
 

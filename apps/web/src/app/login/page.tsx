@@ -1,9 +1,23 @@
 'use client'
 
+import Image from 'next/image'
 import { FormEvent, useState } from 'react'
+import { BrandLogo } from '../../components/brand-logo'
 import { getApiBase } from '../../lib/api-base'
 import { buildMfaChallengePayload, sanitizeNumericCode, type MfaChallengeResponse } from '../../lib/mfa-login-flow'
 import { setAccessToken } from '../../lib/refresh'
+
+// TASK-027.61 — metnex_png.png (the wide, dark hero artwork) is decorative background only, behind
+// an already-opaque form card — it carries no information of its own, so it is `aria-hidden` with
+// an empty alt, per the task's own accessibility requirement for decorative images.
+function LoginHeroBackground() {
+  return (
+    <div aria-hidden="true" className="pointer-events-none fixed inset-0 -z-10 flex items-center justify-center overflow-hidden bg-[#060814]">
+      <Image src="/brand/metnex-login.png" alt="" fill priority unoptimized className="object-contain object-center opacity-90 transition-opacity" />
+      <div className="absolute inset-0 bg-black/10 dark:bg-black/30" />
+    </div>
+  )
+}
 
 type MfaChallenge = MfaChallengeResponse
 
@@ -87,7 +101,8 @@ export default function LoginPage() {
 
   if (challenge) {
     return (
-      <div className="app-page flex items-center justify-center p-6">
+      <div className="app-page relative flex items-center justify-center bg-transparent p-6">
+        <LoginHeroBackground />
         <div className="app-card w-full max-w-sm p-8">
           <div className="mb-8 text-center">
             <h1 className="m-0 text-2xl font-semibold text-ink">MFA Doğrulama</h1>
@@ -142,11 +157,11 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="app-page flex items-center justify-center p-6">
+    <div className="app-page relative flex items-center justify-center bg-transparent p-6">
+      <LoginHeroBackground />
       <div className="app-card w-full max-w-sm p-8">
         <div className="mb-8 text-center">
-          <h1 className="m-0 text-2xl font-semibold text-ink">Metnex</h1>
-          <p className="mt-2 text-sm text-ink-muted">Platform foundation starter</p>
+          <BrandLogo variant="firma" height={120} priority className="mx-auto max-w-full h-auto object-contain" />
         </div>
         <form onSubmit={handleSubmit} className="space-y-4">
           {error ? <div className="rounded-lg border border-status-danger bg-status-danger_bg px-3 py-3 text-sm text-status-danger">{error}</div> : null}

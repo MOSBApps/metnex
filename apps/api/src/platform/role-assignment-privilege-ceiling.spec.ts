@@ -119,7 +119,7 @@ describe('parity: the model agrees with the REAL PermissionGuard', () => {
         db.select.mockReturnValueOnce(chain([])) // tenantRolePermissions: no management surface, always empty
       }
     }
-    const guard = new PermissionGuard(new Reflector(), db as never)
+    const guard = new PermissionGuard(new Reflector(), db as never, { log: jest.fn() } as never)
     const handler = () => undefined
     class Controller {}
     Reflect.defineMetadata(PERMISSION_KEY, permission, handler)

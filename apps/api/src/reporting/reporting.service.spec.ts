@@ -1,242 +1,640 @@
 import { BadGatewayException, BadRequestException, NotFoundException } from '@nestjs/common'
 import { buildMockDb, chain } from '../db/test-helpers/drizzle-mock'
-import type { ReportDataset } from './dataset/report-dataset.contract'
-import { ReportRenderService } from './report-render.service'
+import { DEV_FIXTURE_ARTIFACT, DEV_FIXTURE_ARTIFACT_CODE } from './dataset/dev-fixture-dataset.provider'
+import { ReportDatasetResolver } from './dataset/report-dataset.resolver'
 import { ReportingService } from './reporting.service'
-import { TemplateRegistryService } from './templates/template-registry'
 
-const SAMPLE_ARTIFACT = {
-  code: 'SAMPLE_REPORT',
-  title: 'Sample Report',
-  isActive: true,
-  templatePath: null,
-  supportedOutputFormats: ['HTML', 'PDF', 'XLSX'],
-}
-
-const TEMPLATED_ARTIFACT = {
-  code: 'TEMPLATED-REPORT',
-  title: 'Templated Report',
-  isActive: true,
-  // Non-null just means "this artifact needs a renderer template" — the literal value is never
-  // forwarded anywhere; the real template is looked up by artifact.code in the allowlist.
-  templatePath: 'legacy-metadata-only-field',
-  supportedOutputFormats: ['HTML', 'PDF', 'XLSX'],
-}
-
-// Its code, lower-cased, is exactly the templateId both the API's and the renderer's allowlists
-// register (apps/api/.../templates/sample-report.jrxml and
-// services/jasper-renderer/.../templates/sample-report.jrxml — same file, TASK-022.5-R1).
-const ALLOWLISTED_TEMPLATED_ARTIFACT = {
-  code: 'SAMPLE-REPORT',
-  title: 'Allowlisted Sample Report',
-  isActive: true,
-  templatePath: 'legacy-metadata-only-field',
-  supportedOutputFormats: ['HTML', 'PDF', 'XLSX'],
-}
-
-const OTHER_ARTIFACT = {
-  code: 'OTHER_REPORT',
-  title: 'Other Report',
-  isActive: true,
-  templatePath: null,
-  supportedOutputFormats: ['HTML', 'PDF', 'XLSX'],
-}
-
-function emptyDataset(): ReportDataset {
-  return { rows: [], totalAmount: 0 }
-}
-
-function build() {
+/**
+ * TASK-027.54 — `loadData` (the new JSON endpoint's service method). `renderHtml`/`exportReport`
+ * are pre-existing and unchanged; not re-tested here.
+ *
+ * DEC-0012 governs this file directly: reporting core seeds zero rows and registers zero dataset
+ * providers by default (the Demo Operations sample artifact/provider it removed). An earlier
+ * revision of this task violated that by adding a runtime `onModuleInit` demo-artifact seed and a
+ * demo dataset provider — reverted per AI1 review. `no regression against DEC-0012` below is a
+ * static guard against that regression recurring, not just a behavioural check.
+ */
+function harness() {
   const db = buildMockDb()
-  const provider = { loadDataset: jest.fn().mockResolvedValue(emptyDataset()) }
-  const datasetResolver = {
-    resolve: jest.fn((code: string) => {
-      const known = [SAMPLE_ARTIFACT.code, TEMPLATED_ARTIFACT.code, ALLOWLISTED_TEMPLATED_ARTIFACT.code]
-      if (!known.includes(code)) {
-        throw new NotFoundException(`Bu artifact için dataset provider bulunamadı: ${code}`)
-      }
-      return provider
-    }),
-  }
-  const reportRender = new ReportRenderService()
-  // Real TemplateRegistryService with its real allowlist (currently just 'sample-report',
-  // mirrored on the renderer side) — 'templated-report' (TEMPLATED_ARTIFACT's code, lower-cased)
-  // is deliberately NOT in it, which is exactly the "unknown template id" scenario tested below.
-  const templateRegistry = new TemplateRegistryService()
-  const service = new ReportingService(db as never, datasetResolver as never, reportRender, templateRegistry)
-  return { service, db, datasetResolver, provider, reportRender, templateRegistry }
+  const provider = { supports: jest.fn(), loadDataset: jest.fn() }
+  const resolver = new ReportDatasetResolver([provider as never])
+  const reportRender = { isConfigured: jest.fn(() => false), render: jest.fn() }
+  const templateRegistry = { resolve: jest.fn() }
+  const auditService = { log: jest.fn(async () => undefined) }
+  const service = new ReportingService(db as never, resolver, reportRender as never, templateRegistry as never, auditService as never)
+  return { db, provider, reportRender, templateRegistry, auditService, service }
 }
 
-describe('ReportingService', () => {
+describe('ReportingService.loadData', () => {
+  it('returns { artifact, rows, totalAmount } — no HTML built, unlike renderHtml', async () => {
+    const h = harness()
+    h.db.select.mockReturnValueOnce(chain([{ code: 'A1', title: 'Artifact 1', isActive: true }]))
+    h.provider.supports.mockReturnValue(true)
+    h.provider.loadDataset.mockResolvedValueOnce({ rows: [{ no: '1', label: 'x', occurredAt: '2026-01-01', status: 'OK', quantity: 1, unitPrice: 1, amount: 1 }], totalAmount: 1 })
+
+    const result = await h.service.loadData('tenant-1', 'A1', {})
+    expect(result).toEqual({
+      artifact: { code: 'A1', title: 'Artifact 1', isActive: true },
+      rows: [{ no: '1', label: 'x', occurredAt: '2026-01-01', status: 'OK', quantity: 1, unitPrice: 1, amount: 1 }],
+      totalAmount: 1,
+    })
+    expect(result).not.toHaveProperty('html')
+  })
+
+  it('passes q/status filters through to the provider unchanged', async () => {
+    const h = harness()
+    h.db.select.mockReturnValueOnce(chain([{ code: 'A1', isActive: true }]))
+    h.provider.supports.mockReturnValue(true)
+    h.provider.loadDataset.mockResolvedValueOnce({ rows: [], totalAmount: 0 })
+
+    await h.service.loadData('tenant-1', 'A1', { q: 'search', status: 'FAILED' })
+    expect(h.provider.loadDataset).toHaveBeenCalledWith('tenant-1', { q: 'search', status: 'FAILED' })
+  })
+
+  it('a missing artifact is a 404, the dataset resolver/provider is never reached', async () => {
+    const h = harness()
+    h.db.select.mockReturnValueOnce(chain([]))
+    const error = await h.service.loadData('tenant-1', 'MISSING', {}).catch(e => e)
+    expect(error).toBeInstanceOf(NotFoundException)
+    expect(h.provider.loadDataset).not.toHaveBeenCalled()
+  })
+
+  it('an inactive artifact is also a 404 (same rule renderHtml/exportReport already enforce)', async () => {
+    const h = harness()
+    h.db.select.mockReturnValueOnce(chain([{ code: 'A1', isActive: false }]))
+    const error = await h.service.loadData('tenant-1', 'A1', {}).catch(e => e)
+    expect(error).toBeInstanceOf(NotFoundException)
+  })
+
+  it('an artifact with no matching dataset provider is a 404 (the pre-existing resolver behaviour, and DEC-0012\'s intended default state when no domain module has registered one yet)', async () => {
+    const h = harness()
+    h.db.select.mockReturnValueOnce(chain([{ code: 'UNMAPPED', isActive: true }]))
+    h.provider.supports.mockReturnValue(false)
+    const error = await h.service.loadData('tenant-1', 'UNMAPPED', {}).catch(e => e)
+    expect(error).toBeInstanceOf(NotFoundException)
+  })
+})
+
+describe('ReportingService.loadData — tenant isolation', () => {
+  it('the tenantId passed to loadData is exactly what reaches the provider, unmodified by filters', async () => {
+    const h = harness()
+    h.db.select.mockReturnValue(chain([{ code: 'A1', isActive: true }]))
+    h.provider.supports.mockReturnValue(true)
+    h.provider.loadDataset.mockResolvedValue({ rows: [], totalAmount: 0 })
+
+    await h.service.loadData('tenant-a', 'A1', { q: 'tenant-b', status: 'tenant-c' })
+    expect(h.provider.loadDataset).toHaveBeenCalledWith('tenant-a', { q: 'tenant-b', status: 'tenant-c' })
+  })
+
+  it('two calls for two different tenants each carry their own tenantId — no shared/stale state between calls', async () => {
+    const h = harness()
+    h.db.select.mockReturnValue(chain([{ code: 'A1', isActive: true }]))
+    h.provider.supports.mockReturnValue(true)
+    h.provider.loadDataset.mockResolvedValue({ rows: [], totalAmount: 0 })
+
+    await h.service.loadData('tenant-a', 'A1', {})
+    await h.service.loadData('tenant-b', 'A1', {})
+
+    expect(h.provider.loadDataset).toHaveBeenNthCalledWith(1, 'tenant-a', {})
+    expect(h.provider.loadDataset).toHaveBeenNthCalledWith(2, 'tenant-b', {})
+  })
+})
+
+describe('ReportingService — no regression against DEC-0012 (no seed, no default provider)', () => {
+  it('does not implement OnModuleInit / seed anything at startup', () => {
+    const h = harness()
+    expect((h.service as unknown as { onModuleInit?: unknown }).onModuleInit).toBeUndefined()
+  })
+
+  it('never calls db.insert — this service is read-only against report_artifacts', async () => {
+    const h = harness()
+    h.db.select.mockReturnValueOnce(chain([{ code: 'A1', isActive: true }]))
+    h.provider.supports.mockReturnValue(true)
+    h.provider.loadDataset.mockResolvedValueOnce({ rows: [], totalAmount: 0 })
+
+    await h.service.loadData('tenant-1', 'A1', {})
+    expect(h.db.insert).not.toHaveBeenCalled()
+  })
+})
+
+/**
+ * TASK-027.55 — `getArtifact`/`listArtifacts` substitute an in-memory `DEV_FIXTURE_ARTIFACT` for a
+ * DB lookup, but only when `isDevFixtureEnabled()` (NODE_ENV=development AND
+ * REPORTING_DEV_FIXTURES=true) — re-evaluated on every call via `process.env`, not cached. This
+ * never writes to `report_artifacts`; see the `db.insert` assertion in every case below.
+ */
+describe('ReportingService — dev fixture artifact substitution (env-gated, no DB write)', () => {
+  const ORIGINAL_ENV = { ...process.env }
   afterEach(() => {
-    delete process.env.REPORT_RENDER_ENDPOINT
-    delete process.env.REPORT_RENDER_INTERNAL_TOKEN
+    process.env = { ...ORIGINAL_ENV }
   })
 
-  it('listArtifacts returns active report artifacts', async () => {
-    const { service, db } = build()
-    db.select.mockReturnValueOnce(chain([SAMPLE_ARTIFACT, OTHER_ARTIFACT]))
+  it('returns the in-memory DEV_FIXTURE_ARTIFACT without touching the DB when enabled and the code matches', async () => {
+    process.env.NODE_ENV = 'development'
+    process.env.REPORTING_DEV_FIXTURES = 'true'
+    const h = harness()
 
-    const { artifacts } = await service.listArtifacts('tenant-1')
-
-    expect(artifacts.map(a => a.code)).toEqual(['SAMPLE_REPORT', 'OTHER_REPORT'])
+    const artifact = await h.service.getArtifact('tenant-1', DEV_FIXTURE_ARTIFACT_CODE)
+    expect(artifact).toEqual(DEV_FIXTURE_ARTIFACT)
+    expect(h.db.select).not.toHaveBeenCalled()
   })
 
-  it('getArtifact returns requested report artifact when found', async () => {
-    const { service, db } = build()
-    db.select.mockReturnValueOnce(chain([SAMPLE_ARTIFACT]))
+  it('falls through to the real DB lookup for any other code, even when the fixture flag is enabled', async () => {
+    process.env.NODE_ENV = 'development'
+    process.env.REPORTING_DEV_FIXTURES = 'true'
+    const h = harness()
+    h.db.select.mockReturnValueOnce(chain([{ code: 'REAL_ARTIFACT', isActive: true }]))
 
-    await expect(service.getArtifact('tenant-1', 'SAMPLE_REPORT')).resolves.toEqual(SAMPLE_ARTIFACT)
+    const artifact = await h.service.getArtifact('tenant-1', 'REAL_ARTIFACT')
+    expect(artifact).toEqual({ code: 'REAL_ARTIFACT', isActive: true })
+    expect(h.db.select).toHaveBeenCalledTimes(1)
   })
 
-  it('resolves the dataset provider by artifact code', async () => {
-    const { service, db, datasetResolver } = build()
-    db.select.mockReturnValueOnce(chain([SAMPLE_ARTIFACT]))
+  it('does NOT substitute the fixture artifact when NODE_ENV=production, even if the code matches — falls through to a real (empty) DB lookup and 404s', async () => {
+    process.env.NODE_ENV = 'production'
+    process.env.REPORTING_DEV_FIXTURES = 'true'
+    const h = harness()
+    h.db.select.mockReturnValueOnce(chain([]))
 
-    await service.renderHtml('tenant-1', 'SAMPLE_REPORT', {})
-
-    expect(datasetResolver.resolve).toHaveBeenCalledWith('SAMPLE_REPORT')
+    const error = await h.service.getArtifact('tenant-1', DEV_FIXTURE_ARTIFACT_CODE).catch(e => e)
+    expect(error).toBeInstanceOf(NotFoundException)
+    expect(h.db.select).toHaveBeenCalledTimes(1)
   })
 
-  it('passes tenantId through to the resolved provider', async () => {
-    const { service, db, provider } = build()
-    db.select.mockReturnValueOnce(chain([SAMPLE_ARTIFACT]))
+  it('does NOT substitute the fixture artifact when the flag is missing, even in development', async () => {
+    process.env.NODE_ENV = 'development'
+    delete process.env.REPORTING_DEV_FIXTURES
+    const h = harness()
+    h.db.select.mockReturnValueOnce(chain([]))
 
-    await service.renderHtml('tenant-42', 'SAMPLE_REPORT', { status: 'OPEN' })
-
-    expect(provider.loadDataset).toHaveBeenCalledWith('tenant-42', { status: 'OPEN' })
+    const error = await h.service.getArtifact('tenant-1', DEV_FIXTURE_ARTIFACT_CODE).catch(e => e)
+    expect(error).toBeInstanceOf(NotFoundException)
+    expect(h.db.select).toHaveBeenCalledTimes(1)
   })
 
-  it('render rejects artifacts with no dataset provider (controlled NotFoundException)', async () => {
-    const { service, db } = build()
-    db.select.mockReturnValueOnce(chain([OTHER_ARTIFACT]))
+  it('listArtifacts prepends the fixture artifact only when enabled', async () => {
+    process.env.NODE_ENV = 'development'
+    process.env.REPORTING_DEV_FIXTURES = 'true'
+    const h = harness()
+    h.db.select.mockReturnValueOnce(chain([{ code: 'REAL_ARTIFACT', isActive: true }]))
 
-    await expect(service.renderHtml('tenant-1', 'OTHER_REPORT', {})).rejects.toBeInstanceOf(NotFoundException)
+    const result = await h.service.listArtifacts('tenant-1')
+    expect(result.artifacts[0]).toEqual(DEV_FIXTURE_ARTIFACT)
+    expect(result.artifacts).toHaveLength(2)
   })
 
-  it('export rejects artifacts with no dataset provider (controlled NotFoundException)', async () => {
-    const { service, db } = build()
-    db.select.mockReturnValueOnce(chain([OTHER_ARTIFACT]))
+  it('listArtifacts never includes the fixture artifact when disabled', async () => {
+    process.env.NODE_ENV = 'production'
+    delete process.env.REPORTING_DEV_FIXTURES
+    const h = harness()
+    h.db.select.mockReturnValueOnce(chain([{ code: 'REAL_ARTIFACT', isActive: true }]))
 
-    await expect(service.exportReport('tenant-1', 'OTHER_REPORT', 'PDF', {})).rejects.toBeInstanceOf(NotFoundException)
+    const result = await h.service.listArtifacts('tenant-1')
+    expect(result.artifacts).toEqual([{ code: 'REAL_ARTIFACT', isActive: true }])
   })
 
-  it('rejects an unrecognized format at runtime (route params are not type-enforced)', async () => {
-    const { service, db } = build()
-    db.select.mockReturnValueOnce(chain([SAMPLE_ARTIFACT]))
+  it('getArtifact/listArtifacts never call db.insert regardless of fixture mode', async () => {
+    process.env.NODE_ENV = 'development'
+    process.env.REPORTING_DEV_FIXTURES = 'true'
+    const h = harness()
+    h.db.select.mockReturnValue(chain([]))
 
-    await expect(
-      service.exportReport('tenant-1', 'SAMPLE_REPORT', 'CSV' as never, {}),
-    ).rejects.toBeInstanceOf(BadRequestException)
+    await h.service.getArtifact('tenant-1', DEV_FIXTURE_ARTIFACT_CODE).catch(() => undefined)
+    await h.service.listArtifacts('tenant-1').catch(() => undefined)
+    expect(h.db.insert).not.toHaveBeenCalled()
+  })
+})
+
+const EXPORTABLE_ARTIFACT = { code: 'A1', title: 'Artifact 1', isActive: true, supportedOutputFormats: ['PDF', 'XLSX'], templatePath: null }
+const SAMPLE_ROW = { no: '1', label: 'x', occurredAt: '2026-01-01T00:00:00.000Z', status: 'OK', quantity: 2, unitPrice: 5, amount: 10 }
+
+/**
+ * TASK-027.56 — `exportReport` had no direct unit coverage before this task (only the real-network
+ * suite in reporting.jasper-integration.spec.ts exercised it, and only when a live renderer is
+ * reachable). This block covers the Jasper-configured/fallback branch, filters, format validation,
+ * tenant isolation, and the PDF/XLSX magic-number/secret-redaction guarantees at the mock level —
+ * independent of whether a real renderer container happens to be running.
+ */
+describe('ReportingService.exportReport', () => {
+  it('rejects an unsupported format before touching the artifact/provider at all', async () => {
+    const h = harness()
+    const error = await h.service.exportReport('tenant-1', 'A1', 'RTF' as never, {}, 'actor-1').catch(e => e)
+    expect(error).toBeInstanceOf(BadRequestException)
+    expect(h.db.select).not.toHaveBeenCalled()
   })
 
-  it('rejects export for an artifact whose template id is not in the allowlist (controlled error, not a silent bypass)', async () => {
-    const { service, db } = build()
-    db.select.mockReturnValueOnce(chain([TEMPLATED_ARTIFACT]))
-
-    await expect(
-      service.exportReport('tenant-1', 'TEMPLATED-REPORT', 'PDF', {}),
-    ).rejects.toBeInstanceOf(NotFoundException)
+  it('a missing artifact is a 404, the dataset resolver/provider is never reached', async () => {
+    const h = harness()
+    h.db.select.mockReturnValueOnce(chain([]))
+    const error = await h.service.exportReport('tenant-1', 'MISSING', 'PDF', {}, 'actor-1').catch(e => e)
+    expect(error).toBeInstanceOf(NotFoundException)
+    expect(h.provider.loadDataset).not.toHaveBeenCalled()
   })
 
-  it('export produces a genuinely valid XLSX (ZIP-signed) buffer, not CSV mislabeled as XLSX', async () => {
-    const { service, db, provider } = build()
-    db.select.mockReturnValueOnce(chain([SAMPLE_ARTIFACT]))
-    provider.loadDataset.mockResolvedValue({
-      rows: [{ no: 'TRX-0001', label: 'Row 1', occurredAt: new Date(), status: 'OPEN', quantity: 2, unitPrice: 125, amount: 250 }],
-      totalAmount: 250,
+  it('an inactive artifact is a 404, same as loadData/renderHtml — and this never reaches the audit write (no denial/success/failure audit for a plain 404)', async () => {
+    const h = harness()
+    // supports(true) proves the 404 comes from getArtifact's own isActive check, not incidentally
+    // from ReportDatasetResolver.resolve() rejecting an unconfigured provider (which would also
+    // throw NotFoundException and mask a broken isActive check).
+    h.provider.supports.mockReturnValue(true)
+    h.db.select.mockReturnValueOnce(chain([{ ...EXPORTABLE_ARTIFACT, isActive: false }]))
+    const error = await h.service.exportReport('tenant-1', 'A1', 'PDF', {}, 'actor-1').catch(e => e)
+    expect(error).toBeInstanceOf(NotFoundException)
+    expect(h.provider.loadDataset).not.toHaveBeenCalled()
+    expect(h.auditService.log).not.toHaveBeenCalled()
+  })
+
+  it('rejects a format the artifact does not declare in supportedOutputFormats', async () => {
+    const h = harness()
+    h.db.select.mockReturnValueOnce(chain([{ ...EXPORTABLE_ARTIFACT, supportedOutputFormats: ['XLSX'] }]))
+    h.provider.supports.mockReturnValue(true)
+    const error = await h.service.exportReport('tenant-1', 'A1', 'PDF', {}, 'actor-1').catch(e => e)
+    expect(error).toBeInstanceOf(BadRequestException)
+    expect(h.provider.loadDataset).not.toHaveBeenCalled()
+  })
+
+  it('passes q/status filters through to the provider unchanged', async () => {
+    const h = harness()
+    h.db.select.mockReturnValueOnce(chain([EXPORTABLE_ARTIFACT]))
+    h.provider.supports.mockReturnValue(true)
+    h.provider.loadDataset.mockResolvedValueOnce({ rows: [], totalAmount: 0 })
+
+    await h.service.exportReport('tenant-1', 'A1', 'PDF', { q: 'search', status: 'FAILED' }, 'actor-1')
+    expect(h.provider.loadDataset).toHaveBeenCalledWith('tenant-1', { q: 'search', status: 'FAILED' })
+  })
+
+  describe('tenant isolation', () => {
+    it('the tenantId reaching the provider is exact, unmodified by filters', async () => {
+      const h = harness()
+      h.db.select.mockReturnValue(chain([EXPORTABLE_ARTIFACT]))
+      h.provider.supports.mockReturnValue(true)
+      h.provider.loadDataset.mockResolvedValue({ rows: [], totalAmount: 0 })
+
+      await h.service.exportReport('tenant-a', 'A1', 'PDF', { q: 'tenant-b' }, 'actor-1')
+      expect(h.provider.loadDataset).toHaveBeenCalledWith('tenant-a', { q: 'tenant-b' })
     })
 
-    const result = await service.exportReport('tenant-1', 'SAMPLE_REPORT', 'XLSX', {})
+    it('two exports for two different tenants each carry their own tenantId', async () => {
+      const h = harness()
+      h.db.select.mockReturnValue(chain([EXPORTABLE_ARTIFACT]))
+      h.provider.supports.mockReturnValue(true)
+      h.provider.loadDataset.mockResolvedValue({ rows: [], totalAmount: 0 })
 
-    expect(result.buffer.subarray(0, 2).toString('utf8')).toBe('PK')
-    expect(result.contentType).toBe('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+      await h.service.exportReport('tenant-a', 'A1', 'PDF', {}, 'actor-1')
+      await h.service.exportReport('tenant-b', 'A1', 'PDF', {}, 'actor-1')
+      expect(h.provider.loadDataset).toHaveBeenNthCalledWith(1, 'tenant-a', {})
+      expect(h.provider.loadDataset).toHaveBeenNthCalledWith(2, 'tenant-b', {})
+    })
   })
 
-  it('HTML preview and export use the same dataset provider flow', async () => {
-    const { service, db, provider } = build()
-    db.select.mockReturnValueOnce(chain([SAMPLE_ARTIFACT]))
-    db.select.mockReturnValueOnce(chain([SAMPLE_ARTIFACT]))
-    provider.loadDataset.mockResolvedValue({
-      rows: [{ no: 'TRX-0001', label: 'Row 1', occurredAt: new Date(), status: 'OPEN', quantity: 2, unitPrice: 125, amount: 250 }],
-      totalAmount: 250,
+  describe('renderer / fallback branching', () => {
+    it('calls ReportRenderService.render when the renderer is configured, with the resolved rows', async () => {
+      const h = harness()
+      h.db.select.mockReturnValueOnce(chain([EXPORTABLE_ARTIFACT]))
+      h.provider.supports.mockReturnValue(true)
+      h.provider.loadDataset.mockResolvedValueOnce({ rows: [SAMPLE_ROW], totalAmount: 10 })
+      h.reportRender.isConfigured.mockReturnValue(true)
+      h.reportRender.render.mockResolvedValueOnce({ buffer: Buffer.from('x'), contentType: 'application/pdf', fileName: 'a1.pdf' })
+
+      await h.service.exportReport('tenant-1', 'A1', 'PDF', {}, 'actor-1')
+      expect(h.reportRender.render).toHaveBeenCalledWith({
+        artifactCode: 'A1',
+        templateId: null,
+        format: 'PDF',
+        rows: [SAMPLE_ROW],
+      })
     })
 
-    await service.renderHtml('tenant-1', 'SAMPLE_REPORT', {})
-    await service.exportReport('tenant-1', 'SAMPLE_REPORT', 'XLSX', {})
+    it('never calls the renderer when it is not configured — uses the in-process fallback instead', async () => {
+      const h = harness()
+      h.db.select.mockReturnValueOnce(chain([EXPORTABLE_ARTIFACT]))
+      h.provider.supports.mockReturnValue(true)
+      h.provider.loadDataset.mockResolvedValueOnce({ rows: [SAMPLE_ROW], totalAmount: 10 })
+      h.reportRender.isConfigured.mockReturnValue(false)
 
-    expect(provider.loadDataset).toHaveBeenCalledTimes(2)
-  })
-
-  it('export calls the configured Jasper renderer (with templateId, not templatePath) instead of silently using the fallback', async () => {
-    process.env.REPORT_RENDER_ENDPOINT = 'http://renderer.internal/render'
-    process.env.REPORT_RENDER_INTERNAL_TOKEN = 'secret-token'
-    const { service, db } = build()
-    db.select.mockReturnValueOnce(chain([SAMPLE_ARTIFACT]))
-
-    const fetchMock = jest.fn().mockResolvedValue({
-      ok: true,
-      headers: { get: () => 'application/pdf' },
-      arrayBuffer: async () => new Uint8Array([1, 2, 3]).buffer,
+      await h.service.exportReport('tenant-1', 'A1', 'PDF', {}, 'actor-1')
+      expect(h.reportRender.render).not.toHaveBeenCalled()
     })
-    ;(global as { fetch: typeof fetch }).fetch = fetchMock as never
 
-    const result = await service.exportReport('tenant-1', 'SAMPLE_REPORT', 'PDF', {})
+    it('fallback PDF starts with the real %PDF- magic number', async () => {
+      const h = harness()
+      h.db.select.mockReturnValueOnce(chain([EXPORTABLE_ARTIFACT]))
+      h.provider.supports.mockReturnValue(true)
+      h.provider.loadDataset.mockResolvedValueOnce({ rows: [SAMPLE_ROW], totalAmount: 10 })
+      h.reportRender.isConfigured.mockReturnValue(false)
 
-    expect(fetchMock).toHaveBeenCalledWith('http://renderer.internal/render', expect.any(Object))
-    const [, init] = fetchMock.mock.calls[0] as [string, { body: string }]
-    const parsedBody = JSON.parse(init.body) as Record<string, unknown>
-    expect(parsedBody).not.toHaveProperty('templatePath')
-    expect(parsedBody.templateId).toBeNull()
-    expect(result.buffer).toEqual(Buffer.from([1, 2, 3]))
+      const result = await h.service.exportReport('tenant-1', 'A1', 'PDF', {}, 'actor-1')
+      expect(result.buffer.subarray(0, 5).toString('utf8')).toBe('%PDF-')
+      expect(result.contentType).toBe('application/pdf')
+    })
+
+    it('fallback XLSX starts with the real PK (ZIP) magic number', async () => {
+      const h = harness()
+      h.db.select.mockReturnValueOnce(chain([EXPORTABLE_ARTIFACT]))
+      h.provider.supports.mockReturnValue(true)
+      h.provider.loadDataset.mockResolvedValueOnce({ rows: [SAMPLE_ROW], totalAmount: 10 })
+      h.reportRender.isConfigured.mockReturnValue(false)
+
+      const result = await h.service.exportReport('tenant-1', 'A1', 'XLSX', {}, 'actor-1')
+      expect(result.buffer.subarray(0, 2).toString('utf8')).toBe('PK')
+      expect(result.contentType).toBe('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    })
+
+    it('propagates a renderer failure (e.g. BadGatewayException) rather than silently falling back — no fake success', async () => {
+      const h = harness()
+      h.db.select.mockReturnValueOnce(chain([EXPORTABLE_ARTIFACT]))
+      h.provider.supports.mockReturnValue(true)
+      h.provider.loadDataset.mockResolvedValueOnce({ rows: [SAMPLE_ROW], totalAmount: 10 })
+      h.reportRender.isConfigured.mockReturnValue(true)
+      const rendererError = new Error('renderer unreachable')
+      h.reportRender.render.mockRejectedValueOnce(rendererError)
+
+      const error = await h.service.exportReport('tenant-1', 'A1', 'PDF', {}, 'actor-1').catch(e => e)
+      expect(error).toBe(rendererError)
+    })
   })
 
-  it('fails closed (does not fall back silently) when the configured Jasper renderer is unreachable', async () => {
-    process.env.REPORT_RENDER_ENDPOINT = 'http://renderer.internal/render'
-    process.env.REPORT_RENDER_INTERNAL_TOKEN = 'secret-token'
-    const { service, db } = build()
-    db.select.mockReturnValueOnce(chain([SAMPLE_ARTIFACT]))
-    ;(global as { fetch: typeof fetch }).fetch = jest.fn().mockRejectedValue(new Error('ECONNREFUSED')) as never
+  describe('safe filename / no secret leakage', () => {
+    it('fallback PDF file name is built from the artifact code via buildReportFileName (no raw user input)', async () => {
+      const h = harness()
+      h.db.select.mockReturnValueOnce(chain([{ ...EXPORTABLE_ARTIFACT, code: '../../evil\r\nX: 1' }]))
+      h.provider.supports.mockReturnValue(true)
+      h.provider.loadDataset.mockResolvedValueOnce({ rows: [], totalAmount: 0 })
+      h.reportRender.isConfigured.mockReturnValue(false)
 
-    await expect(service.exportReport('tenant-1', 'SAMPLE_REPORT', 'PDF', {})).rejects.toBeInstanceOf(
-      BadGatewayException,
+      const result = await h.service.exportReport('tenant-1', '../../evil\r\nX: 1', 'PDF', {}, 'actor-1')
+      expect(result.fileName).not.toMatch(/[\r\n]/)
+      expect(result.fileName).not.toContain('..')
+      expect(result.fileName).not.toContain('/')
+    })
+
+    it('the fallback PDF/XLSX buffer never contains a secret/token/connection-string-shaped substring', async () => {
+      const h = harness()
+      h.db.select.mockReturnValue(chain([EXPORTABLE_ARTIFACT]))
+      h.provider.supports.mockReturnValue(true)
+      h.provider.loadDataset.mockResolvedValue({ rows: [SAMPLE_ROW], totalAmount: 10 })
+      h.reportRender.isConfigured.mockReturnValue(false)
+
+      const pdf = await h.service.exportReport('tenant-1', 'A1', 'PDF', {}, 'actor-1')
+      const xlsx = await h.service.exportReport('tenant-1', 'A1', 'XLSX', {}, 'actor-1')
+      expect(pdf.buffer.toString('latin1')).not.toMatch(/postgres(?:ql)?:\/\/|secret|password|Authorization: Bearer/i)
+      expect(xlsx.buffer.toString('latin1')).not.toMatch(/postgres(?:ql)?:\/\/|secret|password|Authorization: Bearer/i)
+    })
+  })
+})
+
+/**
+ * TASK-027.56 — the visible "Geliştirme simülasyon verisi" marker row `exportReport` prepends for
+ * the dev fixture artifact, env-gated exactly like the artifact substitution itself.
+ */
+describe('ReportingService.exportReport — dev fixture export label row', () => {
+  const ORIGINAL_ENV = { ...process.env }
+  afterEach(() => {
+    process.env = { ...ORIGINAL_ENV }
+  })
+
+  it('the fallback PDF bytes visibly contain the "Geliştirme simülasyon verisi" label text', async () => {
+    process.env.NODE_ENV = 'development'
+    process.env.REPORTING_DEV_FIXTURES = 'true'
+    const h = harness()
+    h.provider.supports.mockReturnValue(true)
+    h.provider.loadDataset.mockResolvedValueOnce({ rows: [SAMPLE_ROW], totalAmount: 10 })
+    h.reportRender.isConfigured.mockReturnValue(false)
+
+    const result = await h.service.exportReport('tenant-1', DEV_FIXTURE_ARTIFACT_CODE, 'PDF', {}, 'actor-1')
+    expect(result.buffer.toString('utf8')).toContain('Geliştirme simülasyon verisi')
+  })
+
+  it('the fallback XLSX rows visibly contain the "Geliştirme simülasyon verisi" label text', async () => {
+    process.env.NODE_ENV = 'development'
+    process.env.REPORTING_DEV_FIXTURES = 'true'
+    const h = harness()
+    h.provider.supports.mockReturnValue(true)
+    h.provider.loadDataset.mockResolvedValueOnce({ rows: [SAMPLE_ROW], totalAmount: 10 })
+    h.reportRender.isConfigured.mockReturnValue(false)
+
+    const result = await h.service.exportReport('tenant-1', DEV_FIXTURE_ARTIFACT_CODE, 'XLSX', {}, 'actor-1')
+    // XLSX is a ZIP; the shared-strings/sheet XML inside is not plaintext-searchable without
+    // unzipping, but buildSimpleXlsx is a minimal (uncompressed-content) writer — a direct search
+    // still finds the label because the string table entry isn't deflated in this writer.
+    expect(result.buffer.toString('latin1')).toContain('Geli')
+  })
+
+  it('does NOT prepend the label row for a real (non-fixture) artifact, even when the fixture flag is enabled', async () => {
+    process.env.NODE_ENV = 'development'
+    process.env.REPORTING_DEV_FIXTURES = 'true'
+    const h = harness()
+    h.db.select.mockReturnValueOnce(chain([EXPORTABLE_ARTIFACT]))
+    h.provider.supports.mockReturnValue(true)
+    h.provider.loadDataset.mockResolvedValueOnce({ rows: [SAMPLE_ROW], totalAmount: 10 })
+    h.reportRender.isConfigured.mockReturnValue(true)
+    h.reportRender.render.mockResolvedValueOnce({ buffer: Buffer.from('x'), contentType: 'application/pdf', fileName: 'a1.pdf' })
+
+    await h.service.exportReport('tenant-1', 'A1', 'PDF', {}, 'actor-1')
+    expect(h.reportRender.render).toHaveBeenCalledWith(expect.objectContaining({ rows: [SAMPLE_ROW] }))
+  })
+
+  it('does NOT prepend the label row when the fixture flag is disabled, even for the fixture code (falls through to a real 404)', async () => {
+    process.env.NODE_ENV = 'production'
+    delete process.env.REPORTING_DEV_FIXTURES
+    const h = harness()
+    h.db.select.mockReturnValueOnce(chain([]))
+
+    const error = await h.service.exportReport('tenant-1', DEV_FIXTURE_ARTIFACT_CODE, 'PDF', {}, 'actor-1').catch(e => e)
+    expect(error).toBeInstanceOf(NotFoundException)
+  })
+
+  it('the label row is also sent to the renderer (Jasper path), not only the fallback path', async () => {
+    process.env.NODE_ENV = 'development'
+    process.env.REPORTING_DEV_FIXTURES = 'true'
+    const h = harness()
+    h.provider.supports.mockReturnValue(true)
+    h.provider.loadDataset.mockResolvedValueOnce({ rows: [SAMPLE_ROW], totalAmount: 10 })
+    h.reportRender.isConfigured.mockReturnValue(true)
+    h.reportRender.render.mockResolvedValueOnce({ buffer: Buffer.from('x'), contentType: 'application/pdf', fileName: 'x.pdf' })
+
+    await h.service.exportReport('tenant-1', DEV_FIXTURE_ARTIFACT_CODE, 'PDF', {}, 'actor-1')
+    const [[callArg]] = h.reportRender.render.mock.calls as [[{ rows: Array<{ label: string }> }]]
+    expect(callArg.rows[0]?.label).toBe('Geliştirme simülasyon verisi')
+    expect(callArg.rows[1]).toEqual(SAMPLE_ROW)
+  })
+})
+
+/**
+ * TASK-027.57 — export success/failure audit. `PermissionGuard`'s own spec covers the *denial*
+ * audit (which happens before this method is ever reached, since a denial never lets the
+ * controller/service run at all); this covers the two outcomes only `exportReport` itself can
+ * produce: a real success (after the file bytes exist) and a real failure (renderer/fallback
+ * threw) — both written via the same `PlatformAuditService`, no new table/schema.
+ */
+describe('ReportingService.exportReport — audit (success/failure)', () => {
+  it('writes REPORT_EXPORT_SUCCEEDED only AFTER the renderer has actually produced a result — never before', async () => {
+    const h = harness()
+    h.db.select.mockReturnValueOnce(chain([EXPORTABLE_ARTIFACT]))
+    h.provider.supports.mockReturnValue(true)
+    h.provider.loadDataset.mockResolvedValueOnce({ rows: [SAMPLE_ROW], totalAmount: 10 })
+    h.reportRender.isConfigured.mockReturnValue(true)
+    const callOrder: string[] = []
+    h.reportRender.render.mockImplementationOnce(async () => {
+      callOrder.push('rendered')
+      return { buffer: Buffer.from('x'), contentType: 'application/pdf', fileName: 'a1.pdf' }
+    })
+    h.auditService.log.mockImplementationOnce(async () => {
+      callOrder.push('audited')
+    })
+
+    await h.service.exportReport('tenant-1', 'A1', 'PDF', {}, 'actor-1')
+    expect(callOrder).toEqual(['rendered', 'audited'])
+  })
+
+  it('the success audit metadata carries actorId, tenantId, artifactCode, format, result, reasonCode, rendererMode — and no row content', async () => {
+    const h = harness()
+    h.db.select.mockReturnValueOnce(chain([EXPORTABLE_ARTIFACT]))
+    h.provider.supports.mockReturnValue(true)
+    h.provider.loadDataset.mockResolvedValueOnce({ rows: [SAMPLE_ROW], totalAmount: 10 })
+    h.reportRender.isConfigured.mockReturnValue(false)
+
+    await h.service.exportReport('tenant-1', 'A1', 'PDF', {}, 'actor-42')
+    expect(h.auditService.log).toHaveBeenCalledWith({
+      actorId: 'actor-42',
+      actionCode: 'REPORT_EXPORT_SUCCEEDED',
+      entityType: 'ReportArtifact',
+      entityId: 'A1',
+      summary: expect.any(String),
+      metadata: {
+        tenantId: 'tenant-1',
+        artifactCode: 'A1',
+        format: 'PDF',
+        result: 'SUCCEEDED',
+        reasonCode: 'OK',
+        rendererMode: 'FALLBACK',
+      },
+    })
+    const entry = (h.auditService.log.mock.calls[0] as unknown[])?.[0] as { metadata: Record<string, unknown> }
+    expect(entry.metadata).not.toHaveProperty('rows')
+    expect(entry.metadata).not.toHaveProperty('simulation') // never present for a non-fixture export
+  })
+
+  it('a Jasper-configured export is audited with rendererMode: JASPER', async () => {
+    const h = harness()
+    h.db.select.mockReturnValueOnce(chain([EXPORTABLE_ARTIFACT]))
+    h.provider.supports.mockReturnValue(true)
+    h.provider.loadDataset.mockResolvedValueOnce({ rows: [SAMPLE_ROW], totalAmount: 10 })
+    h.reportRender.isConfigured.mockReturnValue(true)
+    h.reportRender.render.mockResolvedValueOnce({ buffer: Buffer.from('x'), contentType: 'application/pdf', fileName: 'a1.pdf' })
+
+    await h.service.exportReport('tenant-1', 'A1', 'PDF', {}, 'actor-1')
+    expect(h.auditService.log).toHaveBeenCalledWith(expect.objectContaining({ metadata: expect.objectContaining({ rendererMode: 'JASPER' }) }))
+  })
+
+  it('a renderer failure is audited as REPORT_EXPORT_FAILED with a safe reasonCode, and the original error is still re-thrown unchanged — no fake success', async () => {
+    const h = harness()
+    h.db.select.mockReturnValueOnce(chain([EXPORTABLE_ARTIFACT]))
+    h.provider.supports.mockReturnValue(true)
+    h.provider.loadDataset.mockResolvedValueOnce({ rows: [SAMPLE_ROW], totalAmount: 10 })
+    h.reportRender.isConfigured.mockReturnValue(true)
+    const rendererError = new BadGatewayException('Renderer hata döndürdü: 503 — connection string postgres://user:pw@host/db leaked in a hypothetical bad message')
+    h.reportRender.render.mockRejectedValueOnce(rendererError)
+
+    const error = await h.service.exportReport('tenant-1', 'A1', 'PDF', {}, 'actor-1').catch(e => e)
+    expect(error).toBe(rendererError) // unchanged, not swallowed
+    expect(h.auditService.log).toHaveBeenCalledWith(
+      expect.objectContaining({
+        actionCode: 'REPORT_EXPORT_FAILED',
+        metadata: expect.objectContaining({ result: 'FAILED', reasonCode: 'RENDERER_HTTP_ERROR' }),
+      }),
+    )
+    // the raw exception message (which in this test deliberately contains a fake connection
+    // string) must never reach the audit metadata — only the classified static reasonCode does.
+    const entry = (h.auditService.log.mock.calls[0] as unknown[])?.[0] as { metadata: Record<string, unknown> }
+    expect(JSON.stringify(entry.metadata)).not.toMatch(/postgres:\/\//)
+  })
+
+  it('the fallback path is also audited on failure (not only the Jasper path)', async () => {
+    const h = harness()
+    h.db.select.mockReturnValueOnce(chain([EXPORTABLE_ARTIFACT]))
+    h.provider.supports.mockReturnValue(true)
+    // a malformed row (null instead of a real ReportDatasetRow) makes the fallback PDF builder's
+    // own `row.no`/`row.label` access throw for real — a genuine fallback-path failure, not a
+    // mocked/injected one, while still keeping the failure deterministic and localized.
+    h.provider.loadDataset.mockResolvedValueOnce({ rows: [null] as never, totalAmount: 0 })
+    h.reportRender.isConfigured.mockReturnValue(false)
+
+    const error = await h.service.exportReport('tenant-1', 'A1', 'PDF', {}, 'actor-1').catch(e => e)
+    expect(error).toBeInstanceOf(TypeError)
+    expect(h.auditService.log).toHaveBeenCalledWith(
+      expect.objectContaining({ actionCode: 'REPORT_EXPORT_FAILED', metadata: expect.objectContaining({ rendererMode: 'FALLBACK' }) }),
     )
   })
 
-  it('resolves an allowlisted template and sends templateId (never templatePath) to the configured Jasper renderer (TASK-022.5-R1)', async () => {
-    process.env.REPORT_RENDER_ENDPOINT = 'http://renderer.internal/render'
-    process.env.REPORT_RENDER_INTERNAL_TOKEN = 'secret-token'
-    const { service, db } = build()
-    db.select.mockReturnValueOnce(chain([ALLOWLISTED_TEMPLATED_ARTIFACT]))
+  it('an audit-write failure on the success path never turns the response into a failure — the rendered file is still returned', async () => {
+    const h = harness()
+    h.db.select.mockReturnValueOnce(chain([EXPORTABLE_ARTIFACT]))
+    h.provider.supports.mockReturnValue(true)
+    h.provider.loadDataset.mockResolvedValueOnce({ rows: [SAMPLE_ROW], totalAmount: 10 })
+    h.reportRender.isConfigured.mockReturnValue(false)
+    h.auditService.log.mockRejectedValueOnce(new Error('audit db down'))
 
-    const fetchMock = jest.fn().mockResolvedValue({
-      ok: true,
-      headers: { get: () => 'application/pdf' },
-      arrayBuffer: async () => new Uint8Array([1, 2, 3]).buffer,
-    })
-    ;(global as { fetch: typeof fetch }).fetch = fetchMock as never
-
-    const result = await service.exportReport('tenant-1', 'SAMPLE-REPORT', 'PDF', {})
-
-    const [, init] = fetchMock.mock.calls[0] as [string, { body: string }]
-    const parsedBody = JSON.parse(init.body) as Record<string, unknown>
-    expect(parsedBody).not.toHaveProperty('templatePath')
-    // Same templateId the renderer's own allowlist (TemplateRegistry.java) registers — proves the
-    // two allowlists agree, not just that the API stopped forwarding a raw path.
-    expect(parsedBody.templateId).toBe('sample-report')
-    expect(result.buffer).toEqual(Buffer.from([1, 2, 3]))
+    const result = await h.service.exportReport('tenant-1', 'A1', 'PDF', {}, 'actor-1')
+    expect(result.buffer.subarray(0, 5).toString('utf8')).toBe('%PDF-') // still a real success
   })
 
-  it('fails closed when the renderer endpoint is configured but the internal token is missing', async () => {
-    process.env.REPORT_RENDER_ENDPOINT = 'http://renderer.internal/render'
-    const { service, db } = build()
-    db.select.mockReturnValueOnce(chain([SAMPLE_ARTIFACT]))
-    const fetchMock = jest.fn()
-    ;(global as { fetch: typeof fetch }).fetch = fetchMock as never
+  it('an audit-write failure on the failure path never masks the original render error', async () => {
+    const h = harness()
+    h.db.select.mockReturnValueOnce(chain([EXPORTABLE_ARTIFACT]))
+    h.provider.supports.mockReturnValue(true)
+    h.provider.loadDataset.mockResolvedValueOnce({ rows: [SAMPLE_ROW], totalAmount: 10 })
+    h.reportRender.isConfigured.mockReturnValue(true)
+    const rendererError = new BadGatewayException('Renderer servisine erişilemedi')
+    h.reportRender.render.mockRejectedValueOnce(rendererError)
+    h.auditService.log.mockRejectedValueOnce(new Error('audit db down too'))
 
-    await expect(service.exportReport('tenant-1', 'SAMPLE_REPORT', 'PDF', {})).rejects.toBeInstanceOf(
-      BadGatewayException,
-    )
-    expect(fetchMock).not.toHaveBeenCalled()
+    const error = await h.service.exportReport('tenant-1', 'A1', 'PDF', {}, 'actor-1').catch(e => e)
+    expect(error).toBe(rendererError) // the ORIGINAL render error, not the audit-write error
+  })
+
+  describe('tenant isolation', () => {
+    it('the audit metadata tenantId matches exactly the tenant that made the export call', async () => {
+      const h = harness()
+      h.db.select.mockReturnValue(chain([EXPORTABLE_ARTIFACT]))
+      h.provider.supports.mockReturnValue(true)
+      h.provider.loadDataset.mockResolvedValue({ rows: [], totalAmount: 0 })
+      h.reportRender.isConfigured.mockReturnValue(false)
+
+      await h.service.exportReport('tenant-a', 'A1', 'PDF', {}, 'actor-1')
+      await h.service.exportReport('tenant-b', 'A1', 'PDF', {}, 'actor-1')
+
+      expect(h.auditService.log).toHaveBeenNthCalledWith(1, expect.objectContaining({ metadata: expect.objectContaining({ tenantId: 'tenant-a' }) }))
+      expect(h.auditService.log).toHaveBeenNthCalledWith(2, expect.objectContaining({ metadata: expect.objectContaining({ tenantId: 'tenant-b' }) }))
+    })
+  })
+
+  describe('development fixture — simulation flag', () => {
+    const ORIGINAL_ENV = { ...process.env }
+    afterEach(() => {
+      process.env = { ...ORIGINAL_ENV }
+    })
+
+    it('audits simulation: true only for a real dev-fixture export', async () => {
+      process.env.NODE_ENV = 'development'
+      process.env.REPORTING_DEV_FIXTURES = 'true'
+      const h = harness()
+      h.provider.supports.mockReturnValue(true)
+      h.provider.loadDataset.mockResolvedValueOnce({ rows: [], totalAmount: 0 })
+      h.reportRender.isConfigured.mockReturnValue(false)
+
+      await h.service.exportReport('tenant-1', DEV_FIXTURE_ARTIFACT_CODE, 'PDF', {}, 'actor-1')
+      expect(h.auditService.log).toHaveBeenCalledWith(expect.objectContaining({ metadata: expect.objectContaining({ simulation: true }) }))
+    })
+
+    it('never audits simulation: true in production, even for the fixture code (which 404s there anyway)', async () => {
+      process.env.NODE_ENV = 'production'
+      delete process.env.REPORTING_DEV_FIXTURES
+      const h = harness()
+      h.db.select.mockReturnValueOnce(chain([]))
+
+      await h.service.exportReport('tenant-1', DEV_FIXTURE_ARTIFACT_CODE, 'PDF', {}, 'actor-1').catch(() => undefined)
+      expect(h.auditService.log).not.toHaveBeenCalled() // 404 before any render/audit is reached
+    })
   })
 })
