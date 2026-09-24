@@ -47,6 +47,26 @@ class TemplateRegistryTest {
     }
 
     @Test
+    void resolvesTheAllowlistedScadaAnalysisReportTemplateAndFillsItFromTextRows() throws Exception {
+        assertThat(registry.has("scada-analysis-report")).isTrue();
+
+        JasperReport report = registry.resolve("scada-analysis-report");
+        assertThat(report.getName()).isEqualTo("scada-analysis-report");
+
+        com.metnex.jasperrenderer.web.dto.RenderRow row = new com.metnex.jasperrenderer.web.dto.RenderRow();
+        row.setKind("DATA");
+        row.setC1("2025-01-01T00:00:00Z");
+        row.setC2("Şebeke [sanal x v1]");
+        row.setC4("12.5");
+        net.sf.jasperreports.engine.JasperPrint print = net.sf.jasperreports.engine.JasperFillManager.fillReport(
+            report,
+            new java.util.HashMap<>(),
+            new net.sf.jasperreports.engine.data.JRBeanCollectionDataSource(java.util.List.of(row)));
+        assertThat(print.getPages()).hasSize(1);
+        assertThat(net.sf.jasperreports.engine.JasperExportManager.exportReportToPdf(print)).isNotEmpty();
+    }
+
+    @Test
     void compilesTheBuiltInDefaultTemplateUsedWhenNoTemplateIdIsGiven() {
         JasperReport report = registry.defaultTemplate();
 

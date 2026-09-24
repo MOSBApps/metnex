@@ -1,5 +1,7 @@
 import { BadRequestException, Body, Controller, ForbiddenException, Get, NotFoundException, Param, Patch, Post, Query, UseGuards } from '@nestjs/common'
 import { CurrentUser } from '../platform/current-user.decorator'
+import { RequireMfaSetupComplete } from '../platform/decorators/require-mfa-setup-complete.decorator'
+import { MfaEnforcementGuard } from '../platform/guards/mfa-enforcement.guard'
 import { JwtAuthGuard } from '../platform/jwt-auth.guard'
 import { PerfDbDiagnosticsService } from './perf-db-diagnostics.service'
 import {
@@ -23,7 +25,8 @@ function assertSystemAdmin(user: AuthUser) {
 }
 
 @Controller('admin/perf')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, MfaEnforcementGuard)
+@RequireMfaSetupComplete()
 export class PerfAdminController {
   constructor(
     private readonly diagnostics: PerfDbDiagnosticsService,

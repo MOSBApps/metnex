@@ -1,5 +1,7 @@
 import { Controller, ForbiddenException, Get, Query, UseGuards } from '@nestjs/common'
 import { CurrentUser } from '../platform/current-user.decorator'
+import { RequireMfaSetupComplete } from '../platform/decorators/require-mfa-setup-complete.decorator'
+import { MfaEnforcementGuard } from '../platform/guards/mfa-enforcement.guard'
 import { JwtAuthGuard } from '../platform/jwt-auth.guard'
 import { PlatformAuditService } from './platform-audit.service'
 
@@ -9,7 +11,8 @@ interface AuthUser {
 }
 
 @Controller('platform-audit-logs')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, MfaEnforcementGuard)
+@RequireMfaSetupComplete()
 export class PlatformAuditController {
   constructor(private readonly auditService: PlatformAuditService) {}
 

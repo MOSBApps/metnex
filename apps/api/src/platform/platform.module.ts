@@ -28,6 +28,8 @@ import { CustomerAdminController, SaasController } from './saas.controller'
 import { SaasService } from './saas.service'
 import { StorageUsageService } from './storage-usage.service'
 import { TenantController } from './tenant.controller'
+import { TenantRoleController } from './tenant-role.controller'
+import { TenantRoleService } from './tenant-role.service'
 import { TenantService } from './tenant.service'
 import { UserController } from './user.controller'
 import { UserService } from './user.service'
@@ -53,6 +55,7 @@ const jwtExpiresIn = process.env.JWT_EXPIRES_IN ?? '15m'
     PermissionController,
     RoleController,
     TenantController,
+    TenantRoleController,
     UserController,
     SaasController,
     CustomerAdminController,
@@ -70,6 +73,7 @@ const jwtExpiresIn = process.env.JWT_EXPIRES_IN ?? '15m'
     PrivilegeAuditService,
     RoleService,
     TenantService,
+    TenantRoleService,
     UserService,
     SaasService,
     CustomerAccessService,

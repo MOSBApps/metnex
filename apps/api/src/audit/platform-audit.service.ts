@@ -3,12 +3,14 @@ import { randomUUID } from 'crypto'
 import { eq, sql, SQL } from 'drizzle-orm'
 import { DB, type Db } from '../db/db.module'
 import { users } from '../db/schema'
+import { scrubSecrets } from './scrub-secrets'
 
 export interface PlatformAuditLogInput {
   actorId?: string | null
   actionCode: string
   entityType: string
-  entityId: string
+  /** `null` when the event has no valid entity (e.g. SCADA_QUERY_DENIED / INVALID_CATALOG_ID); never a placeholder. */
+  entityId: string | null
   summary: string
   metadata?: Record<string, unknown> | null
 }
@@ -24,27 +26,13 @@ export interface PlatformAuditListQuery {
   offset: number
 }
 
-function scrubSecrets(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map(scrubSecrets)
-  if (!value || typeof value !== 'object') return value
-
-  const secretKeys = ['password', 'passwordHash', 'refreshToken', 'refreshTokenHash', 'token', 'apiKey', 'apiKeyCiphertext']
-  const result: Record<string, unknown> = {}
-  for (const [key, nested] of Object.entries(value as Record<string, unknown>)) {
-    result[key] = secretKeys.some(secretKey => key.toLowerCase().includes(secretKey.toLowerCase()))
-      ? '[REDACTED]'
-      : scrubSecrets(nested)
-  }
-  return result
-}
-
 export interface PlatformAuditListRow {
   id: string
   actorId: string | null
   actorSnapshot: Record<string, unknown> | null
   actionCode: string
   entityType: string
-  entityId: string
+  entityId: string | null
   summary: string
   metadata: Record<string, unknown> | null
   createdAt: Date

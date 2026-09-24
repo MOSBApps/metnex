@@ -1404,3 +1404,854 @@ Kullanıcı, break-glass'ı gerçek/yerel bir Postgres'e karşı smoke test etme
 
 ## 2026-09-22 — AI1 Onayı: TASK-027.47-R1 ve TASK-027.47
 AI1, TASK-027.47-R1 teslimini onayladı. Kabul edilenler: kalıcı PostgreSQL rate-limit ve atomik `SELECT ... FOR UPDATE`; token hash ledger'ı ve tek kullanımlık claim; gerçek izole PostgreSQL smoke testinde 15/15 başarı; self-servis parola değişimi ve session iptali kanıtı; peer demotion için operasyonel prosedür. Gerçek production DB/HTTP/secret kullanılmaması ve break-glass'ın Nest/HTTP'ye bağlanmaması doğru bulundu. TASK-027.47-R1 `done`. Ana TASK-027.47 de R1 ile birlikte `done` kapandı. TASK-027.48 (MFA enforcement) sıradaki görev — AI1'in detaylı spesifikasyonu bekleniyor. AI1 bu turda dosya/DB/Docker/runtime değişikliği yapmadığını belirtti.
+
+## 2026-09-22 — AI2: TASK-028.1 Kalan AI Skeleton atıflarının ve fork-generator'ın temizliği
+Kullanıcı (Product Owner) talebiyle: proje genelinde hâlâ jenerik "AI Skeleton" olarak
+tanımlanan/tariflenen aktif dokümantasyon ve `docs/rename/METNEX_HISTORICAL_REFERENCE_POLICY.md`
+§7'de AI1 kararı bekleyen `scripts/create-project.sh`/`.ps1` fork-generator açık sorusu ele alındı.
+- **Kullanıcı kararı:** generator script'leri tamamen kaldırılsın (Metnex artık kendi git
+  geçmişi/remote'u olan somut bir ürün, şablon-fork mekanizmasına ihtiyaç yok).
+- `scripts/create-project.sh`, `scripts/create-project.ps1` silindi; aktif referans veren
+  `README.md`, `docs/README.md`, `docs/runbooks/PRODUCT_OWNER_LIFECYCLE_PLAYBOOK.md` (Faz 0 +
+  checklist), `docs/runbooks/METNEX_LIFECYCLE_AND_STATUS_RUNBOOK.md`,
+  `docs/runbooks/local-development.md`, `docs/project/METNEX_SCOPE.json` güncellendi.
+- `README.md` Metnex ürünü olarak yeniden yazıldı: "# AI Skeleton" başlığı ve jenerik tanım,
+  sabit kişisel path (`/Users/dogan/...`) ve tüm generator komutları kaldırıldı.
+- `ODC.md` temizlendi: kırık `documentation.project-*` path'leri (`PROJECT_*.json` →
+  gerçek `METNEX_*.json`) düzeltildi; var olmayan `docs/product/PRODUCT_BASELINE_SRS.md`,
+  `docs/SRS.md`, `docs/odc/*`, `scripts/check-project-records.mjs` dosyalarına atıf yapan
+  "Product Baseline SRS" ve "Dogfooding note" bölümleri kaldırıldı; "Remote contract sync"
+  bölümü `scripts/odc-sync.sh`'ın bu repoda henüz uygulanmadığını açıkça belirtecek şekilde
+  yeniden yazıldı; `project.description`'daki "iskelet" ifadesi kaldırıldı.
+- TASK-024.2'den kalan kırık dosya-adı referansları (`PROJECT_STATE.md`/
+  `PROJECT_LIFECYCLE_AND_STATUS_RUNBOOK.md` → gerçek adları `METNEX_STATE.md`/
+  `METNEX_LIFECYCLE_AND_STATUS_RUNBOOK.md`) 7 aktif dosyada düzeltildi (`PROGRESS_LOG.md`
+  geçmiş girdileri hariç, append-only kuralı korundu).
+- `openmas|aiskeleton` regex'inin kaçırdığı iki gerçek kalıntı bulundu: `apps/web` roller
+  sayfasındaki canlı kullanıcı metninde "openbm" ifadesi kaldırıldı; boşluklu "Open Mas"
+  biçimi (regex'in yakalamadığı) 7 aktif belgede (`docs/README.md`,
+  `docs/domain/DB-METADATA-TEMPLATE.md`, 4 `docs/backlog/*_TEMPLATE.md`,
+  `docs/runbooks/db-recreate-with-icu.md`) Metnex'e çevrildi.
+- `docs/runbooks/local-development.md`'deki yanlış varsayılan port bilgisi (6500, gerçek
+  `.project-defaults` değeri 7500) düzeltildi.
+- **Bilinçli dokunulmayanlar:** `infra/docker/docker-compose.dev.yml`'deki `openmas_*` external
+  volume adları (gerçek veri bu volume'lerde, rename yıkıcı işlem onayı gerektirir — TASK-024.5/
+  026.2'de zaten belgelenmişti); `docs/ui-contract/**` ve `docs/decisions/DEC-0001/0006/0010/
+  0011/0012` içindeki jenerik "skeleton" terimi (kırık referans değil, ayrı kapsamlı bir
+  dokümantasyon task'ı gerektirir); tüm tarihi kayıtlar (`backlog/TASK-024-*`, `docs/rename/*`,
+  `docs/migration/*`, `PROGRESS_LOG.md` geçmiş girdileri, `backup/openmas-pre-metnex-migration-*.dump`).
+- Doğrulama: `./scripts/check.sh --skip-docker` audit/typecheck adımlarında PASS; lint adımı
+  apps/web'in önceden var olan, bu task'tan bağımsız `eslint-plugin-react-hooks` çözümleme
+  sorunuyla (pnpm isolated linker, TASK-027-36 notunda zaten belgelenmiş teknik borç) durdu.
+  Kalan adımlar elle doğrulandı: `pnpm --filter api exec eslint "src/**/*.ts"` temiz;
+  `pnpm --filter api exec jest --runInBand` → 53 suite / 1501 test PASS;
+  `pnpm --filter web run test` (vitest) → 8 dosya / 117 test PASS; `pnpm run build` → hem
+  `api` hem `@metnex/web` başarılı (Next.js build içindeki lint uyarısı build'i düşürmedi).
+  Git commit/push yapılmadı; kullanıcı onayı ile ayrıca yapılacak.
+
+## 2026-09-22 — AI2: TASK-027.48 MFA Policy Activation ve Enforcement Geçişi
+Task'ın kendi kritik kuralı ("karar eksikse production enforcement yapma") gereği, 10 ön koşul
+Q-DP22b/c karar paketlerine (`docs/migration/METNEX_AUTHORIZATION_ENDPOINT_AUDIT_AND_MFA_POLICY_DECISION.md`
+§5.3/§6.1) eşlendi; kararlar boştu, bu yüzden implementasyona başlamadan önce Product Owner'a
+(bu oturumda kullanıcıya) AskUserQuestion ile soruldu.
+**Kararlar:** MFA policy route'u Option B (`policy/:tenantId` + `isSystemAdmin`-only yetki);
+enforcement şimdi ve global (yalnızca hazırlık değil); MFA'sız mevcut kullanıcılar için setup-required
+geçişi (kademeli rollout/grace period yok); admin reset alt kararları AI2'nin önerdiği paket
+(mfaVerified aktörün kendi MFA'sı etkinse zorunlu, self-reset/impersonation yasağı zaten vardı,
+kalıcı izin kodu yerine şimdilik `isSystemAdmin`); enforcement kapsamı tüm korumalı route'lar.
+**Kritik blocker ve kapsam genişlemesi:** implementasyona başlarken web'de hiçbir MFA setup UI'ı
+(QR/TOTP/recovery code ekranı, login'in `requiresMfa` yanıtını ele alma) olmadığı bulundu — bu
+haliyle enforcement açılsaydı gerçek bir kilitlenme olurdu (task'ın kendi kritik güvenlik kuralının
+ihlali). Kullanıcıya bildirildi; kullanıcı "MFA'yı komple geliştir" kararıyla kapsamı web'i de
+kapsayacak şekilde genişletti.
+**Backend:** `mfa.controller.ts`/`mfa.service.ts` — policy route düzeltildi (fail-closed hem
+controller hem service'te, `MFA_POLICY_UPDATED` audit'i); `adminResetMfa`'ya Q-DP22c(1) mfaVerified
+şartı eklendi (mevcut testlerin call-count varsayımlarını bozmamak için ayrı bir DB çağrısı yerine
+mevcut actor sorgusuna `leftJoin(userMfaSettings)` eklendi). `MfaEnforcementGuard` artık
+`PlatformAuditService` enjekte ediyor, her ret `MFA_ENFORCEMENT_DENIED` audit'i yazıyor.
+`@RequireMfaSetupComplete()` + `MfaEnforcementGuard`, platform/roles/tenants/users/saas,
+customer-admin, reports, settings (platform+tenant), perf-admin, platform-audit-logs,
+auth/change-password controller'larına eklendi; MFA akışının kendisi, `auth/me`, `platform/me/*`,
+login/logout/bootstrap/health bilinçli muaf tutuldu (tam liste ve gerekçe:
+`docs/runbooks/MFA_ENFORCEMENT_ROUTE_MATRIX.md`, yeni dosya). `settings.module.ts`/`perf.module.ts`/
+`reporting.module.ts`/`audit.module.ts` artık `MfaRequirementService`'i (ve gerekirse
+`AuditModule`'ü) sağlıyor — guard'ın DI zinciri bu modüllerde de çözülüyor.
+**Yan bulgu (düzeltildi):** `auth/mfa/challenge/verify` httpOnly refresh cookie'sini hiç set
+etmiyordu (yalnızca body'de token dönüyordu) — `auth/login` ile aynı sözleşmeye getirildi
+(`REFRESH_COOKIE`/`COOKIE_MAX_AGE_MS` `auth.controller.ts`'ten export edilip paylaşıldı); aksi
+halde MFA ile giren bir kullanıcı sayfa yenilemesinde oturumunu kaybederdi.
+**Frontend:** yeni `apps/web/src/app/(app)/app/settings/security/page.tsx` (MFA durumu, TOTP
+kurulum QR+manuel anahtar+kod doğrulama, kurtarma kodu gösterimi, devre dışı bırakma, kurtarma
+kodu yenileme); `login/page.tsx`'e `requiresMfa` challenge adımı (TOTP veya kurtarma kodu)
+eklendi; `lib/api.ts`'nin merkezi `request()`'i artık her 403'te `MFA_SETUP_REQUIRED`/
+`MFA_SESSION_NOT_VERIFIED`'ı yakalayıp otomatik yönlendiriyor (döngü önlenerek); `lib/mfa-error.ts`'in
+hiç var olmayan `/profile` referansı gerçek sayfaya düzeltildi.
+**Testler:** yeni `mfa-enforcement.guard.spec.ts` (10 test — guard'ın kendi karar ağacı);
+`endpoint-authorization-inventory.spec.ts` 91 endpoint'lik yeni snapshot'a güncellendi (Q-DP22b
+artık `INLINE_AND_SERVICE_SYSTEM_ADMIN`, `NO_AUTHORIZATION_DEAD_ROUTE` sınıfı tamamen kalktı);
+`authorization-audit-findings.spec.ts`, `mfa-admin-reset-authorization.spec.ts`,
+`mfa-settings-perf-validation.spec.ts`, `platform-user-admin-privilege-boundary.spec.ts`,
+`platform-dto-validation.spec.ts`, `apps/web/.../mfa-error.spec.ts` güncellendi. **2 mutasyon
+kontrolü bizzat çalıştırılıp doğrulandı ve geri alındı:** `role.controller.ts`'ten
+`MfaEnforcementGuard`/`@RequireMfaSetupComplete()` kaldırılınca 2 test kırıldı; guard'a koşulsuz
+`return true` eklenince 6 test kırıldı.
+**Doğrulama:** `pnpm --filter api exec tsc --noEmit` temiz; `pnpm --filter api exec eslint
+"src/**/*.ts"` temiz; `pnpm --filter api exec jest --runInBand` → **54 suite / 1520 test PASS**;
+`pnpm --filter web exec tsc --noEmit` temiz; `pnpm --filter web run test` (vitest) → **8 dosya /
+117 test PASS**; `pnpm run build` → api + web PASS. `./scripts/check.sh --skip-docker`'ın lint
+adımı apps/web'in önceden var olan, bu task'tan bağımsız `eslint-plugin-react-hooks` çözümleme
+sorunuyla (TASK-027-36'da kayıtlı teknik borç) durdu; audit/typecheck PASS, kalan adımlar yukarıdaki
+gibi elle doğrulandı. Gerçek DB/HTTP/MFA sağlayıcısı kullanılmadı; enforcement gerçek ortamda henüz
+hiç çalıştırılmadı. Dokümantasyon: yeni `docs/runbooks/MFA_ENFORCEMENT_ROUTE_MATRIX.md`,
+`docs/migration/METNEX_AUTHORIZATION_ENDPOINT_AUDIT_AND_MFA_POLICY_DECISION.md` §5.3/§6.1
+dolduruldu, `docs/migration/METNEX_PLATFORM_PRIVILEGE_MODEL_DECISION_PACKAGE.md` §14.12 eklendi,
+`docs/migration/BOTC_MIGRATION_OPEN_QUESTIONS.md`'ye append-only kapanış kaydı eklendi (Q-DP22b/c
+KAPANDI), `backlog/TASK-027-48-mfa-policy-enforcement.md` oluşturuldu (`status: review`). Git
+commit/push yapılmadı; nihai `done` kararı AI1/Product Owner'a bırakıldı.
+
+## 2026-09-22 — AI2: TASK-027.48 AI1/PO review düzeltmeleri (ikinci tur)
+AI1/PO, ilk teslimi `review`'da tuttu ve dört kapanış öncesi düzeltme istedi. Hepsi ele alındı:
+1. **check.sh lint adımı tamamlanmamıştı** — daha önce yalnızca "API lint ayrıca doğrudan
+   çalıştırıldı" diye raporlanmıştı, tam gate koşulmamıştı. Bu turda Q-ENV01'in kurulu
+   workaround'uyla (`NODE_PATH=<repo>/node_modules/.pnpm/node_modules TURBO_ENV_MODE=loose
+   ./scripts/check.sh --skip-docker`) tam gate çalıştırıldı: **PASS**, lint adımı dahil
+   ("✔ No ESLint warnings or errors" — web lint'te de sıfır sorun).
+2. **Web test sayısı artmamıştı (8 dosya/117 test)** — apps/web'de daha önce hiç component testi
+   yoktu (test infrastructure'ı `@testing-library/react`, `jsdom`, `@vitejs/plugin-react`
+   eklenerek ilk kez kuruldu: yeni `apps/web/vitest.config.ts`, `apps/web/vitest.setup.ts`).
+   3 yeni test dosyası eklendi: `login/__tests__/page.spec.tsx` (5 test — normal giriş,
+   `requiresMfa` challenge ekranına geçiş, TOTP kodu ve kurtarma koduyla doğrulama, reddedilen
+   kodda hata+token saklanmama), `settings/security/__tests__/page.spec.tsx` (8 test — durum
+   görüntüleme, tam kurulum akışı QR→kod→kurtarma kodları→etkin, reddedilen kurulum kodu, devre
+   dışı bırakma başarı/ret, kurtarma kodu yenileme, vazgeç), `lib/__tests__/api-mfa-redirect.spec.ts`
+   (5 test — merkezi `request()`'in 403 yönlendirme sözleşmesi). Web test sayısı **117 → 135**.
+   Login sayfası ayrıca önceden hiç kullanılmayan (`mfa-login-flow.ts`, dead code) test edilmiş
+   `buildMfaChallengePayload`/`sanitizeNumericCode` yardımcılarını kullanacak şekilde küçük bir
+   DRY refactor'ü aldı.
+3. **MFA enforcement route matrisi testle sabitlenmemişti** — yeni
+   `apps/api/src/platform/guards/mfa-enforcement-route-matrix.spec.ts` (8 test), route matrisinin
+   4 somut özelliğini uçtan uca kanıtlıyor: MFA setup/doğrulama uçlarında `@RequireMfaSetupComplete()`
+   yok (dosya + method bazında); `auth/me`/`platform/me/*`/bootstrap/health'te de yok;
+   `auth.controller.ts`'teki `change-password`'un guard'ı `login`/`refresh`/`logout`/`me`'ye
+   sızmıyor; login/refresh/logout'ta hiç guard yok; **en kritik özellik** — aynı guard, aynı
+   kullanıcı, aynı MFA durumu bir korumalı route'u reddederken decorator'sız (setup akışı
+   şeklindeki) bir route'u geçiriyor (kilitlenmeme kanıtı); MFA gerekli ve kurulu olmayan bir
+   kullanıcı denediği her korumalı route'ta tutarlı reddediliyor. Ayrıca ilk teslimde yalnızca
+   tasarım gerekçesiyle iddia edilen 2 mutasyon kontrolü (guard kaldırma, MFA bypass ekleme)
+   bizzat çalıştırılıp doğrulandı ve geri alındı (role.controller.ts'ten guard kaldırılınca 2
+   test, guard'a koşulsuz bypass eklenince 6 test kırıldı).
+4. **Gerçek tarayıcı/HTTP doğrulaması yapılmamıştı** — kontrollü yerel smoke test alternatifi
+   (TASK-027.47-R1 emsaliyle) kullanıcıya AskUserQuestion ile soruldu. **Kullanıcı kararı: yalnızca
+   açık raporlama, smoke test çalıştırılmadı** (task'ın kendi "Kapsam dışı" listesi zaten Docker
+   build/run'ı hariç tutuyordu).
+**Doğrulama:** `pnpm --filter api exec jest --runInBand` → **55 suite / 1528 test PASS** (54→55,
+yeni route-matrix dosyası); `pnpm --filter web run test` → **11 dosya / 135 test PASS** (8→11,
+117→135); `NODE_PATH=... TURBO_ENV_MODE=loose ./scripts/check.sh --skip-docker` → **tam PASS**
+(audit/typecheck/lint/test/build hepsi, Docker atlandı). Gerçek DB/HTTP/MFA sağlayıcısı
+kullanılmadı; enforcement gerçek ortamda henüz çalıştırılmadı (PO kararıyla bu turda da
+yapılmadı). Git commit/push yapılmadı; `backlog/TASK-027-48-mfa-policy-enforcement.md` güncellendi
+(`status: review` — nihai `done` kararı hâlâ AI1/PO'ya bırakıldı).
+
+## 2026-09-22 — AI1 Onayı: TASK-027.48
+
+TASK-027.48 incelemesi tamamlandı ve `done` olarak onaylandı. MFA backend/frontend akışı, enforcement route matrisi, test kapsamı ve lint dahil tam quality gate kabul edildi; gerçek production MFA/DB/HTTP doğrulaması sonraki operasyonel geçişe bırakıldı.
+
+## 2026-09-22 — AI1 Onayı: TASK-027.48 `done`
+AI1, TASK-027.48'i (MFA Policy Activation ve Enforcement Geçişi) `done` olarak onayladı. Kabul
+edilenler: MFA policy route'larının tenant kapsamına alınması (`policy/:tenantId`, isSystemAdmin-only
+yetki); backend enforcement guard'ının (`MfaEnforcementGuard`) uygulanması; login MFA challenge
+akışının tamamlanması; MFA setup, recovery code ve disable ekranlarının eklenmesi; kilitlenmeme
+özelliğinin route matrisi testleriyle (`mfa-enforcement-route-matrix.spec.ts`) doğrulanması; web
+test sayısının 117'den 135'e çıkarılması; lint dahil tam `check.sh --skip-docker` PASS. Gerçek
+production MFA/DB/HTTP doğrulaması bilinçli olarak sonraki operasyonel geçişe bırakıldı. Sıradaki
+görev **TASK-027.49** (tenant-role delegation). `backlog/TASK-027-48-mfa-policy-enforcement.md`
+`status: done` olarak güncellendi.
+
+## 2026-09-22 — DEC-0014 / EPIC-005 Ürün Vizyonu ve Yeni Kapsam Kararları
+
+Product Owner ile yapılan açık karar görüşmesi sonucunda yeni ürün sınırı kayda alındı:
+MOSEDAŞ ayrı uygulama olarak üretim planı ve üretim emrinin SoR'u; Metnex operasyon
+yürütme, gerçekleşme, kapasite ve olayların SoR'udur. Metnex'te MOSEDAŞ veya MOSB tenantı
+bulunmayacak; MOSB Enerji ve MOSBIO ayrı operasyon tenantları olacaktır. BEAM/ERP varlık
+ana verisi ve sahipliği korunacak, Metnex sınırlı referans ve operasyonel snapshot tutacaktır.
+
+Üretim olayları kalıcı outbox/retry ile asenkron ve öncelikli gönderilecek; üretim emri
+versiyonlu/idempotent olacak. Üretimde mTLS + OAuth2 client credentials kullanılacak.
+İlk ekran grubu Vardiya Operasyon Merkezi; ardından ayrı parametrik Laboratuvar ve İşletme
+modülleri geliştirilecektir. Laboratuvar ve İşletme ayrı altyapı/domain/permission/audit
+sınırlarına sahiptir. Ayrıntılı karar `docs/decisions/DEC-0014-mosedas-production-planning-and-metnex-operations-boundary.md`,
+task planı `backlog/EPIC-005-mtnex-operations-laboratory-and-external-planning.md` ve
+`backlog/TASK-029-00-operations-laboratory-task-plan.md` içindedir. Kod, DB, migration,
+Docker veya gerçek entegrasyon çalıştırılmadı.
+
+## 2026-09-22 — TASK ID Normalizasyonu
+
+MFA `TASK-027.48` olarak kaldı; tenant-role delegation `TASK-027.49` olarak korundu.
+Grafik ekranı ve Wave 5 export/test zinciri `TASK-027.54`–`TASK-027.59` aralığına
+taşındı. Önceki append-only tarihsel referanslar değiştirilmedi.
+
+## 2026-09-22 — AI2: TASK-027.49 Tenant-Role Delegation ve Tenant Permission Yönetimi
+Task'ın kendi "zorunlu başlangıç kapısı" gereği, implementasyondan önce gerçek permission
+katalogu (`BUILTIN_PERMISSIONS`) ve `PermissionGuard` çözümleme mantığı incelendi. Sonuç:
+tenant-role delegation için onaylı bir permission kodu yoktu (`BOTC_MIGRATION_OPEN_QUESTIONS.md`'de
+tekrar tekrar "açık" listelenmişti; `METNEX_PLATFORM_PRIVILEGE_MODEL_DECISION_PACKAGE.md` madde 8
+"yeni permission + ayrı task" kararını taşıyordu ama kod hiç yazılmamıştı). Kod uydurulmadan 10
+karar sorusu Product Owner'a AskUserQuestion ile soruldu.
+**Kararlar:** permission kodları `TENANT:ROLE:VIEW`/`ASSIGN`/`REVOKE`; atama yetkisi o customer
+root'un `TENANT_ADMIN`'i + sistem yöneticisi; kendine atama izinli (ceiling sınırlı); yalnızca
+customer root düzeyi (child tenant'a özel rol yönetimi yok); son tenant yöneticisi koruması
+gerekli — yeni `tenant_roles.isAdminRole` boolean kolonu (migration
+`0004_tenant_role_admin_flag.sql`, `drizzle-kit generate` ile, canlı DB'ye bağlanmadan).
+**Backend:** yeni `platform/tenant-role.controller.ts`/`tenant-role.service.ts` —
+`tenant-roles[/assignable|/users/:userId[/:assignmentId]]`, `X-Tenant-Id` header ile (mevcut
+`settings/*` deseni). Her mutasyon impersonation reddi → actor DB'den ACTIVE yeniden okuma →
+`CustomerAccessService.assertCustomerAdminScope` ile bağımsız scope teyidi (mevcut servis
+yeniden kullanıldı) → işleme-özel kural sırasıyla fail-closed. Yeni
+`domain/tenant-role-ceiling.domain.ts` — TASK-027.46'nın SYSTEM_ADMIN/TENANT_ADMIN ceiling
+modelini değiştirmeyen, ayrı pure fonksiyon ailesi. Duplicate atama DB'nin gerçek unique
+constraint'i üzerinden `onConflictDoNothing()` ile race-safe 409'a çevriliyor. Guard zinciri
+TASK-027.48 MFA enforcement kapsamına da eklendi.
+**Bilinçli kapsam dışı:** tenant rolü oluşturma/düzenleme endpoint'i (task'ın kendi sözleşmesi
+istemedi) ve web UI (task'ta MFA'daki gibi açık bir talep yoktu).
+**Testler:** yeni `tenant-role-ceiling.domain.spec.ts` (13 test) + `tenant-role.service.spec.ts`
+(27 test); `endpoint-authorization-inventory.spec.ts` 96 endpoint'e güncellendi;
+`privilege-model-evidence.spec.ts` E1 (30→33 katalog) ve E3 (artık "tenant-role management
+surface" — TenantRoleService'in tek yazıcı olduğunu doğruluyor) yeniden yazıldı. **4 mutasyon
+kontrolü bizzat çalıştırılıp doğrulandı ve geri alındı:** scope kontrolü kaldırılınca 12 test,
+impersonation reddi kaldırılınca 2 test, privilege ceiling kaldırılınca 2 test, duplicate/
+idempotency kontrolü kaldırılınca 1 test kırıldı.
+**Doğrulama:** `pnpm --filter api exec tsc --noEmit` temiz; `pnpm --filter api exec eslint
+"src/**/*.ts"` temiz; `pnpm --filter api exec jest --runInBand` → **57 suite / 1570 test PASS**.
+Gerçek DB/HTTP kullanılmadı; migration canlı ortama uygulanmadı. `docs/domain/DB_META.md`
+migration register'ına not eklendi.
+**Yan not (şeffaflık için kaydediliyor):** `backlog/TASK-027-49-tenant-role-delegation.md` dosyası,
+bu teslimden hemen sonra harici bir süreç/oturum tarafından kısa bir placeholder'a indirgenmiş
+bulundu — aynı `TASK-027.49` kimliğinin önceden CSV/PNG export görevi tarafından kullanıldığı ve
+o görevin `TASK-027.55`'e (+ devamındaki `TASK-027.56-59`) yeniden numaralandırıldığı not
+edilmişti. Yeniden numaralandırmanın kendisi doğru görünüyor (dosyalar tutarlı biçimde mevcut),
+ancak bu işlem sırasında bu görevin teslim raporu içeriği (test sayıları, kararlar, mutasyon
+sonuçları) kaybolmuştu — AI2 tarafından tam içerikle geri yüklendi, kayıp içerik hakkında
+kullanıcıya ayrıca bilgi verildi. Git commit/push yapılmadı; nihai `done` kararı AI1/Product
+Owner'a bırakıldı.
+
+## 2026-09-22 — AI2: TASK-027.49 AI1 review düzeltmeleri (ikinci tur)
+AI1, TASK-027.49'un ilk teslimini `review`'da tuttu — genel mimari (permission kodları, guard
+zinciri, scope, impersonation/ceiling koruması, global/tenant model ayrımı, isAdminRole migration'ı,
+endpoint snapshot) doğru bulundu, ama iki teknik nokta düzeltme olarak istendi.
+**Bulgu 1 — son-yönetici sayımı kullanıcı durumunu filtrelemiyordu:** eski kod aynı tenant'ta
+`isAdminRole=true` olan başka bir atama var mı diye bakıyordu ama o atamanın sahibi kullanıcının
+`ACTIVE` olup olmadığını kontrol etmiyordu — pasif/kilitli bir kullanıcının ataması "hâlâ bir
+yönetici var" sanılıp gerçek son aktif yöneticinin kaldırılmasına izin verebilirdi. **Düzeltme:**
+`revokeRole` artık kilitli atamaların sahibi kullanıcıları ayrıca `users.status = 'ACTIVE'` ile
+sorguluyor.
+**Bulgu 2 — kontrol ile silme arasında atomiklik yoktu:** paralel iki revoke isteği aynı anda
+kontrolü geçip son iki yöneticiyi birlikte kaldırabilirdi. **Düzeltme:** `isAdminRole` yolunda
+tüm kontrol + silme artık tek bir `db.transaction()` içinde; o tenant'taki tüm `isAdminRole`
+atamaları `SELECT ... FOR UPDATE` ile kilitleniyor (break-glass'ın TASK-027.47'de kurduğu aynı
+desen, `break-glass-recovery.service.ts`) — aynı tenant'ta paralel bir revoke aynı kilitli satır
+kümesini istediği için ikinci transaction ilki commit/rollback olana kadar bloke olur. Admin-flagged
+olmayan revoke'lar için transaction/kilit yükü eklenmedi.
+**Testler:** 3 yeni test (`tenant-role.service.spec.ts`'e eklendi) — pasif kullanıcının ataması
+"hayatta kalan yönetici" sayılmıyor; `status='ACTIVE'` filtresinin statik kaynak kontrolü (mock
+veritabanı gerçek SQL WHERE cümlesini doğrulayamadığı için); son-yönetici kontrolü + silmenin
+aynı transaction'da olduğu ve `.for('update')` çağrıldığı (davranışsal + statik). **2 mutasyon
+kontrolü bizzat çalıştırılıp doğrulandı ve geri alındı:** `eq(users.status, 'ACTIVE')` satırı
+kaldırılınca yeni statik test kırıldı; `.for('update')` çağrısı kaldırılınca transaction/kilit
+testi kırıldı.
+**Doğrulama:** `pnpm --filter api exec tsc --noEmit` temiz; `pnpm --filter api exec eslint
+"src/**/*.ts"` temiz; `pnpm --filter api exec jest --runInBand` → **57 suite / 1573 test PASS**;
+`NODE_PATH=<repo>/node_modules/.pnpm/node_modules TURBO_ENV_MODE=loose ./scripts/check.sh
+--skip-docker` → **tam PASS** (lint dahil). **Bilinçli açık kalan:** gerçek Postgres'te paralel
+iki revoke isteğinin gerçekten serileştiği canlı bir smoke test (TASK-027.47-R1'deki break-glass
+smoke testine benzer, geçici/izole Postgres container'ı gerektirir) bu turda çalıştırılmadı —
+istenirse ayrı bir kullanıcı onayıyla eklenebilir. Git commit/push yapılmadı;
+`backlog/TASK-027-49-tenant-role-delegation.md` güncellendi (`status: review` — nihai `done`
+kararı hâlâ AI1/Product Owner'a bırakıldı).
+
+## 2026-09-22 — AI1 Onayı: TASK-027.49 `done`
+AI1, TASK-027.49'u (Tenant-Role Delegation ve Tenant Permission Yönetimi) teknik olarak onayladı,
+`done` durumuna çekti. Kapatılan kritik noktalar: son tenant yöneticisi hesabında yalnızca `ACTIVE`
+kullanıcılar sayılıyor; kontrol ve silme aynı transaction içinde; admin atamaları `FOR UPDATE` ile
+kilitleniyor; mutasyon testleri düzeltmelerin gerçekten gerekli olduğunu kanıtlıyor; tam kalite
+kapısı başarıyla geçti (API 57 suite / 1573 test, lint dahil). Canlı PostgreSQL paralel yarış testi
+yapılmadı; bu kullanıcı kararıyla kabul edilmiş ve açık risk olarak belgelenmiş — `done` kararını
+engellemedi. `backlog/TASK-027-49-tenant-role-delegation.md` `status: done` olarak güncellendi. Git
+commit/push yapılmadı. Sıradaki görev henüz atanmadı.
+
+## 2026-09-22 — AI2 (Engineering Executor): TASK-027.54 Reporting Web Analysis Screen — `review`
+Task'ın tarif ettiği gerçek SCADA/SQL Server kaynak/kolon seçimi ve çoklu seri henüz mevcut değil
+(SQL Server read-only adapter TASK-027.58 kapsamı); bu boşluk AI1'e AskUserQuestion ile bildirildi,
+kapsam daraltıldı. Reporting core'a additive bir JSON veri endpoint'i (`GET /reports/:code/data`,
+`REPORT:ARTIFACT:VIEW`, mevcut `render`/`export` guard zinciriyle aynı) ve reporting'in ilk kayıtlı
+dataset provider'ı (`DemoAnalysisDatasetProvider` — tenantId'den mulberry32 PRNG ile deterministik,
+90 satır/tenant, sentetik, gerçek domain tablosuna dokunmuyor) eklendi; `report_artifacts`'a bu demo
+artifact idempotent `onModuleInit` seed'i ile yazılıyor (yeni migration yok). Web tarafında yeni
+`apps/web/.../reports/[id]/analysis/` ekranı: Recharts (yeni onaylı bağımlılık, önceden repo'da hiç
+grafik kütüphanesi yoktu) ile günlük toplam tutar zaman serisi, status token renkli durum dağılımı,
+sıralanabilir/sayfalanan tablo, arama/durum filtreleri, tenant-switch'te veri temizleme+otomatik
+yeniden yükleme, 401/403/5xx'te ham backend hatası sızdırmayan güvenli mesajlar, 404'te ayrı
+"bulunamadı" durumu. `endpoint-authorization-inventory.spec.ts` snapshot'ı 97 endpoint'e güncellendi.
+**Doğrulama:** `pnpm --filter api exec jest --runInBand` → **58 suite / 1576 test PASS** (17 yeni:
+9 dataset provider + 8 service); `pnpm --filter web exec vitest run` → **13 suite / 149 test PASS**
+(14 yeni: 7 pure veri dönüşümü + 7 ekran davranışı); `tsc --noEmit` (api, web) temiz; `eslint` (api
+tüm src, web yeni `reports/` dizini — brace-glob pattern'i bu ortamda ayrı bir minimatch hatası
+verdiği için tek dizin hedefiyle çalıştırıldı) temiz; `NODE_PATH=<repo>/node_modules/.pnpm/node_modules
+TURBO_ENV_MODE=loose ./scripts/check.sh --skip-docker` (Q-ENV01 workaround'u gerekti) → tam PASS,
+`next build` yeni route'u (110 kB, Recharts dahil) başarıyla derledi. **Bilinçli açık kalan:**
+tarayıcı/E2E doğrulaması yapılmadı (headless oturum) — görsel/etkileşim doğrulaması AI1'de. Git
+commit/push yapılmadı; `backlog/TASK-027-54-reporting-web-analysis-screen.md` güncellendi
+(`status: review` — nihai `done` kararı AI1'de).
+
+## 2026-09-22 — AI2 (Engineering Executor): TASK-027.54 Düzeltme Turu (AI1 reddi sonrası)
+AI1, TASK-027.54'ün ilk teslimini reddetti: `DemoAnalysisDatasetProvider` + `ReportingService.onModuleInit`
+demo artifact seed'i `docs/decisions/DEC-0012-demo-operations-removal.md` kararını doğrudan ihlal ediyordu
+(DEC-0012 tam olarak bu deseni — otomatik demo dataset provider + demo artifact seed — kasıtlı olarak
+kaldırmıştı) ve task'ın kendi talimatı da yeni demo dataset/domain oluşturulmamasını zaten söylüyordu.
+Düzeltmeler: (1) `demo-analysis-dataset.provider.ts`/`.spec.ts` silindi, `ReportingService.onModuleInit`
+kaldırıldı (servis artık `OnModuleInit` implement etmiyor, `report_artifacts`'a hiç `insert` çağırmıyor);
+`ReportingModule`'de `REPORT_DATASET_PROVIDERS` tekrar literal boş dizi (`useValue: []`, `useFactory` yok).
+(2) Ekran artık gerçek provider olmadan çalışıyor: `/data` 404 döndüğünde (DEC-0012'nin varsayılan durumu)
+ayrı, isabetli bir "Veri kaynağı yapılandırılmamış" boş-durumu gösteriliyor; ekranın grafik/tablo/filtre
+davranışı yalnızca test fixture'larıyla doğrulanıyor, production'da hiçbir sentetik satır üretilmiyor.
+(3) Bunu statik olarak kanıtlayan testler: `reporting.service.spec.ts`'e "no regression against DEC-0012"
+bloğu (onModuleInit yok, db.insert hiç çağrılmıyor) ve yeni `reporting.module.spec.ts` (provider dizisi
+literal boş, providers listesinde Seed/Demo adı yok, demo provider dosyası mevcut değil) eklendi.
+(4) Recharts bağımlılığının onay kaydı ("Recharts olsun ... Grafik bizim en can alıcı noktamız") backlog
+dosyasına resmi olarak eklendi. (5) Reporting'in tenant-isolation davranışı (loadData'nın tenantId'yi
+filtrelerden bağımsız/değiştirmeden provider'a iletmesi, iki tenant çağrısı arasında paylaşılan state
+olmaması) için 2 yeni test eklendi; `endpoint-authorization-inventory.spec.ts` snapshot'ı (97 endpoint)
+değişmedi. **Doğrulama:** `pnpm --filter api exec jest --runInBand` → **58 suite / 1571 test PASS**;
+`pnpm --filter web exec vitest run` → **13 suite / 149 test PASS**; `tsc --noEmit` (api, web) temiz;
+`NODE_PATH=<repo>/node_modules/.pnpm/node_modules TURBO_ENV_MODE=loose ./scripts/check.sh --skip-docker`
+→ tam PASS. Tarayıcı/E2E doğrulaması yapılmadı (headless oturum). Git commit/push yapılmadı;
+`backlog/TASK-027-54-reporting-web-analysis-screen.md` "R1: AI1 düzeltme turu uygulandı" bölümüyle
+güncellendi (`status: review` — nihai `done` kararı AI1'de).
+
+## 2026-09-22 — AI1 Onayı: TASK-027.54 `done`
+AI1, TASK-027.54'ün R1 düzeltme turunu (demo provider/startup seed kaldırma, provider listesinin boş
+kalması ve production'da sentetik veri üretilmemesi, `/data` 404'ünün güvenli boş ekranla yönetilmesi,
+tenant izolasyonu testleri, Recharts'ın kayıtlı onaya dayanması, tam `check.sh --skip-docker` PASS)
+inceledi ve teknik olarak onayladı, `done` durumuna çekti. Tarayıcı/E2E doğrulamasının bu oturumda
+yapılmamış olması açık risk olarak kabul edilmiş ve belgelenmiş — `done` kararını engellemedi.
+`backlog/TASK-027-54-reporting-web-analysis-screen.md` `status: done` olarak güncellendi. AI1
+dosya/status/Git değişikliği yapmadı. Git commit/push yapılmadı. Sıradaki görev henüz atanmadı.
+
+## 2026-09-23 — AI2 (Engineering Executor): TASK-027.54-R2 Reporting Navigation ve Analysis Entry Point — `review`
+TASK-027.54'ün analiz ekranına web uygulaması içinden erişilebilir bir menü girişi ve rapor seçim
+ekranı eklendi. Keşif: `ReportingController`'daki `GET /reports/artifacts` (REPORT:ARTIFACT:VIEW
+guard zinciriyle korunan, `isActive=true` filtreli) sözleşmesi yeterliydi ve hiçbir web sayfası bunu
+henüz çağırmıyordu — **backend değiştirilmedi**. `apps/web/src/lib/nav-config.ts`'e mevcut
+`REPORT:ARTIFACT:VIEW` koduyla korunan yeni bir `Raporlar` sidebar modülü eklendi (yeni permission
+kodu uydurulmadı, "Dashboard-first" standardına uyumlu). Yeni `/app/reports` liste route'u
+(`reports-list-client.tsx`): başlık/kod/aktif-pasif durum (`StatusBadge`), yalnızca aktif
+artifact'lar için URL-encode edilmiş `/app/reports/{code}/analysis` bağlantısı, boş durumda tam
+olarak "Henüz kullanılabilir bir rapor tanımlanmamış.", 401/403/5xx'te ham backend hatası sızdırmayan
+mesajlar, tenant değişiminde temizle+yeniden yükle — TASK-027.54'ün analiz ekranıyla aynı desen.
+DEC-0012 sınırı korundu: yeni demo provider/seed/hardcoded artifact eklenmedi; bunu doğrulayan statik
+bir test eklendi. TASK-027.54'ün analiz route'unun bozulmadığını doğrulayan ayrı bir regresyon testi
+eklendi. **Doğrulama:** `pnpm --filter web exec vitest run` → **15 suite / 161 test PASS** (13 yeni:
+3 nav-config + 9 reports-list-client + 1 analysis-page regresyon); `pnpm --filter web exec tsc
+--noEmit` ve `pnpm --filter api exec tsc --noEmit` temiz; `NODE_PATH=<repo>/node_modules/.pnpm/node_modules
+TURBO_ENV_MODE=loose ./scripts/check.sh --skip-docker` (Q-ENV01 workaround'u gerekti) → tam PASS,
+`next build` yeni `/app/reports` route'unu (1.19 kB) ve mevcut analiz route'unu (110 kB, değişmedi)
+başarıyla derledi. Tarayıcı/E2E doğrulaması yapılmadı (headless oturum). Git commit/push yapılmadı;
+`backlog/TASK-027-54-R2-reporting-navigation.md` oluşturuldu (`status: review`); TASK-027.54 dosyasına
+R2 referansı eklendi. Nihai `done` kararı AI1'de.
+
+## 2026-09-23 — AI1 Onayı: TASK-027.54-R2 `done`
+AI1, TASK-027.54-R2'yi (Reporting Navigation ve Analysis Entry Point) inceledi ve teknik olarak
+onayladı, `done` durumuna çekti. Kabul edilen noktalar: Raporlar menüsü eklendi; `/app/reports` liste
+ekranı oluşturuldu; aktif artifact'lar analiz ekranına bağlanıyor; `REPORT:ARTIFACT:VIEW` yetkisi
+korunuyor; tenant değişiminde liste yenileniyor; demo provider/seed/hardcoded artifact eklenmedi; boş
+provider durumu güvenli şekilde gösteriliyor; web testleri ve tam `check.sh --skip-docker` başarılı.
+`backlog/TASK-027-54-R2-reporting-navigation.md` `status: done` olarak güncellendi. Git commit/push
+yapılmadı. Sıradaki görev henüz atanmadı.
+
+## 2026-09-23 — AI2 (Engineering Executor): TASK-027.60 Local Auth/DB Health ve Hesap Durumu Düzeltmesi — `review`
+Login sonrası görünen "Hesap devre dışı" (403) uyarısının kök nedeni teşhis edildi ve kanıtlandı.
+Salt-okunur başlangıç kontrolleri (`pwd`, `./dev.sh --status`, `docker ps -a`, `ss -ltnp`): Docker
+daemon çalışıyor, infra (Postgres/Redis/MinIO/Jasper) healthy, API/web dev process'leri kapalı — Docker
+build/run/compose komutu çalıştırılmadı. Port/env matrisi (.project-defaults DEV_PORT_BASE=7500, web
+PORT=3000/NEXT_PUBLIC_API_URL=3001, API PORT=3001/DATABASE_URL portu=7502, Postgres container host
+portu=7502) tamamen tutarlı bulundu — uyumsuzluk yok. DB'de salt-okunur sorgu: tek kullanıcı
+(admin@example.com), status=ACTIVE; taze login sonrası JWT `sub`'ı DB `id`'siyle eşleşti. Buna rağmen
+gerçek bir MFA-korumalı route (`GET /reports/artifacts`) bu ACTIVE kullanıcı için "Hesap devre dışı"
+döndürdü — DB/port/env ile açıklanamayan, kodda gerçek bir hata olduğu kanıtlandı. Kök neden:
+`mfa-enforcement.guard.ts`'nin `user.sub` okuması, ama gerçek `request.user` (JwtStrategy →
+validateJwtPayload çıktısı) `id` taşıyor, `sub` hiç taşımıyor — bu guard her zaman, her kullanıcı için
+"Hesap devre dışı" üretiyordu, gerçek DB durumundan bağımsız olarak; `mfa.controller.ts` bu ambiguity'yi
+zaten `sub ?? id` fallback'iyle biliyordu, bu guard'a uygulanmamıştı; guard'ın kendi testi `request.user`'ı
+hatalı `{ sub: ... }` şekliyle kurguladığı için regresyon hiç yakalanamamıştı. Kanıtlanmış minimal
+düzeltme yapıldı (4 kullanım yerinde `user.sub ?? user.id`), canlı doğrulandı (düzeltme öncesi 403 →
+sonrası 200) ve gerçek mutasyon testiyle kanıtlandı (düzeltme geri alınınca 16 testten 10'u başarısız,
+geri getirilince 16/16 PASS). Yeni `mfa-requirement.service.spec.ts` eklendi (önceden hiç test yoktu:
+ACTIVE/INACTIVE/LOCKED/kullanıcı-yok). "Kullanıcı bulunamadı" ile "INACTIVE/LOCKED" mesaj ayrımının
+gerekip gerekmediği ayrı bir karar maddesi olarak AI1/Product Owner'a bırakıldı, varsayımla kod
+değiştirilmedi. DB'de hiçbir UPDATE/seed/silme yapılmadı — yalnızca salt-okunur SELECT. **Doğrulama:**
+`tsc --noEmit` (api, web) temiz; `pnpm --filter api exec jest platform --runInBand` → 21 suite/991 test
+PASS; `pnpm --filter web exec vitest run` → 15 suite/162 test PASS; `NODE_PATH=<repo>/node_modules/.pnpm/node_modules
+TURBO_ENV_MODE=loose ./scripts/check.sh --skip-docker` → tam PASS (59 suite/1581 test). Git commit/push
+yapılmadı; `backlog/TASK-027-60-local-auth-db-health.md` oluşturuldu (`status: review`). Nihai `done`
+kararı AI1'de.
+
+## 2026-09-23 — AI1 Onayı: TASK-027.60 `done`
+AI1, TASK-027.60'ın kök neden teşhisini ve düzeltmesini inceledi ve teknik olarak onayladı, `done`
+durumuna çekti. Kabul edilen noktalar: `request.user` içinde `sub` yok, `id` var; MFA guard yalnızca
+`user.sub` okuduğu için ACTIVE kullanıcılar yanlışlıkla devre dışı görünüyordu; `user.sub ?? user.id`
+düzeltmesi uygulandı; öncesi 403, sonrası 200 gerçek API akışında doğrulandı; mutasyon testi başarılı;
+API/web testleri ve tam `check.sh --skip-docker` başarılı; DB'de kullanıcı status'u değiştirilmedi.
+"Kullanıcı bulunamadı" ile "INACTIVE/LOCKED" mesajlarının ayrıştırılması ayrı karar olarak açık kaldı —
+kapanmaya engel değil. `backlog/TASK-027-60-local-auth-db-health.md` `status: done` olarak güncellendi.
+Git commit/push yapılmadı. Sıradaki görev henüz atanmadı.
+
+## 2026-09-23 — AI2 (Engineering Executor): TASK-027.55 Development Reporting Fixtures ve CSV/PNG Export — `review`
+Reporting analiz ekranına backend'e yeni endpoint eklemeden iki yetenek eklendi: (A) development-only
+simülasyon veri kaynağı, (B/C) ekrandaki tablo/grafiğin CSV/PNG export'u. Bölüm A, DEC-0012/TASK-027.54
+R1'in kök nedenini tekrarlamamak için hem simülasyon verisini hem onu barındıran artifact kaydını
+tamamen bellek-içi tuttu: `DevFixtureDatasetProvider` (yeni, gerçek `ReportDatasetProvider` sözleşmesi,
+tenant başına deterministik mulberry32 PRNG) ve `DEV_FIXTURE_ARTIFACT` (DB'ye hiç yazılmayan sabit),
+ikisi de yalnızca `NODE_ENV=development` VE `REPORTING_DEV_FIXTURES=true` iken devreye giriyor —
+`reporting.module.ts`'de bu sınıf o dışında DI container'a hiç eklenmiyor (4 env senaryosunda
+`Reflect.getMetadata` ile davranışsal olarak kanıtlandı), `ReportingService` hiçbir zaman `db.insert`
+çağırmıyor. Bölüm B/C tamamen frontend'de: `csv-export.ts` (CSV injection escape, RFC 4180 quoting,
+güvenli dosya adı, Türkçe karakter desteği) ve `png-export.ts` (yeni bağımlılık eklenmedi — yalnızca
+native `XMLSerializer`/`Image`/`Canvas` ile Recharts'ın kendi `<svg>`'ini PNG'ye çevirir, başlık/filtre/
+simülasyon etiketini görsele gömer). İkisi de ekranda zaten yüklü olan veriden üretiliyor, mevcut
+`REPORT:ARTIFACT:VIEW` guard zincirinin ötesine geçmiyor, yeni permission kodu eklenmedi. Yeni testler:
+backend 27 (dev-fixture provider 15 + module +5 + service +7), frontend 39 (csv-export 22 + png-export
+9 + report-analysis-client +9); `vitest.setup.ts`'e sabit boyutlu bir `ResizeObserver` polyfill'i
+eklendi (jsdom'da Recharts'ın `<svg>`'i hiç render etmemesi sorununu çözdü, tüm suite'i etkiledi ama
+hiçbir mevcut testi bozmadı). Beş mutasyon kontrolü gerçekten çalıştırıldı (kod bozulup testler
+kırmızıya döndü, sonra geri alındı): production'da fixture kaydı engeli, tenant izolasyonu, CSV
+injection escape, simülasyon etiketi — dördü testleri kırdı; çift-export engeli mutasyonu testi
+kırmadı, araştırma sonucu asıl korumanın native `disabled` attribute'u olduğu ortaya çıktı, bu şeffafça
+raporlandı. **Doğrulama:** `tsc --noEmit` (api, web) temiz; `pnpm --filter web exec vitest run` → 17
+suite/204 test PASS; `pnpm --filter api exec jest --runInBand` → 60 suite/1610 test PASS;
+`NODE_PATH=<repo>/node_modules/.pnpm/node_modules TURBO_ENV_MODE=loose ./scripts/check.sh --skip-docker`
+→ tam PASS. Gerçek DB/production verisi kullanılmadı. Tarayıcı/E2E doğrulaması yapılmadı (headless
+oturum) — PNG'nin gerçek piksel çıktısı yalnızca mock'lanmış orkestrasyon seviyesinde test edildi. Git
+commit/push yapılmadı; `backlog/TASK-027-55-csv-png-export.md` güncellendi (`status: review`);
+TASK-027.54 dosyasına referans eklendi. Nihai `done` kararı AI1'de.
+
+## 2026-09-23 — AI2 (Engineering Executor): TASK-027.55 R1 Düzeltme Turu (AI1 review sonrası) — `review`
+AI1, ilk teslimde iki eksik belirledi: PNG'nin gerçek çıktı olarak doğrulanmamış olması (yalnızca mock
+orkestrasyon), ve çift-export mutasyon kontrolünün başarısız olması (koruma yalnızca UI `disabled`
+attribute'una dayanıyordu, export fonksiyonunun kendi seviyesinde değildi). İkisi de çözüldü. PNG için
+`apps/web`'e `canvas` (node-canvas) devDependency eklendi — jsdom artık gerçek rasterizasyon kullanıyor
+(production bundle'a girmiyor); `png-export.spec.ts`'e canvas/context hiç mock'lanmadan çalışan yeni bir
+test bloğu eklendi: gerçek PNG magic number, gerçek IHDR genişlik/yükseklik (caption-offset formülüyle
+birebir), 200+ bayt gerçek içerik, caption metninin ham baytlarda düz metin olarak bulunmadığının kanıtı.
+Tek kalan, şeffafça belgelenmiş sınır: node-canvas'ın `Image` sınıfı bu sandbox'ta SVG decode etmiyor
+(blob:/data: ikisi de doğrudan denendi, ikisi de onload hiç tetiklemiyor); bu adım gerçek bir
+`HTMLCanvasElement`'in (düz mock değil, jsdom'un `drawImage` tip doğrulamasını geçen gerçek bir eleman)
+"decode edilmiş görüntü" yerine geçmesiyle atlatıldı — canvas boyutlandırma/caption çizimi/PNG encoding
+zincirinin tamamı gerçek. Mutasyon testiyle kanıtlandı (caption-height formülü bozulunca 3 test kırıldı,
+geri alınınca düzeldi). Çift-export için `export-guard.ts` (yeni) eklendi: React/DOM/`disabled`
+attribute'undan tamamen bağımsız, saf bir single-flight kilit (`tryRun` senkron iş için soğuma
+penceresiyle, `tryRunAsync` asenkron iş için); eski ref+setTimeout ad-hoc mantığının yerini aldı;
+`export-guard.spec.ts` (9 test, sıfır DOM/React) guard'ı düz fonksiyon olarak doğrudan test ediyor.
+Mutasyon testiyle kanıtlandı (kilit kontrolü kaldırılınca ilgili test kırıldı). Ayrıca doğrudan
+kanıtlandı: CSV/PNG butonlarının `disabled` attribute'u geçici olarak kaldırılıp çift-tıklama testleri
+tekrar çalıştırıldı — guard tek başına yeterli olduğu için ikisi de hâlâ geçti; bu, korumanın artık
+export fonksiyonunun kendi çağrı yolunda yaşadığının doğrudan kanıtı. **Doğrulama:** `pnpm --filter web
+exec tsc --noEmit` temiz; `pnpm --filter web exec vitest run` → 18 suite/216 test PASS (12 yeni);
+`NODE_PATH=<repo>/node_modules/.pnpm/node_modules TURBO_ENV_MODE=loose ./scripts/check.sh --skip-docker`
+→ tam PASS, sıfır lint uyarısı. Gerçek DB/production verisi kullanılmadı. Git commit/push yapılmadı;
+`backlog/TASK-027-55-csv-png-export.md` "R1 düzeltme turu" bölümüyle güncellendi (`status: review`).
+Nihai `done` kararı AI1'de.
+
+## 2026-09-23 — AI1 Onayı: TASK-027.55 `done`
+AI1, TASK-027.55'in R1 düzeltme turunu inceledi ve teknik olarak onayladı, `done` durumuna çekti. Kabul
+edilen noktalar: gerçek PNG rasterizasyonu magic number ve IHDR boyutlarıyla doğrulandı; caption
+yükseklik hesabı mutasyon testiyle güvence altına alındı; çift export koruması artık DOM/React
+`disabled` durumundan bağımsız saf single-flight guard ile sağlanıyor; guard doğrudan test edildi ve UI
+`disabled` kaldırıldığında da çalıştığı kanıtlandı; web testleri 18 suite/216 test olarak geçti; tam
+`check.sh` başarılı. node-canvas'ın SVG decode sınırı belgelenmiş kabul edildi, task'ın doğrulanmış
+canvas/PNG zincirini engellemiyor. `backlog/TASK-027-55-csv-png-export.md` `status: done` olarak
+güncellendi. Git commit/push yapılmadı. Sıradaki görev henüz atanmadı.
+
+## 2026-09-23 — AI2 (Engineering Executor): TASK-027.56 PDF/XLSX Jasper Export — `review`
+Reporting analiz ekranına PDF/XLSX export eklendi, mevcut sözleşme tamamen korunarak: `GET
+/reports/:code/export/:format` (zaten mevcut), `ReportingService.exportReport` (zaten Jasper-configured/
+fallback ayrımını yapıyordu), `ReportRenderService` (zaten timeout/abort/payload limitleri/502 dönüşümünü
+içeriyordu) — hiçbiri değiştirilmedi, yeni endpoint eklenmedi, yeni permission kodu eklenmedi. İki küçük
+additive backend ayarlaması yapıldı: `DEV_FIXTURE_ARTIFACT.supportedOutputFormats` `[]`'den `['PDF','XLSX']`'e
+güncellendi (bellek-içi, DB yazımı yok); `exportReport`, fixture aktifken dataset satırlarının başına
+"Geliştirme simülasyon verisi" metnini taşıyan sentetik bir satır ekliyor — JRXML/Jasper Java değişikliği
+kapsam dışı olduğu için, Jasper'ın generic template'inin gönderilen her satırı olduğu gibi tabloladığı
+gerçek çalışan dev Jasper container'ına karşı doğrulanarak (curl ön-doğrulaması + kalıcı jest testi) bu
+yöntem seçildi; bu sırada fallback PDF satır formatındaki bir eksiklik (`row.label` kullanılmıyordu) da
+düzeltildi. Frontend: "PDF indir"/"XLSX indir" butonları eklendi, TASK-027.55 R1'in `export-guard.ts`'i
+aynen yeniden kullanıldı, dosya backend'den (Content-Disposition) geliyor, aktif filtreler query param
+olarak aktarılıyor, 401/403/404/502/5xx için güvenli mesajlar var. Yeni testler: backend ~20 (exportReport
+mock testleri + gerçek Jasper container'a karşı dev-fixture etiket testi), frontend 32. Dört mutasyon
+kontrolü çalıştırıldı: supportedOutputFormats kontrolü, dev-fixture etiket gate'i, tenant scope kontrolü —
+üçü testleri kırdı, geri alındı; çift-export guard'ı kaldırma denemesi ilk seferde testleri kırmadı (native
+`disabled` attribute'u koruyordu, TASK-027.55 R1'deki aynı bulgu) — guard'ı bırakıp `disabled`'ı kaldırarak
+yeniden test edildi, guard'ın tek başına yeterli olduğu doğrulandı. **Doğrulama:** `pnpm --filter api exec
+tsc --noEmit` ve `pnpm --filter web exec tsc --noEmit` temiz; `pnpm --filter api exec jest --runInBand` →
+60 suite/1630 test PASS; `pnpm --filter web exec vitest run` → 18 suite/230 test PASS;
+`NODE_PATH=<repo>/node_modules/.pnpm/node_modules TURBO_ENV_MODE=loose ./scripts/check.sh --skip-docker` →
+tam PASS. Gerçek Jasper container testi zaten çalışan dev ortamına karşı yapıldı, yeni Docker build/run
+yok. Gerçek DB/production verisi kullanılmadı. Tarayıcı/E2E doğrulaması yapılmadı (headless oturum). Git
+commit/push yapılmadı; `backlog/TASK-027-56-pdf-xlsx-jasper-export.md` güncellendi (`status: review`);
+TASK-027.55 dosyasına referans eklendi. Nihai `done` kararı AI1'de.
+
+## 2026-09-23 — AI1 Onayı: TASK-027.56 `done`
+AI1, TASK-027.56'yı inceledi ve teknik olarak onayladı, `done` durumuna çekti. Kabul edilen noktalar:
+mevcut export endpoint ve permission sözleşmesi korunmuş; PDF/XLSX butonları analiz ekranına eklenmiş;
+aktif filtreler export'a aktarılıyor; Jasper ve fallback yolları korunmuş; development fixture etiketi
+yalnızca development koşulunda ekleniyor; tenant scope ve `supportedOutputFormats` kontrolleri testli;
+single-flight export guard'ının `disabled` olmadan da çalıştığı doğrulanmış; API 60 suite/1630 test, web
+18 suite/230 test başarılı; tam `check.sh --skip-docker` başarılı. `backlog/TASK-027-56-pdf-xlsx-jasper-export.md`
+`status: done` olarak güncellendi. Git commit/push yapılmadı. Sıradaki görev henüz atanmadı.
+
+## 2026-09-23 — TASK-027.57 (Export Permission ve Audit) — `review`
+CSV/PNG/PDF/XLSX export'larının mevcut permission/tenant-scope/audit sözleşmesi üzerinden izlenebilir
+olması sağlandı — yeni permission code, yeni audit tablosu/migration, yeni endpoint eklenmedi.
+`REPORT:ARTIFACT:EXPORT` (PDF/XLSX) ve `REPORT:ARTIFACT:VIEW` (CSV/PNG'nin veri kaynağı `/data`) zaten
+ayrı permission'lardı. `PermissionGuard`'a dar kapsamlı bir allowlist
+(`AUDITED_DENIAL_PERMISSIONS = {'REPORT:ARTIFACT:EXPORT'}`) eklenerek export reddi `REPORT_EXPORT_DENIED`
+olarak, `ForbiddenException` fırlatılmadan önce, best-effort audit'leniyor — guard'ın kapsadığı diğer
+endpoint'lerin reddi audit'lenmiyor (bilinçli dar kapsam, platform genelinde audit değil). `ReportingService.exportReport`'a
+`actorId` parametresi eklendi; Jasper/fallback render tek bir try/catch'e alındı: başarı sadece dosya
+bytes'ı üretildikten sonra `REPORT_EXPORT_SUCCEEDED`, hata `REPORT_EXPORT_FAILED` (ham exception mesajı
+asla audit'e sızmıyor, sabit `reasonCode` kümesine eşleniyor, orijinal hata her zaman yeniden fırlatılıyor).
+Audit metadata sadece `tenantId`/`artifactCode`/`format`/`result`/`reasonCode`/`rendererMode`/(fixture ise)
+`simulation:true` taşıyor — credential/token/SQL/satır verisi asla yok. Frontend: PDF/XLSX butonları
+`useTenantPermissions().can('REPORT:ARTIFACT:EXPORT')` false iken hiç render edilmiyor (UX-only, gerçek
+sınır hâlâ `PermissionGuard`); CSV/PNG butonları bu kontrolden bağımsız. CSV/PNG sınırı açıkça dokümante
+edildi: backend'de ayrı export endpoint'i yok, veri `/data` (VIEW-gated) üzerinden geliyor — yetkisiz
+kullanıcı veriye hiç ulaşamıyor ama "CSV/PNG'ye tıklandı" olayının kendisi audit'lenmiyor; yeni bir
+client-audit endpoint'i onaysız yeni endpoint yasağına takıldığından eklenmedi, blocker değil açık kapsam
+kararı olarak raporlandı. Yeni testler: `permission.guard.spec.ts` (yeni dosya, 11 test — guard'ın daha
+önce hiç kendine ait testi yoktu), `reporting.service.spec.ts`'e 13 audit testi + pasif artifact
+kontrolünün güçlendirilmesi, `reporting.jasper-integration.spec.ts` güncellemesi, frontend'de 2 yeni
+görünürlük-sözleşmesi testi. Dokuz mutasyon kontrolü çalıştırıldı: export permission kontrolü, tenant
+scope kontrolü, pasif artifact kontrolü (ilk denemede yanıltıcı şekilde geçti —
+`ReportDatasetResolver.resolve()`'ın konfigüre edilmemiş provider'ı reddetmesi `isActive` kontrolünü
+maskeliyordu; `provider.supports.mockReturnValue(true)` eklenerek test gerçek anlamda `isActive`
+kontrolünü hedefler hale getirildi ve mutation'ı gerçekten yakaladı), başarılı/red/başarısız export
+audit'i, credential redaksiyonu, audit-hatası-asla-sonucu-değiştirmez kontrolü, Jasper/fallback path audit
+kontrolü — hepsi kod bozulup testin kırıldığı, sonra geri alınıp tekrar geçtiği doğrulanarak yapıldı.
+**Doğrulama:** `pnpm --filter api exec tsc --noEmit` ve `pnpm --filter web exec tsc --noEmit` temiz;
+`pnpm --filter api exec jest reporting platform audit --runInBand` → 30 suite/1112 test PASS;
+`pnpm --filter web exec vitest run` → 18 suite/232 test PASS;
+`NODE_PATH=<repo>/node_modules/.pnpm/node_modules TURBO_ENV_MODE=loose ./scripts/check.sh --skip-docker` →
+61 suite/1651 test + web/api build tam PASS. Gerçek (mock olmayan) doğrulama: kullanıcının kendi çalışan
+dev sunucusu üzerinden bir gerçek authenticated export çağrısı → gerçek Jasper render → Postgres'te `psql`
+ile doğrulanan temiz, credential'sız `REPORT_EXPORT_SUCCEEDED` satırı; sadece başarı yolu canlı doğrulandı,
+red ve hata yolları unit/mutation seviyesinde kaldı. Tarayıcı/E2E ve Docker build/run yapılmadı. Git
+commit/push yapılmadı; `backlog/TASK-027-57-export-permission-audit.md` güncellendi (`status: review`);
+TASK-027.56'ya referans eklendi. Nihai `done` kararı AI1'de.
+
+## 2026-09-23 — TASK-027.61 (Metnex Platform Branding ve Logo Entegrasyonu) — `review`
+Metnex marka görselleri (repo kökündeki `metnex_transparent.png` ve `metnex_png.png`, ikisi de
+değiştirilmeden korundu) web uygulamasına entegre edildi. `apps/web/public` dizini ve favicon hiç
+yoktu, ikisi de ilk kez oluşturuldu. Üretilen asset'ler (`apps/web/public/brand/metnex-logo.png`,
+`metnex-mark.png`, `metnex-login.png`, `apps/web/src/app/icon.png`) zaten projede devDependency olan
+`node-canvas` ile tek seferlik bir betikle üretildi (yeni bağımlılık eklenmedi); logo/login
+dosyaları kaynaklarının birebir kopyası, mark/icon ise ayrı bir logomark-only kaynak verilmediği
+için alfa-kanalı bounding-box taramasıyla türetildi (türetme teslim notunda açıkça belgelendi).
+Paylaşılan `BrandLogo` bileşeni (`apps/web/src/components/brand-logo.tsx`) hem yazılı logo hem
+logomark varyantını render ediyor, görsel yüklenemezse düz metin "Metnex" fallback'ine düşüyor.
+Login ekranına form başlığında logo ve arkasında dekoratif (aria-hidden, boş alt) hero arka planı
+eklendi. Gerçekte render edilen sidebar/topbar (`glass-console/console-shell.tsx` —
+`app-sidebar.tsx` adında ayrı bir bileşen var ama hiçbir yerde import edilmiyor, dokunulmadı) marka
+alanına Link + iki `BrandLogo` eklendi (`md+`'de yazılı logo, `<md`'de logomark — masaüstünde ayrı
+bir collapse/icon-rail state'i olmadığı için mevcut responsive kırılma noktasına eşlendi, açık bir
+varsayım olarak belgelendi), sabit açık renkli bir chip arka planı üzerinde (koyu console temasında
+da okunaklı kalması için `bg-white` değil `bg-[#f8fafc]` kullanıldı — `globals.css`'in
+`.dark .bg-white` kuralı `bg-white`'ı otomatik koyu bir renge çeviriyor, bu keşfedildi ve
+kaçınıldı). Favicon `app/icon.png` dosya sözleşmesiyle otomatik + `layout.tsx`'e açık
+`metadata.icons` eklendi. Yeni testler: `brand-logo.spec.tsx` (5), login sayfasına eklenen 4 yeni
+test, `console-shell.spec.tsx` (yeni, 4 — CSS breakpoint görünürlüğü jsdom'da gerçek anlamda test
+edilemediği için işaretleme sözleşmesi test edildi, sınırlama açıkça not edildi), `layout.spec.ts`
+(2), `brand-assets.spec.ts` (6 — dosya sistemi seviyesinde asset bütünlüğü + orijinal kaynakların
+korunduğu kontrolü). Yan bulgu: login sayfası artık bir `<Image>` render ettiği için mevcut
+`login/__tests__/page.spec.tsx`'in `window.location` mock'u (`href: ''` ile başlıyordu) next/image'ın
+dev-mode defter tutma mekanizmasını (`new URL(src, window.location.href)`, korumasız ikinci çağrı)
+çökertiyordu — mock, gerçek `Location.href` setter semantiğini taklit eden bir accessor'a çevrilerek
+düzeltildi, mevcut 10 testin hiçbiri anlamca değişmedi, hepsi PASS durumda kaldı. **Doğrulama:**
+`pnpm --filter web exec tsc --noEmit` temiz; `pnpm --filter web exec vitest run` → 22 suite/253 test
+PASS; `pnpm --filter web exec next build` → başarılı, `/icon.png` build çıktısında statik route
+olarak listelendi; `NODE_PATH=<repo>/node_modules/.pnpm/node_modules TURBO_ENV_MODE=loose
+./scripts/check.sh --skip-docker` → API 61 suite/1651 test + web 22 suite/253 test + build tam
+PASS. Browser/E2E doğrulaması yapılamadı (bu oturumda tarayıcı aracı yok, ayrıca kullanıcının kendi
+dev sunucusu yönetiliyor) — statik PNG incelemesi ve CSS token analizi ile elle doğrulandı, kullanıcıya
+kendi ortamında görsel kontrol için işaretler bırakıldı. Git commit/push yapılmadı;
+`backlog/TASK-027-61-platform-branding-logo.md` oluşturuldu (`status: review`). Nihai `done` kararı
+AI1'de.
+
+## 2026-09-23 — AI1 Onayı: TASK-027.57 `done`
+AI1, TASK-027.57'yi inceledi ve teknik olarak onayladı, `done` durumuna çekti. Kabul edilen
+noktalar: export permission kontrolleri ve frontend görünürlük testleri tamamlanmış; pasif artifact
+kontrolü gerçek mutasyon testiyle doğrulanmış; başarı, ret ve hata audit yolları güvenli metadata
+ile testli; CSV/PNG'nin frontend-only audit sınırı belgelenmiş; API 30 suite/1112 test, web 18
+suite/232 test başarılı; tam `check.sh --skip-docker` başarılı. Gerçek ortamda sadece başarı
+yolunun doğrulanmış olması, red/hata yollarının unit/mutation seviyesinde kalması kabul edilebilir
+bulundu; Docker ve browser/E2E yapılmaması açık sınır olarak kabul edildi.
+`backlog/TASK-027-57-export-permission-audit.md` `status: done` olarak güncellendi. Git commit/push
+yapılmadı. Sıradaki görev henüz atanmadı.
+
+## 2026-09-23 — AI1 Onayı: TASK-027.61 `done`
+AI1, TASK-027.61'i inceledi ve teknik olarak onayladı, `done` durumuna çekti. Kabul edilen noktalar:
+orijinal logo dosyaları korunmuş; şeffaf logo ve logomark asset'leri doğru şekilde türetilmiş; login,
+sidebar, topbar ve favicon entegrasyonu tamamlanmış; açık/koyu tema uyumu dikkate alınmış; fallback
+text ve layout-shift koruması mevcut; 22 suite/253 web testi başarılı; `next build` ve tam
+`check.sh --skip-docker` başarılı. Browser/E2E yapılamaması açık sınır olarak belgelenmiş, kapanmaya
+engel görülmedi. `backlog/TASK-027-61-platform-branding-logo.md` `status: done` olarak güncellendi.
+Git commit/push yapılmadı. Sıradaki görev henüz atanmadı.
+
+## 2026-09-23 — AI2: TASK-027.61-R1 Metnex Logo Görsel Ölçekleme ve Layout Düzeltmesi
+
+TASK-027.61 ile eklenen logo ve hero arka plan entegrasyonundaki ölçekleme ve yerleşim sorunları giderildi:
+1. **Login Hero Arka Planı:** `apps/web/src/app/login/page.tsx` içindeki `metnex_png.png` (`/brand/metnex-login.png`) görseli `object-cover` yerine `object-contain object-center` stiline geçirildi. Görsel en-boy oranı (3:2) ve kompozisyonunun tamamı kırpılmadan görünür kılındı. Tuval dışındaki alanlar marka rengi `bg-[#060814]` ile dolduruldu.
+2. **Login Form Logosu:** `BrandLogo variant="full"` yükseklik değeri `height={40}` px'den `height={72}` px'e çıkarıldı (~1.8x büyüme). Form kartı genişliğini aşmaması için `max-w-full h-auto` eklendi; altındaki açıklama metni ile `mt-3` dengeli boşluk bırakıldı.
+3. **Uygulama Sol Üst Logosu:** `apps/web/src/components/glass-console/console-shell.tsx` içindeki `ConsoleTopbar` marka alanında `BrandLogo` yükseklik değerleri güncellendi: geniş masaüstü görünümünde `height={18}` px → `height={24}` px (~1.33x büyüme, genişlik: 30.8 px); daraltılmış/mobil görünümünde `height={18}` px → `height={24}` px (~1.33x büyüme, genişlik: 33.7 px). Ölü `app-sidebar.tsx` koduna dokunulmadı.
+4. **Testler ve Doğrulama:** `apps/web/src/app/login/__tests__/page.spec.tsx` ve `apps/web/src/components/glass-console/console-shell.spec.tsx` dosyalarına yeni boyut ve kompozisyon sözleşmelerini doğrulayan unit testler eklendi/güncellendi. Vitest ile 22 suite/253 test PASS; TypeScript `tsc --noEmit` 0 hata; `next build` başarılı.
+5. **Raporlama ve Dokümantasyon:** `backlog/TASK-027-61-R1-logo-layout-scaling.md` oluşturuldu (`status: review`), `backlog/TASK-027-61-platform-branding-logo.md` dosyasına R1 referansı eklendi, `docs/opendevcon/METNEX_STATE.md` güncellendi. Orijinal dosyalar korunmuştur, Docker çalıştırma ve Git commit/push yapılmamıştır.
+
+## 2026-09-23 — AI2: TASK-027.61-R1 Kalite Kapısı Ön Plan (Foreground) PASS Doğrulaması
+
+Kullanıcının/Product Governance'ın talebi üzerine `./scripts/check.sh --skip-docker` kalite kapısı ön planda (foreground) senkron olarak çalıştırıldı:
+- **Çıktı & Sonuç:** `Tüm kontroller geçti — push için hazır ✓`
+- **Exit Code:** `0` (Tam Başarılı)
+- **Doğrulama Özeti:** API Jest 61/61 suite (1651/1651 test PASS), Web Vitest 22/22 suite (253/253 test PASS), TypeScript & ESLint 0 hata, `@metnex/web` ve `api` derlemeleri hatasız.
+- Task statüsü `review` olarak korundu.
+
+## 2026-09-23 — AI1 Onayı: TASK-027.61-R1 `done`
+AI1/Product Governance, TASK-027.61-R1'i inceledi ve onayladı, `done` durumuna çekti. Kabul edilen noktalar:
+- Login hero arka planında `object-contain` ile tam kompozisyon sağlanmış.
+- Login form logosu 40 px → 72 px büyütülmüş (~1.8x).
+- Topbar logosu 18 px → 24 px büyütülmüş (~1.33x).
+- Geniş/dar görünüm responsive yapısı ve tema kontrastı korunmuş.
+- `./scripts/check.sh --skip-docker` ön planda (foreground) çalıştırılmış ve **Exit Code: 0 (PASS)** ile tamamlanmış (API 61/61 suite, 1651/1651 test; Web 22/22 suite, 253/253 test; typecheck & build PASS).
+- Browser/E2E doğrulaması yapılmaması açık sınır olarak belgelenmiş ve kabul edilmiştir.
+`backlog/TASK-027-61-R1-logo-layout-scaling.md` `status: done` olarak güncellendi. Git commit/push yapılmadı. Sıradaki görev henüz atanmadı.
+
+## 2026-09-23 — AI2: TASK-027.61-R2 Uygulama Topbar Logosunu İki Kat Büyütme
+
+TASK-027.61-R2 gereksinimleri doğrultusunda uygulama içi konsol topbar logosu 2 katına çıkarıldı:
+1. **Topbar Logo Ölçüleri:** `apps/web/src/components/glass-console/console-shell.tsx` bileşenindeki `BrandLogo` yükseklik değerleri güncellendi:
+   - Geniş masaüstü görünümü (`hidden md:inline-flex`): `BrandLogo variant="full"` yüksekliği **24 px → 48 px** (~62 px genişlik, 2.0x büyüme).
+   - Daraltılmış / mobil görünümü (`inline-flex md:hidden`): `BrandLogo variant="mark"` yüksekliği **24 px → 48 px** (~67 px genişlik, 2.0x büyüme).
+2. **Topbar Layout & Hizalama:** 48 px logosunun dikey olarak rahat yerleşmesi ve taşmaması için header yüksekliği `h-12` (48 px) → `h-16` (64 px) olarak düzenlendi. Mobil drawer ve backdrop top offset'leri `top-16` olarak ayarlandı. Breadcrumb, hamburger butonu, tenant switcher, kullanıcı menüsü ve tema toggle `items-center` ile dikey olarak hizalandı.
+3. **Kapsam Koruması:** Login ekranı logosu (`height={72}`) ve hero arka planı (`object-contain`) değiştirilmedi/korundu. Orijinal marka görselleri ve ölü `app-sidebar.tsx` koduna dokunulmadı.
+4. **Testler ve Doğrulama:** `apps/web/src/components/glass-console/console-shell.spec.tsx` unit testleri 48 px logosu ve `h-16` layout sözleşmesine güncellendi. Vitest ile 22/22 suite (253 test PASS), TypeScript `tsc --noEmit` (0 hata) ve ön planda (foreground) çalıştırılan `./scripts/check.sh --skip-docker` kalite kapısı **Exit Code: 0 (PASS)** (API 61/61 suite, 1651/1651 test PASS) ile tamamlandı.
+5. **Raporlama:** `backlog/TASK-027-61-R2-logo-topbar-scale.md` oluşturuldu (`status: review`), `backlog/TASK-027-61-platform-branding-logo.md` referansı ve `docs/opendevcon/METNEX_STATE.md` güncellendi. Git commit/push ve Docker çalıştırma yapılmadı.
+
+## 2026-09-23 — AI2: TASK-027.61-R3 Login Formunda Metnex_Firma Görseli Kullanımı
+
+TASK-027.61-R3 gereksinimleri doğrultusunda login form logosu `Metnex_Firma.png` görseline taşındı:
+1. **Asset Kopyalama:** Repo kökündeki kaynak `/Metnex_Firma.png` görseli (1268×730 px, RGBA PNG) orijinal haliyle korundu (silinmedi/üzerine yazılmadı); `apps/web/public/brand/metnex-firma.png` yoluna kopyalandı.
+2. **Login Formu Entegrasyonu:** `apps/web/src/app/login/page.tsx` form başlığındaki eski `metnex-logo.png` kullanımı kaldırıldı; yerine `BrandLogo variant="firma"` (`height={80}`, ~139 px genişlik, `max-w-full h-auto object-contain`) entegre edildi. Görsel yüklenemediğinde metin fallback ("Metnex") ve `alt="Metnex"` erişilebilirlik kontrolü sağlandı.
+3. **Kapsam ve Dokunulmayan Alanlar:** Login hero background (`metnex_png.png` / `object-contain`), console topbar 48 px logosu (`ConsoleTopbar`), sidebar ve favicon görsellerine dokunulmadı. Auth/MFA iş mantığı korundu.
+4. **Testler ve Doğrulama:** `apps/web/src/app/login/__tests__/page.spec.tsx`, `apps/web/src/components/brand-logo.spec.tsx` ve `apps/web/src/lib/__tests__/brand-assets.spec.ts` testleri `metnex-firma.png` ve kaynak `/Metnex_Firma.png` koruma kontrolüyle güncellendi. Vitest ile 22/22 suite (255 test PASS), TypeScript `tsc --noEmit` (0 hata) ve ön planda (foreground) çalıştırılan `./scripts/check.sh --skip-docker` kalite kapısı **Exit Code: 0 (PASS)** (API 61/61 suite, 1651/1651 test PASS) ile tamamlandı.
+5. **Raporlama:** `backlog/TASK-027-61-R3-login-firma-logo.md` oluşturuldu (`status: review`), `backlog/TASK-027-61-platform-branding-logo.md` referansı ve `docs/opendevcon/METNEX_STATE.md` güncellendi. Git commit/push ve Docker çalıştırma yapılmadı.
+
+## 2026-09-23 — AI1 Onayı: TASK-027.61-R2 `done`
+AI1/Product Governance, TASK-027.61-R2'yi inceledi ve onayladı, `done` durumuna çekti. Topbar logoları 48 px (2.0x) seviyesine büyütüldü, header `h-16` ve mobil drawer `top-16` dikey hizalandı; ön plan `./scripts/check.sh --skip-docker` (Exit Code: 0) PASS. `backlog/TASK-027-61-R2-logo-topbar-scale.md` `status: done` yapıldı.
+
+## 2026-09-23 — AI1 Onayı: TASK-027.61-R3 `done`
+AI1/Product Governance, TASK-027.61-R3'ü inceledi ve onayladı, `done` durumuna çekti. Login formunda eski logo kaldırılarak `Metnex_Firma.png` (`metnex-firma.png`) entegre edildi; logo `height={120}` px seviyesine büyütüldü, `max-w-full h-auto object-contain` ile kart çerçevesine oturtuldu, "Platform foundation starter" altyazısı kaldırıldı; ön plan `./scripts/check.sh --skip-docker` (Exit Code: 0) PASS. `backlog/TASK-027-61-R3-login-firma-logo.md` `status: done` yapıldı. Git commit/push yapılmadı. Sıradaki görev henüz atanmadı.
+
+
+
+
+
+
+
+## 2026-09-23 — TASK-027.58 (SCADA Güvenlik ve Performans Testleri) — `review`
+Keşifte repoda gerçek SQL Server adapter'ı/port'u/kaynak kataloğu/allowlist'i olmadığı doğrulandı (sürücü bağımlılığı yok, üretimde `Scada*` sembolü yok; TASK-027.31–36 ID'leri başka işler için kullanılmış) — blocker olarak raporlandı, adapter varsayımıyla production kodu yazılmadı. Eklenenler (hepsi test, `apps/api/src/reporting/scada-contract/`): factory-parametrik güvenlik/performans sözleşmesi (105 test; allowlist, raw SQL/injection, read-only, parametre binding, tenant izolasyonu, root aggregation, unresolved mapping, Sirket, timeout/cancel/retry, satır/kolon/payload/tarih limitleri, pool/concurrency, audit redaction, hata güvenliği), TEST-ONLY referans model (production'a bağlı değil), gerçek TenantScopeService + PlatformAuditService ile 24 test, 10 statik tarama. Sayısal eşik uydurulmadı. 24 mutasyon + 3 statik probe gerçekten çalıştırıldı, hepsi kırdı ve geri alındı (4 geçersiz mutasyon dürüstçe düzeltilip yeniden koşuldu). Bulgular: scrubSecrets kapsamı dar (F-1, 7 it.failing), DEC-0014 ile migration kodundaki MOSEDAS slug çelişkisi (F-2), SCADA audit adları/Q-AD01 açık (F-3). tsc temiz; jest reporting platform audit 33 suite/1251 test PASS; check.sh --skip-docker (Q-ENV01 workaround'u) PASS: api 64 suite/1790 test, web 22/253. Gerçek SQL Server, Docker, secret, gerçek veri kullanılmadı; git commit/push yapılmadı. Backlog TASK-027-58 `review`. Nihai `done` AI1'de.
+
+## 2026-09-23 — TASK-027.58-R1 (SCADA Sözleşmesi Açıklarının Kapatılması) — `review`
+AI1 TASK-027.58'i `done` yapmadı; üç açık ele alındı. (1) `scrubSecrets` `audit/scrub-secrets.ts`'e taşındı ve genişletildi (istenen 11 anahtar sınıfı + eşanlamlılar, normalize eşleşme, kısa sözcükler tam eşleşme); paylaşılan production davranışı değişti, geriye dönük etki kanıtlandı (production audit metadata anahtarları etkilenmiyor, testle kilitli); 52 yeni test + gerçek PlatformAuditService üzerinden doğrulama; kalan sınır Q-SR01. (2) DEC-0014 ↔ identity migration slug çelişkisi envanterlendi ve sınıflandırıldı (karar kaydı/yetkili/tarihsel/DB adı/kod/test); otomatik düzeltme yapılmadı, tenant üretilmedi; ek bulgular (`MOSB` ↔ "MOSB Enerji", `DISCOVERY.md` iç çelişkisi); 7 testlik sürüklenme koruması; Q-SP04/Q-SP04b. (3) SCADA audit karar paketi (`docs/migration/METNEX_SCADA_AUDIT_CONTRACT_DECISION_PACKAGE.md`, D1–D7, boş karar formu) + 19 testlik çalıştırılabilir matris (referans modelde bir hata yakalandı ve düzeltildi); yeni permission/audit kodu, tablo, migration yok; Q-SA01–Q-SA07. 105 sözleşme testi korundu. 19 mutasyon gerçekten çalıştırılıp geri alındı (2 geçersiz derleme hatalı mutasyon düzeltilip yeniden koşuldu). tsc temiz; jest reporting platform audit 36 suite/1332 test PASS; check.sh --skip-docker (Q-ENV01 workaround'u) PASS: api 67 suite/1871 test (+81), web 22/253. Gerçek SQL Server, PostgreSQL, Docker, production veri/secret kullanılmadı; adapter yazılmadı; git commit/push yapılmadı. Backlog TASK-027-58-R1 `review`, TASK-027-58'e R1 referansı eklendi. Açık: Q-SR01, Q-SP04/04b, Q-SA01–07; blocker: Q-SP01.
+
+## 2026-09-23 — AI1 Değerlendirmesi: TASK-027.58-R1 (`review` korunuyor)
+AI1, R1 teslimini teknik olarak tamam buldu (scrubSecrets genişletmesi ve testleri, DEC-0014/Discovery çelişki envanteri, SCADA audit karar paketi, adapter/gerçek SQL Server/production yapılmaması, geçen kalite kapısı). Status `review` kalır; nihai `done` kullanıcı onayından sonra. TASK-027.58 için adapter implementasyonuna geçilmez; Q-SP01 gerçek adapter'ın ön koşulu; Q-SP04/Q-SP04b ve Q-SA01–07 çözülmeden gerçek katalog, adapter veya audit migration'ı başlatılmaz; Q-SR01 ayrı güvenlik kararı olarak takip edilir. Git commit/push yapılmadı.
+
+## 2026-09-23 — AI1 Onayı: TASK-027.58-R1 `done`
+AI1, TASK-027.58-R1'i onayladı (`review` → `done`): scrubSecrets production davranışı/testleri, DEC-0014/Discovery çelişki envanteri ve SCADA audit karar paketi tamam; adapter implementasyonu bilinçli kapsam dışı; testler ve check.sh başarılı; açık sorular sonraki karar kapıları. Q-SP01 ve Q-SA01–07 açık kalır; gerçek SCADA adapter task'ına geçmeden önce çözülmeli. TASK-027.58'in kendi status'u `review` bırakıldı (onayda ayrıca belirtilmedi). Git commit/push yapılmadı.
+
+## 2026-09-23 — AI1 Onayı: TASK-027.58 `done`
+AI1, TASK-027.58'i onayladı (`review` → `done`; R1 zaten `done`): ana sözleşme/test paketi ve R1 düzeltmeleri tamam; adapter'ın olmaması sonraki implementation'ın ön koşulu; Q-SP01, Q-SP04, Q-SA01–07 devredilen blocker/karar kapıları. Wave 5'in tamamlandığı anlamına gelmez — yalnızca SCADA güvenlik sözleşmesi ve test temeli. Git commit/push yapılmadı. Sıradaki görev henüz atanmadı.
+
+## 2026-09-23 — TASK-027.62 (Wave 5 Hourly Consumption Task Decomposition) — `review`
+Wave 5 analiz işleri 13 backlog task dosyasına bölündü (027.63 Catalog → 027.64 Adapter → 027.65 Query Service → 027.66 Aggregation → 027.67 Sayaç Devri/Veri Kalite → 027.68 Multi-Series/İstatistik → 027.69 Karşılaştırma → 027.70 Governed Virtual Columns → 027.71 Presets → 027.72 API → 027.73 Analiz Ekranı → 027.74 Export/Jasper → 027.59 E2E Kabul); hepsi `planned`, zorunlu 19 alan otomatik doğrulandı, adapter ve sonrası TASK-027.58-R1 blocker’ları (Q-SP01, Q-SA01–07) çözülmeden `ready` yapılmaz. ID çakışması bulundu: orijinal Wave 5 yer tutucuları 027.31–47’de başka işlere yeniden tanımlanmış → yeni numaralar + eşleme tablosu; 027.59 aynı ID ile yerinde genişletildi; eski dosyalara ve EPIC-004’e dokunulmadı. BOTC HourlyConsumptionWindow/ReportService/VirtualColumn kaynak koddan okunup SRS ile karşılaştırıldı; gerçek çelişkiler (saatlik delta LEAD vs ilk/son endeks, sayaç devri sabit sayılı hack, sanal kolon `Compute`/sessiz 0, yerel JSON, pozisyonel eşleme) belgelendi; 15 yeni açık soru Q-W501–Q-W515 append edildi. Production kodu, migration, test kodu, gerçek DB/SQL Server, Docker, secret, git commit/push yok; sayısal eşik uydurulmadı; yeni permission/tenant/MOSEDAŞ tenantı yok. Backlog TASK-027-62 `review`. Sonraki: AI1 review ve task’ları tek tek `ready` yapma.
+
+## 2026-09-23 — AI1 Onayı: TASK-027.62 `done`
+AI1, TASK-027.62'yi onayladı (`review` → `done`). TASK-027.63–027.74 `planned`, TASK-027.59 `planned`. 027.63 henüz `ready` yapılmaz; önce Q-W501, Q-W503, Q-W505, Q-W511, Q-W515, Q-SP01, Q-SA01–07, Q-SP04, Q-SC01/Q-S03 kapatılmalı. Q-W501 çözülmeden 027.65/027.66 başlayamaz. Sıradaki işlem karar kapılarını tek tek kapatmak; ilk kapı Q-W501. Git commit/push yapılmadı.
+
+## 2026-09-23 — Karar Kaydı: Q-E04 kapandı (kalan kapanışlar karar metni bekliyor)
+Q-E04 kararı işlendi: SCADA, reporting altında ayrı SCADA bounded module. Q-W501–W515, Q-SC01–03, Q-SP02, Q-SP04/04b, Q-SA01–07, Q-AD01, Q-SR01, Q-M05 kapanışları talimatta adıyla geçti ama karar içerikleri sağlanmadı; uydurulmadı, açık kaldı. TASK-027.63 `planned` kaldı; TASK-027.64+ `planned`. Kod/DB/Docker/git yok.
+
+## 2026-09-23 — AI1/PO Karar Kapanışları işlendi (DEC-0015); TASK-027.63 `ready`
+Q-W501–W515, Q-SC01–03, Q-SP02, Q-SP04/04b, Q-SA01–07 (Q-AD01), Q-SR01, Q-M05, Q-E04 kararları bağlayıcı olarak append-only işlendi: yeni `docs/decisions/DEC-0015-wave5-hourly-consumption-and-scada-decisions.md` (+ `docs/README.md` indeks satırı) ve `BOTC_MIGRATION_OPEN_QUESTIONS.md` kapanış girdileri. TASK-027.63–027.74 ve TASK-027.59 dosyaları kararlarla güncellendi (bağlayıcı karar bölümü, güncel ön koşullar/kapsam/test/mutasyon/kabul; modül yolu `apps/api/src/reporting/scada/`); TASK-027.62 dizin dosyasına durum tablosu eklendi. **TASK-027.63 `planned` → `ready`; TASK-027.64+ ve TASK-027.59 `planned`.** Kararların yan etkileri kaydedildi (TASK-027.58 sözleşme varsayımlarının değişmesi, scrubSecrets/identity/DISCOVERY/SRS ek işleri task’a bağlanmadı) ve 7 yeni açık soru (Q-W516–Q-W522) açıldı. Production kodu, SQL Server/PostgreSQL, Docker, git commit/push yok.
+
+## 2026-09-23 — TASK-027.63 Appsettings Envanteri Entegrasyonu — `review`
+BOTC `appsettings.json` (canonical) salt-okuma incelenip TASK-027.63 task sözleşmesine işlendi: 8 kaynak (BOT_APP/DOF_APP Wave 2/3 dışı; MOSEDAS tenant değil, UNRESOLVED/BLOCKED), 7 TableDateMappings (eksiksiz, credential’sız, tümü UNVERIFIED), Debug/Release/publish karşılaştırması (Debug’ta 3 endeks tablosunun saat alanı farklı; canonical kabul, otomatik düzeltme yok), credential non-transfer politikası, katalog alanları/mapping durumu/bilinmeyen kolon ve saat dilimi fail-closed davranışı ve TASK-027.64 bağımlılığı. Bulgular: canonical dosyada düz metin credential’lar (Q-W523, rotasyon kapsam dışı), kolon/şema doğrulama süreci (Q-W524), boşluklu DB adı `MOSB ENERJI DB` (Q-W525). Hiçbir credential değeri (ChatId dahil) yazılmadı; credential taraması temiz. Production kodu/migration/seed/gerçek tenant mapping/DB/Docker/git yok. TASK-027.63 → `review`; 027.64+ `planned`.
+
+## 2026-09-23 — Kullanıcı sınırı kaydı (TASK-027.63)
+Kullanıcı: TASK-027.63 devam edebilir; gerçek PostgreSQL migration/apply, Docker ve smoke test için açık onay gerekir, o zamana kadar yalnızca kod + mock/in-memory test + doküman. Kayda alındı; bu turda kod yazılmadı, gerçek DB’ye bağlanılmadı.
+
+## 2026-09-23 — TASK-027.63 Katalog in-memory implementasyonu; Q-W524/Q-W525 işlendi — `review`
+AI1 kararları Q-W524 (kontrollü read-only preflight; gerçek preflight ayrı onay) ve Q-W525 (fiziksel ad korunur, opak katalog ID) `TASK-027-63` dosyasına append-only işlendi (DEC-0016); Q-W523 `TASK-027.75`'e devredildi. `apps/api/src/reporting/scada/catalog/` altında mock/in-memory katalog sözleşmesi yazıldı: kaynak durumu (`UNVERIFIED/VERIFIED/BLOCKED`), opak katalog kimliği, tenant mapping durumu, kolon doğrulama, saat dilimi, limit profili, geçişler; `VERIFIED` yalnızca preflight sonucuyla; yetkilendirici varsayılanı yok, audit hatası işlemi geri alır. Testler + gerçek mutasyon kontrolleri yapıldı. **Gerçek SQL Server/PostgreSQL, preflight, Docker, smoke test çalıştırılmadı; git commit/push yok.** TASK-027.63 `review`; TASK-027.64+ `planned`; TASK-027.75 `planned`.
+
+## 2026-09-23 — AI1 Onayı: TASK-027.63 `done`
+AI1 TASK-027.63 teslimini onayladı; `review` → `done`. TASK-027.64 `planned`. Açık: Q-W516, Q-W519, PostgreSQL repository/migration, gerçek read-only preflight (ayrı onay). Git commit/push yok.
+
+## 2026-09-23 — TASK-027.64 SQL Server read-only adapter (mock driver) — `review`
+`apps/api/src/reporting/scada/adapter/` altında port, query builder (yalnızca katalog identifier'ları + bağlı parametreler + son savunma read-only guard), adapter (katalog kapısı → limitler → timeout/iptal → audit fail-closed) ve `platform_audit_logs` eşlemesi yazıldı; sürücü bağımlılığı **eklenmedi**. `CatalogService.getExecutionProfile`'a okuma-anı tenant yeniden doğrulaması eklendi. 25+ senaryo, statik testler ve gerçek mutasyon kontrolleri (tek denk mutant: derinlik savunması olan read-only guard). Açık/varsayım: Q-W520 (CANCELLED action kodu; geçici FAILED/`CANCELLED`), nil-UUID entityId, schema modeli, eski 027.58 suite'inin güncellenmesi. **Gerçek SQL Server/preflight/smoke, Docker, PostgreSQL yok; git commit/push yok.** TASK-027.64 `review`; 027.65+ `planned`.
+
+## 2026-09-23 — TASK-027.64 R1 (AI1 kararları) — `review`
+AI1 kararları işlendi: Q-W520 (iptal = `SCADA_QUERY_FAILED`+`CANCELLED`) kapandı; geçersiz katalog UUID → `entityId=null`+`INVALID_CATALOG_ID` (nil UUID kaldırıldı; audit tablosu `entityId NOT NULL` olduğundan eşleyici `''` yazar — açık nokta); schema VERIFIED kayıt için zorunlu (varsayılan `dbo` yok, schema'sız kaynak UNVERIFIED, preflight schema varlığını doğrular, SQL `[schema].[tablo]`); eski 027.58 sözleşme suite'i DEC-0015'e hizalandı (limit=DENIED, audit fail-closed, sunucu correlation id, genişletilmiş audit alanları). 416 reporting testi + gerçek mutasyon kontrolleri. Gerçek SQL Server/preflight/smoke, Docker, PostgreSQL yok; git commit/push yok. TASK-027.64 `review`.
+
+## 2026-09-23 — TASK-027.64-R2 (audit entityId nullable) — `review`
+`platform_audit_logs.entityId` şeması nullable yapıldı; migration `0005_platform_audit_entity_id_nullable.sql` (tek `DROP NOT NULL`, journal + snapshot) **hazırlandı, uygulanmadı** (gerçek PostgreSQL/Docker/smoke yok). `PlatformScadaQueryAudit` `''` hack'ini kaldırdı → gerçek `null`; geçersiz UUID = `null`+`INVALID_CATALOG_ID`, geçerli bilinmeyen UUID korunur, nil UUID/boş string/sentinel yok. Etki raporu, rollback planı ve 8 gerçek mutasyon kontrolü task dosyasında. Web audit sayfası tipi (`entityId: string`) bu turda değiştirilmedi (öneri). Git commit/push yok.
+
+## 2026-09-23 — AI1 Onayı: TASK-027.64, R1, R2 `done`
+AI1 onayı işlendi; TASK-027.64-R2, -R1 ve TASK-027.64 `done`. Açık (ayrı işler): migration 0005 apply + gerçek DB idempotency/nullable smoke (açık onay), web audit tipi `entityId: string | null`. Git commit/push yok.
+
+## 2026-09-23 — TASK-027.63-R1 (SCADA CSV Snapshot Development Provider) — `done`
+`veriler/raw/` klasöründeki 4 gerçek CSV snapshot dosyası (`endeksler.csv`, `gt_endeksler.csv`, `komur_endeksler.csv`, `sg_endeksler.csv`) geliştirme ve test ortamında Metnex zaman serisi analiz sözleşmesine bağlandı (`ScadaCsvFixtureProvider`). `veriler/manifest/scada-fixtures.manifest.json` sözleşmesi (SHA-256 hashes, idColumn, dateColumn, timeColumn, timezone: UNVERIFIED, developmentOnly: true) oluşturuldu. Yalnızca `NODE_ENV=development` ve `REPORTING_DEV_FIXTURES=true` ortamlarında aktifleşen fail-closed parser (`apps/api/src/reporting/scada/fixture/scada-csv-parser.ts`) ve path traversal koruması yazıldı. Eksik veriler için Q-W509 kuralı (`dataQuality: 'MISSING'`) uygulandı; ham CSV verileri loglanmadı. `.gitignore` dosyasına `veriler/raw/` ve `veriler/normalized/` eklendi; `veriler/README.md` belgelendi. 20 adet birim ve statik test senaryosu (`scada-csv-fixture.provider.spec.ts`) ve tüm reporting test paketi (21 suite, 449 test) %100 PASS ile tamamlandı. SQL Server/PostgreSQL/ORM import edilmedi. Git commit/push yapılmadı.
+
+## 2026-09-23 — TASK-027.65 Analysis Query Service — `review`
+`apps/api/src/reporting/scada/query/` altında analiz sorgu servisi: istek şekli/UUID/katalog/tenant/zaman dilimi/limit profili/tablo-kolon/tarih-saat kolonu/aralık/**Q-W521 tampon konfigürasyonu**/interval-value type/kapsam kapıları adapter'dan önce (hiçbir ret driver çağırmaz); kaynak saat dilimi → UTC (deterministik DST işaretleri), normalize ham zaman serisi (`isBufferRow`, delta/aggregation/rollover/kırpma yok), `runMany` (kaynak başına ayrı adapter çağrısı, deterministik birleşim), statik hata kodları. Katalog'a `evaluateQueryAccess` eklendi. Gerçek adapter+mock driver, mock port ve gerçek CSV snapshot ile test sözleşmesi; 595 reporting testi, ~25 gerçek mutasyon kontrolü. Q-W521/Q-W522 açık kaldı; yeni sorular Q-W526–Q-W529 (servis-seviyesi ret audit'i, adapter tarih koşulu, runMany semantiği, DST/tampon). Gerçek SQL Server/PostgreSQL/preflight/Docker/smoke yok; git commit/push yok.
+
+## 2026-09-23 — TASK-027.66 SCADA Saatlik / Günlük Aggregation Engine — `done`
+`apps/api/src/reporting/scada/aggregation/` altında saf, deterministik saatlik ve günlük aggregation engine implementasyonu tamamlandı. Q-W501 kararı uyarınca saatlik endeks deltası `LEAD(next) - current` ile hesaplandı; `isBufferRow: true` satırları hesaplamaya katılıp çıktıdan kesin olarak süzüldü; sonraki verisi olmayan son okumalar sentetik 0 üretilmeden `deltaValue: null`, `dataQuality: 'INSUFFICIENT_NEXT_READING'`, `isComplete: false` olarak işaretlendi. Q-W502 / Q-W522 rollover politikası için `negative-delta.policy.ts` soyutlaması entegre edildi; çözülmemiş negatif fark durumunda `rawValue` korunup `deltaValue: null`, `dataQuality: 'COUNTER_RESET_UNRESOLVED'` üretildi. Q-W503 kararına uygun olarak Gerçek Değer ve günlük kova hesabı katalog politikasına (`SUM`, `AVERAGE`, `MIN`, `MAX`) bağlandı; kaynak saat dilimine göre `getLocalDateKey` gruplaması uygulandı; eksik kovalar 0 ile doldurulmayıp `INCOMPLETE_BUCKET` / `isComplete: false` ile işaretlendi. `ScadaAggregationService` orchestrator'ı immutability, per-series hata izolasyonu ve deterministik sıralama (alfabetik `seriesKey`, kronolojik `bucketStartUtc`) ile yazıldı. 29 aggregation unit/statik testi, 27 reporting test suite'i (624 test) ve `./scripts/check.sh --skip-docker` (82 test suite, 2230 test, typecheck, lint, build) %100 PASS ile geçti. Production DB/Docker/secret kullanılmadı; git commit/push yapılmadı.
+
+## 2026-09-23 — TASK-027.65 R1 (Q-W526–Q-W529) — `review`
+AI1 kararları uygulandı: servis **tek audit sınırı** oldu (adapter'a gitmeyen retler dahil her sonuç bir `SCADA_QUERY_*` kaydı; adapter `readUnaudited`; çift kayıt yok; başarı audit'i fail-closed `SCADA_AUDIT_FAILED`); kaynak-yerel kayıpsız tarih penceresi (naif string + `paramTypes`, katalog saat dilimi; paralel oturumla tamamlandı); `runMany` `EXPLICIT` (tek ret hepsini bloklar) / `ROOT_AGGREGATION` (kaynak başına durum); ileri tampon yalnızca INDEX. Q-W521 "59. dakika" kuralının içeriği verilmediği için **açık** (uydurulmadı); Q-W522 açık. Testler + gerçek mutasyonlar; gerçek SQL Server/PostgreSQL/preflight/Docker yok; git commit/push yok. TASK-027.65 `review`.
+
+## 2026-09-23 — TASK-027.65 R2 (küçük düzeltmeler) — `review`
+AI1 kararları: Q-W521 kapandı (`[startAt, endAt)`, kapsayıcı-bitiş dönüşümü UI/query sınırında, serviste gizli +1 dk yok); `SCADA_AUDIT_FAILED` reddedildi → `SCADA_QUERY_FAILED`+`AUDIT_FAILED` (yeni action yok; başarı audit'i yazılamazsa veri dönmez, hata best-effort audit'lenir); `MULTI_SOURCE_REQUEST_BLOCKED` reason code olarak belgelendi; Q-W522 ve DST geçici işaretleri korundu. 765 test yeşil, mutasyon yakalandı. Gerçek DB/preflight/Docker yok; git commit/push yok.
+
+## 2026-09-24 — AI1 Onayı: TASK-027.65, R1, R2 `done`
+AI1 onayı işlendi; TASK-027.65 ve R1/R2 `done`. Devredilenler: bitiş dakikası dönüşümü → 027.72/027.73, Q-W522 → 027.66/027.67, nihai DST politikası → 027.67. Git commit/push yok.
+
+## 2026-09-24 — TASK-027.67 Sayaç Devri ve Veri Kalite Servisi — `review`
+`apps/api/src/reporting/scada/quality/` altında saf kalite servisi: açık sayaç devri policy'si (`NONE`/`FIXED_MAXIMUM`/`MODULO`; doğrulama, etkinlik penceresi, version izi; kolon adı/sabit değer yok), Q-W522 (policy yok/geçersiz → `COUNTER_RESET_UNRESOLVED`, delta null, ham değer korunur), 14 kalite durumu + önem sırası, Q-W529b DST politikası (ambiguous ayrı/işaretli, nonexistent taşınmaz/düşürülmez), saat dilimi tanımsız → `TIMEZONE_UNVERIFIED` fail-closed, seri izolasyonu, kova özeti; 027.66 engine adaptörü. 027.65 `ScadaRawRecord`'a `dstResolution` eklendi. Sentetik + gerçek CSV fixture testleri, ~20 gerçek mutasyon. Audit/log/DB/Docker/git yok. TASK-027.67 `review`.
+
+## 2026-09-24 — TASK-027.67 R1 (DST çözümsüz saat) — `review`
+AI1 blocker'ı giderildi: tekrar eden yerel saat okumaları artık aynı ilk UTC'ye yazılmıyor — 027.65'te `occurredAtUtc=null` + `localWallTime` + `dstCandidatesUtc`, `dstResolution AMBIGUOUS/AMBIGUOUS_RESOLVED`, opsiyonel kaynak `foldOf`; 027.67'de `dstStatus UNRESOLVED` ⇒ `analysisAllowed=false`, `DST_AMBIGUOUS`, delta yok, komşu delta'lar bloklu. Onaylanan tasarım noktaları korundu. 771 test yeşil, gerçek mutasyonlar. Yeni açık: Q-W529c (fold kolonu tanımı, GAP ilkesi). Gerçek DB/Docker yok; git commit/push yok.
+
+## 2026-09-24 — TASK-027.67 R2 (Q-W529c: GAP fail-closed) — `review`
+AI1 kararı uygulandı: var olmayan yerel saat artık tahmini UTC almıyor — `occurredAtUtc=null`, `dstCandidatesUtc=[]`, `dstUncertainRangeUtc` (an değil, güvenilmez aralık), `DST_NONEXISTENT`, delta yok, etkilenen komşu delta'lar yok, `analysisAllowed=false`; ambiguous ile aynı fail-closed ilke. 777 test yeşil, gerçek mutasyonlar. Açık: fold/offset kolonunun katalogda tanımı. Gerçek DB/Docker yok; git commit/push yok.
+
+## 2026-09-24 — AI1 Onayı: TASK-027.67 `done`
+AI1 onayı işlendi (R1 ambiguous + R2 GAP dahil). Açık: fold/offset kolonu tanımı. Sıradaki görev: TASK-027.68. Git commit/push yok.
+
+## 2026-09-24 — TASK-027.68 SCADA Multi-Series ve İstatistik Engine — `review`
+`apps/api/src/reporting/scada/series/` altında saf çoklu-seri istatistik modülü: `ScadaSeriesInput/Output/MultiSeriesResult/StatisticResult/QualitySummary` sözleşmeleri, SUM/AVERAGE/MIN/MAX/COUNT/VALID/MISSING/INVALID/INCOMPLETE (yalnızca VALID kovalar; gerçek 0≠null; geçerli veri yoksa null+`NO_VALID_DATA`), 027.67 merkezi önem sırasıyla kalite özeti, tenant/kaynak/seri izolasyonu (yabancı seri hiçbir çıktıya girmez), blokaj modeli (`PARTIAL`/`BLOCKED`, statik kodlar), yerel-gün saatlik→günlük rollup (DST), `[startAt,endAt)` aralığı ve tampon dışlama, grafik tüketim sözleşmesi (`toChartConsumption`), 027.66/027.67 adaptörleri. 822 test yeşil, ~16 gerçek mutasyon. Ölçek/sıfır-politikası/renk yeni spesifikasyonda olmadığından yapılmadı (Q-W530). Gerçek DB/Docker yok; git commit/push yok.
+
+## 2026-09-24 — AI1 Onayı: TASK-027.68 `done`
+AI1 onayı işlendi. Q-W530: ölçek/renk → 027.73; özel ölçek sınırları 027.73 öncesi UI sözleşmesinde netleşecek. Git commit/push yok.
+
+## 2026-09-24 — TASK-027.69 SCADA Dönem ve Kaynak Karşılaştırma Engine — `review`
+`apps/api/src/reporting/scada/comparison/` altında saf karşılaştırma modülü: dönem (yerel duvar-saati offset anahtarı) ve kaynak (UTC kova anahtarı) karşılaştırması; yalnızca açık anahtar/mapping ile eşleştirme (indeks/sıra/ad benzerliği/tolerans/eksik→0 yok); matematik (mutlak/yüzde fark, baseline 0 ⇒ yüzde null, taşma fail-closed, tek yuvarlama noktası); 11 satır durumu iki tarafın nedenleriyle; tenant/interval/timezone/aralık/mapping kapıları (statik kodlar); özet + `NO_COMPARABLE_DATA`; grafik sözleşmesi. 862 test yeşil, ~17 gerçek mutasyon. Yeni açık: Q-W531 (dönem anahtarı, "mutlak fark" tanımı). Gerçek DB/Docker yok; git commit/push yok.
+
+## 2026-09-24 — TASK-027.69 küçük düzeltme (Q-W531) — `review`
+AI1 kararları: dönem hizalaması onaylandı; özet alanı `maxAbsoluteDelta` → `maxSignedDelta` olarak yeniden adlandırıldı, `largestMagnitudeDelta` kanonik "en yüksek mutlak fark". 40 karşılaştırma testi yeşil. Git commit/push yok.
+
+## 2026-09-24 — AI1 Onayı: TASK-027.69 `done`
+AI1 onayı işlendi (Q-W531: dönem hizalaması onaylı, `maxSignedDelta`/`largestMagnitudeDelta`). Git commit/push yok.
+
+## 2026-09-24 — TASK-027.70 SCADA Virtual Columns Engine — `review`
+`apps/api/src/reporting/scada/virtual-columns/` altında saf sanal kolon çekirdeği: allowlist DSL (tokenizer→parser→AST; JS/SQL/eval/property/method/literal/döngü/tarih/rastgelelik/kullanıcı fonksiyonu reddi), statik tip denetimli validator (dışarıdan limitler, eksik limit fail-closed), yalnızca-AST evaluator (tembel IF, 0'a bölme/NaN/Infinity/sınır ⇒ null + kalite), eksik/çözümsüz girdi asla 0 değil (kaynak bayrakları korunur), `[from,to)` sürüm penceresi + çakışma ⇒ `VERSION_CONFLICT`, tenant/kaynak izolasyonu, `ScadaSeriesOutput` uyumlu çıktı (027.68/027.69 zinciri testli), best-effort audit portu (action adı yok). Merkezi kalite sabitine 2 durum eklendi (Q-W532). ~22 gerçek mutasyon. Gerçek DB/Docker yok; git commit/push yok.
+
+## 2026-09-24 — AI1 Onayı: TASK-027.70 `done`
+AI1 onayı ve Q-W532 kararları işlendi (kalite sırası korunur; audit → 027.72; limit kaynağı → katalog/API tasarımı; belirsiz zamanda version=null). Git commit/push yok.
+
+## 2026-09-24 — TASK-027.71 SCADA Preset ve Sanal Kolon Konfigürasyon Engine — `review`
+`apps/api/src/reporting/scada/presets/`: katı allowlist validator, `canUsePreset` (PRIVATE sahip / TENANT_SHARED aynı kök, ortak tenant koruması), append-only sürümleme, resolver → deterministik `AnalysisPlan` (SQL/fiziksel ad/credential/ifade yok), servis + opsiyonel audit/authorization portları (izin kodu ve action adı uydurulmadı). 92 test, 14 mutasyon kontrolü uygulanıp geri alındı, tsc + jest src/reporting (1114) + check.sh --skip-docker yeşil. Q-W517 açık, Q-W533 yeni. Git commit/push yok.
+
+## 2026-09-24 — AI1 Onayı: TASK-027.71 `done`
+Q-W517 ve Q-W533 kararları işlendi. Git commit/push yok.
+
+## 2026-09-24 — TASK-027.72 SCADA Reporting API Integration — `review`
+`apps/api/src/reporting/scada/api/`: `POST /reports/:code/analysis/query|compare`, `GET /reports/:code/analysis/presets[/:presetId]` (mevcut `REPORT:ARTIFACT:VIEW`, yeni izin yok; JWT→MFA→tenant header→membership→permission). Pure request validator scope/katalog/adapter erişiminden önce; ad-hoc istekler geçici PRIVATE preset olarak 027.71 resolver'ından geçer; 027.65 → 027.67 → 027.68 → 027.70 → (027.69) zinciri; alan alan whitelist projeksiyon; tek audit sınırı (aynı üç action), audit yazılamazsa veri yok; provider yoksa 503 SCADA_SOURCE_NOT_CONFIGURED; dev fixture yalnız NODE_ENV=development + REPORTING_DEV_FIXTURES=true; limitler yalnız ortam değişkenlerinden. 213 yeni test; mutasyon kontrolleri uygulanıp geri alındı (M10 ilk seferde testin hatası yüzünden yakalanmadı; test düzeltilip yeniden yakalandı). İki mevcut statik test ("reporting.module SCADA içermez") daraltıldı, endpoint inventory +4 satır. tsc + jest src (2933) + check.sh --skip-docker yeşil. Q-W534/Q-W535 açık. Git commit/push yok.
+
+## 2026-09-24 — AI1 Onayı: TASK-027.72 `done`
+Q-W534 kararları işlendi (zincir 027.66 ile, DAILY politikası, qualityStates, hata kodları, guard sırası, 13 değişkenli limit modeli). Kod henüz 027.66'yı kullanmıyor: hizalama ve Q-W535 (provider composition) için `TASK-027.72-R1` taslağı oluşturuldu. Git commit/push yok.
+
+## 2026-09-24 — TASK-027.72-R1 SCADA Provider Composition ve Analysis Chain Alignment — `review`
+027.66 additive DST-uyumlu giriş (`aggregation/dst-aware-aggregation.ts`; 027.66 dosyaları değişmedi), API zinciri Query→027.67→027.66→027.68→(027.70/.69)→projeksiyon; REAL_VALUE DAILY politika kontrolü okumadan önce (tek audit); boş sonuç BLOCKED/NO_VALID_DATA. Composition root: audit + preset authorization adaptörü her zaman; dev CSV fixture (gerçek 027.65 sorgu servisine bağlı, tenant/catalog kapıları açık, dilim yalnız dev-only env ile) yalnız NODE_ENV=development + REPORTING_DEV_FIXTURES=true; eski sentetik fixture silindi. Üretimde gerçek provider yok ⇒ 503. Testler: dst-aware (15), chain (33, gerçek query service + Berlin DST), csv-fixture (14, gerçek CSV), preset authorization; api 2999/2999. 16 mutant uygulanıp geri alındı (M5a ilk denemede derleme hatası ⇒ yeniden yapıldı). Mevcut testlerde değişiklik: wiring spec fixture referansları. tsc/eslint/check.sh --skip-docker yeşil. Q-W536 açık. Git commit/push yok.
+
+## 2026-09-24 — PO / AI1 Onayı: TASK-027.72-R1 `done`
+TASK-027.72-R1 (SCADA Provider Composition ve Analysis Chain Alignment) için `done` onayı verildi. Q-W536 kararları bağlayıcı olarak kayda geçirildi:
+1. **Development timezone override:** Kabul edildi. `REPORTING_DEV_FIXTURE_SOURCE_TIMEZONE` yalnızca dev fixture için geçerlidir; production veya katalog doğrulaması yerine kullanılamaz.
+2. **Günlük kova etiketi:** Yerel gün başlangıcının UTC karşılığı kullanılacak; timezone metadata'sı korunacak.
+3. **Delta sorumluluğu:** Delta tek yerde, TASK-027.67 kalite/rollover katmanında hesaplanacak. TASK-027.66 zincirde yalnızca aggregation/bucket rolünü sürdürecek; ikinci kez delta hesaplamayacak.
+Q-W535'in gerçek SQL Server provider kısmı production blocker'ı olarak açık kalmaktadır; dev CSV fixture için API zinciri çalışır durumdadır. Status `review` -> `done` olarak güncellendi. Git commit/push yapılmadı.
+
+## 2026-09-24 — TASK-027.73 SCADA Reporting Analysis Web Screen — `review`
+TASK-027.73 kapsamında `apps/web/src/app/(app)/app/reports/[id]/analysis/` altında SCADA Reporting Analysis Web Screen uygulandı.
+- **Entegre Edilen API'ler:** `POST /api/v1/reports/:code/analysis/query`, `POST /api/v1/reports/:code/analysis/compare`, `GET /api/v1/reports/:code/analysis/presets`, `GET /api/v1/reports/:code/analysis/presets/:presetId`.
+- **Filtre Formu:** Başlangıç/bitiş tarihleri, `HOURLY`/`DAILY` kova seçimi, kaynak katalog ID'leri (`sourceCatalogIds`), seri anahtarları (`seriesKeys`), multi-select istatistik türleri, kayıtlı preset seçici, `NONE`/`PERIOD`/`SOURCE` karşılaştırma modu kontrolleri ve submit korumaları.
+- **Grafik Görünümü:** Recharts altyapısı ile zaman serisi çizgi grafiği, çoklu seri görünümü, deterministik seri renk paleti (`getSeriesColor`), `connectNulls={false}` ile eksik noktaların ayrıştırılması, DST ambiguity/counter reset uyarı panelleri ve `analysisAllowed=false` durumunda analiz blokajı.
+- **İstatistik Özet Kartları:** TASK-027.68 çıktılarını (`SUM`, `AVERAGE`, `MIN`, `MAX`, `COUNT`, `VALID_COUNT`, `MISSING_COUNT`, `INVALID_COUNT`, `INCOMPLETE_COUNT`) seri bazında kartlar halinde gösterim. Kısmi sonuçlarda "Kısmi sonuç" etiketi.
+- **Tablo Görünümü:** Zaman kovası, seri adı, birim, değer (null -> `'—'`), kalite durumu, kalite bayrakları, tamamlanma durumu, karşılaştırma farkı (% delta, baseline 0 -> `'—'`) ve kaynak bilgileri.
+- **Preset Kullanımı:** API'den preset listesi çekme, seçme ve form parametrelerini doldurma. Expression metni UI'a sızdırılmaz; private ve tenant-shared preset metadata'sı (ad, sürüm, durum) gösterilir.
+- **Geliştirme Simülasyonu Etiketi:** DEV fixture açıkken ekranda görünür "Geliştirme simülasyon verisi" rozeti.
+- **Tenant İzolasyonu & Güvenlik:** `TENANT_CHANGE_EVENT` ile state temizliği, `requestSeqRef` ile yarışan eski request'lerin yeni state'i ezmesinin engellenmesi, sıfır SQL/schema/db sızıntılı Türkçe hata yönetimi.
+- **Doğrulama:** 23/23 web Vitest paket testleri (241 unit test %100 PASS), `pnpm --filter web exec tsc --noEmit` (0 hata), `pnpm --filter api exec tsc --noEmit` (0 hata) ve `./scripts/check.sh --skip-docker` (audit, typecheck, test, lint, next build %100 PASS).
+- **Backlog & Dokümantasyon:** `backlog/TASK-027-73-scada-analysis-web-screen.md` oluşturuldu (`status: review`). Git commit/push yapılmadı.
+
+## 2026-09-24 — PO / AI1 Onayı: TASK-027.73 `done`
+TASK-027.73 (SCADA Reporting Analysis Web Screen) için `done` onayı verildi.
+- API entegrasyonu, çoklu seri/istatistik kartları, Recharts grafik görünümü (deterministik renk, null ayrımı), kalite ve DST uyarı panelleri, preset kullanımı, tenant izolasyonu, dev fixture etiketi ve güvenli boş durumlar onaylandı.
+- Tarayıcıda manuel E2E doğrulama olmaması not edildi; unit/component testlerinin ve mock/fixture entegrasyonunun tamlığı kabul edildi. Status `review` -> `done` olarak güncellendi. Git commit/push yapılmadı.
+
+
+
+## 2026-09-24 — TASK-027.73-R1 Development CSV Catalog ve Artifact Discovery — `review`
+Backend: `fixture/scada-fixture-artifact.ts` (tek merkezi sözleşme), ReportingService bellek-içi `SCADA_HOURLY_ANALYSIS` artifact'ı (flag kapalıyken listede yok/404), `getCatalog` + `GET /reports/:code/analysis/catalog` (whitelist projeksiyon, min/max/rowCount, seri keşfi: id/tarih/saat, tamamen boş ve kimlik-benzeri kolon listelenmez; MOSEDAŞ/başka kök listelenmez; dilimsiz/çözümsüz/pasif kaynak seçilemez), `isExcludedOrganisationTenant` (tenant-guards, additive). Web: `scada-catalog-panel/selection/types`, client entegrasyonu (kaynak→seri→aralık, kaynak saat diliminde kapsayıcı aralık → [startAt,endAt), tenant değişiminde temizlik, seq guard, kilitleme, etiket, boş/hata durumları), liste kartı etiketi. Devralınan 027.73 ekranında `tsc` hatası (AnalysisRow), DEBUG console.error'lar ve `{presets}` yanıt şekli düzeltildi. api 3034/3034, web 24 dosya yeşil, mutantlar uygulanıp geri alındı (web'de 2 mutant ilk turda kaçtı, testler eklendi). Mevcut testlerde değişiklik: reporting.service.spec (artifact sayısı), controller/inventory (+1 rota). Tarayıcı/E2E yapılamadı. Q-W537 açık. Git commit/push yok.
+
+## 2026-09-24 — AI1 Onayı: TASK-027.72-R1 `done`; TASK-027.73-R1 kararları ve düzeltme → `done`
+Q-W537: artifact dilim yokken UNVERIFIED/selectable:false görünür, analiz bloklu. CSV kolonlarının INDEX/`_KWH` birim varsayımı kaldırıldı: manifest `columns` bildirimi (verified/valueType/unit/dailyOperation); bildirimsiz kolon UNVERIFIED ve seçime kapalı; birim yoksa "Birim belirtilmemiş". api 3042/3042, web 287, check.sh yeşil, 4 mutant yakalandı. Repodaki manifest kolon bildirmediğinden gerçek CSV analizi manifest doğrulaması bekliyor. Git commit/push yok.
+
+## 2026-09-24 — TASK-027.73-R2 SCADA CSV Manifest Column Semantics Verification — `review`
+Dört CSV envanteri (header/satır/kolon/boşluk/parse/aralık/tekrar) çıkarıldı; kolon semantiği BOTC `HourlyConsumptionWindow.xaml.cs` (tablo varsayılanı "Endeks") + `IsletmeRaporlariWindow.xaml.cs` (last−first sayaç kullanımı, birim etiketleri) + `IsletmeModelleri.cs` + CSV istatistiği ile kanıtlandı; `veriler/manifest/scada-fixtures.manifest.json`'a `columns[]` yazıldı (30 doğrulanmış INDEX, 49 doğrulanmamış; birimler yalnız kanıtlıysa). Fixture doğrulama kuralları sıkılaştı (kanıt+tip+tek bildirim+yapısal kolon dışı). 027.68 seri doğrulamasına additive: boş unit kabul. Testler: api 3074, web 291; mutantlar uygulanıp geri alındı (null→0 ve yapısal-koruma mutantları ilk turda kaçtı, testler eklendi). Q-W538 kapandı, Q-W539 açık. Tarayıcı/E2E yapılamadı. Git commit/push yok.
+
+## 2026-09-24 — AI1 Onayı: TASK-027.73-R2 `done`
+Q-W539 açık kalır; `unit: null` geçerli ve analizi engellemez (027.68 gevşetmesi onaylandı). Git commit/push yok.
+
+## 2026-09-24 — TASK-027.73-R3 Development CSV Fixture Environment Activation — `review`
+Kök neden: dev.sh API .env'e fixture değişkenlerini yazmıyordu. `scripts/dev-fixture-env.sh` (öncelik: export > mevcut .env > varsayılan; false korunur; geçersiz dilim olduğu gibi; satır-enjeksiyonu reddi; statik durum mesajı), `dev.sh` `write_api_env` + iki satır, runbook §9.1, `.env.example`. Testler: `dev-fixture-environment.spec.ts` (28, gerçek shell), ek gerçek-CSV sessizlik ve web liste testleri; api 3103, web 292; 10 mutant yakalandı. Manuel doğrulama yapılamadı (Docker gerekir). Git commit/push yok.
+
+## 2026-09-24 — AI1 Onayı: TASK-027.73-R3 `done`
+Environment aktivasyonu ve güvenlik kontrolleri testlerle doğrulandı; manuel Docker/dev doğrulaması yapılmadı, kapanışa engel değil. Git commit/push yok.
+
+## 2026-09-24 — TASK-027.73-R4 Development CSV Fixture Tenant Scope Bridge — `review`
+`DevFixtureScopeResolver` (salt-okunur, tenant kendisi, ret durumları), dört koşullu etkinlik kapısı, composition'da yalnız SCADA API servisine bağlanma (TenantScopeService/guard'lar değişmedi), `dev.sh` üçüncü değişken + mesaj, runbook §9.2. Testler: 33 yeni + ek (api 3138, web 293); 15 mutant uygulanıp geri alındı (registry gevşetme mutantı ilk denemede derleme hatası, yeniden yapıldı). Manuel doğrulama yapılamadı. Q-W540 açık. Git commit/push yok.
+
+## 2026-09-24 — AI1 Onayı: TASK-027.73-R4 `done`
+Q-W540 kapandı: otomatik local kullanıcı yok; membership/MFA/permission mevcut bootstrap üzerinden; bridge bypass etmez. Git commit/push yok.
+
+## 2026-09-24 — TASK-027.71-R1 Development Virtual Column Store ve Yönetim Akışı — `review`
+`DevVirtualColumnStore` + `ScadaVirtualColumnController` (4 koşullu development kapısı), servis yönetim yöntemleri (create/list/activate/disable, 027.70 doğrulama, mevcut rol modeli), whitelist projeksiyon (expression yok), web `ScadaVirtualColumnPanel` + `virtualColumnIds` + "(sanal)" işareti. Testler: api 3201 (61+2 yeni), web 306 (11+2 yeni); mutantlar uygulanıp geri alındı (servis root süzgeci mutantı ilk turda kaçtı, test eklendi). Mevcut testlerde güncelleme: modül-mention testleri, endpoint inventory, wiring ham-gövde sayacı. Manuel doğrulama yapılamadı. Q-W541 açık. Git commit/push yok.
+
+## 2026-09-24 — AI1 Onayı: TASK-027.71-R1 `done`
+Q-W541: `name` reddedilir (validator + test güncellendi), activate/işlem sırası/dev store kabul. Git commit/push yok.
+
+## 2026-09-24 — TASK-027.74 SCADA Analysis Export ve Jasper/PDF/XLSX Entegrasyonu — `review`
+`POST /reports/:code/analysis/export/:format` (mevcut `REPORT:ARTIFACT:EXPORT`, aynı guard zinciri); sunucu isteği yeniden doğrular/çalıştırır; export modeli 027.72 whitelist projeksiyonundan (expression/SQL/ad yok); CSV (RFC 4180, injection, null≠0), XLSX (çok sayfalı Analysis/Statistics/Quality/Comparison), PDF (mevcut Jasper seam + yeni allowlist şablonu `scada-analysis-report`, additive `RenderRow` alanları; fallback mevcut), PNG (sunucu yetki+audit+caption, tarayıcı çizer); mevcut `REPORT_EXPORT_*` audit'i fail-closed; web düğmeleri EXPORT iznine bağlı, çift export guard'ı. Testler: api 3272 (reporting 1666), web 328; 19 mutant yakalandı; check.sh yeşil. Java testi Maven'la koşulamadı (yerel JVM harness'ında şablon derlendi/PDF üretildi). Q-W542 açık. Git commit/push yok.
+
+## 2026-09-24 — TASK-027.74 düzeltme (AI1): PNG başarı audit'i completion'a taşındı — `review`
+Q-W542 kabul (şablon, RenderRow, sample-report korunur; Türkçe font ayrı smoke). PNG: step 1 caption + tek kullanımlık `exportId` (audit yok); step 2 `POST …/export/PNG/complete` (EXPORT izni, guard zinciri; actor/tenant/artifact/yeniden çözülen root ile doğrulama, tek kullanımlık, TTL) → `REPORT_EXPORT_SUCCEEDED`/`FAILED(CLIENT_RENDER_FAILED)`; audit yazılamazsa dosya teslim edilmez. api 3289 (reporting 1683), web 330, +10 mutant yakalandı (root mutantı ilk turda kaçtı, test eklendi), check.sh yeşil. Git commit/push yok. `done` onayı bekleniyor.
+
+## 2026-09-24 — AI1 Onayı: TASK-027.74 `done`
+Q-W542 kapandı, PNG akışı onaylandı. Açık not: PNG completion store bellek içi (production için ayrı hardening); Türkçe font ayrı smoke testi. Git commit/push yok.
+
+## 2026-09-24 — TASK-027.59 Wave 5 Reporting Uçtan Uca Kabul — `review`
+Gerçek 4 CSV snapshot + gerçek manifest üzerinde kompoze zincir kabul paketi (`wave5-e2e-acceptance.spec.ts`, 24 test; 11 senaryo): saatlik/günlük (gerçek 0, null+bayrak, sayaç sıfırlama), çoklu seri, PERIOD/SOURCE karşılaştırma, sanal kolon (restart'ta silinir), preset (stub store), export (CSV/XLSX/PDF/PNG + audit), tenant izolasyonu, fail-closed. api 3313 (reporting 1707), web 330, 14 mutant yakalandı (manifest ve index mutantları başka paketlerce), check.sh yeşil. Manuel tarayıcı doğrulaması yapılamadı (oturum/DB/servisler). Bulgular: Q-W543 (preset UI seçimleri doldurmuyor; UI SOURCE karşılaştırması aynı seri anahtarıyla eşliyor), Q-W544 (dev preset store yok). Kod değişmedi; yalnız DEC-0014 envanter satırı eklendi. Git commit/push yok.
+
+## 2026-09-24 — TASK-027.59-R1 Wave 5 Preset ve Kaynak Karşılaştırma Tamamlama — `review`
+Development bellek-içi preset store + `POST …/presets` (dört kapı; id/version/owner sunucuda; shared yalnız mevcut yönetim hakkıyla; plan katalogla çözümlenmeden saklanmaz), preset form hydration (hepsi-ya-hiç; kaynak/seri/tarih/interval/istatistik/sanal kolon/PERIOD/SOURCE+eşleme), "Preset olarak kaydet" (yalnız dev store'da), SOURCE karşılaştırma açık `{leftSeriesKey,rightSeriesKey}` eşlemesi (API + web; otomatik yalnız aynı anahtar, yinelenen sağ seri reddi, eksik eşlemede istek yok), comparison state temizliği. api 3375 (reporting 1769), web 388; 15 mutant yakalandı (root mutantı ilk turda kaçtı, sızdıran-store testi eklendi; 1 eşdeğer mutant), check.sh üç kez yeşil. Manuel tarayıcı kabulü yapılamadı. Git commit/push yok. `done` onayı bekleniyor.
+
+## 2026-09-24 — AI1 Onayı (2026-09-24): TASK-027.59-R1 ve TASK-027.59 `done`; Wave 5 development kabulü tamamlandı. Q-W543(a/b) ve Q-W544 giderildi (preset hydration, açık SOURCE seri eşleme, dev bellek-içi preset store; tenant-izole, in-memory sınırında). Operasyonel not: tarayıcıda manuel kabul yapılmadı; test ve gerçek CSV entegrasyon kanıtlarıyla kapanışa engel değil. Git commit/push yok.
+
+## 2026-09-24 — TASK-027.60 Wave 5 Commit ve Push
+Wave 5 (027.59 + R1 dahil) tek commit ile `dev` dalına commit edildi ve upstream `origin/dev`e push edildi (`feat(reporting): complete Wave 5 SCADA reporting acceptance`). `veriler/raw/`, .env, secret ve build çıktıları kapsam dışı; force/amend/history rewrite yok. Commit hash: `git log -1` (bu satır commit içinde olduğundan hash burada yazılmaz).

@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { useEffect, useRef, useState, type ReactNode, type RefObject } from 'react'
+import { BrandLogo } from '../brand-logo'
 import { AccordionSection } from './primitives'
 
 export interface ConsoleBreadcrumbItem {
@@ -18,6 +19,7 @@ export function ConsoleTopbar({
   themeToggle,
   onMenuToggle,
   menuButtonRef,
+  brandHref = '/app',
 }: {
   breadcrumb: ConsoleBreadcrumbItem[]
   tenantSelector: ReactNode
@@ -27,9 +29,11 @@ export function ConsoleTopbar({
   themeToggle: ReactNode
   onMenuToggle: () => void
   menuButtonRef?: RefObject<HTMLButtonElement | null>
+  /** TASK-027.61 — brand mark links to the current console's own dashboard route. */
+  brandHref?: string
 }) {
   return (
-    <header className="glass-panel relative z-10 flex h-12 items-stretch border-b border-glass-border-focus/50 bg-glass-elevated shadow-glass">
+    <header className="glass-panel relative z-10 flex h-16 items-center border-b border-glass-border-focus/50 bg-glass-elevated shadow-glass">
       <div className="flex shrink-0 items-center gap-2 px-3 md:w-52 md:border-r md:border-glass-border-default">
         <button
           ref={menuButtonRef}
@@ -43,7 +47,18 @@ export function ConsoleTopbar({
             <path d="M3 5h14M3 10h14M3 15h14" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
           </svg>
         </button>
-        <span className="shrink-0 truncate text-[15px] font-semibold tracking-wide text-glass-text-primary">Metnex</span>
+        {/*
+          TASK-027.61-R2 — topbar logos doubled from 24px to 48px height for enhanced visibility.
+          The light chip (`bg-[#f8fafc]`) stays legible in both light and dark console themes.
+        */}
+        <Link
+          href={brandHref}
+          aria-label="Metnex – panele git"
+          className="inline-flex shrink-0 items-center rounded-md bg-[#f8fafc] px-2 py-1 shadow-sm ring-1 ring-black/10 transition-colors hover:bg-white"
+        >
+          <BrandLogo variant="full" height={48} className="hidden md:inline-flex" priority />
+          <BrandLogo variant="mark" height={48} className="inline-flex md:hidden" priority />
+        </Link>
       </div>
 
       <div className="flex min-w-0 flex-1 items-center gap-3 px-3 sm:px-4">
@@ -141,7 +156,7 @@ export function ConsoleSidebar({
     <>
       {open ? (
         <div
-          className="fixed inset-x-0 bottom-0 top-12 z-40 bg-black/40 md:hidden"
+          className="fixed inset-x-0 bottom-0 top-16 z-40 bg-black/40 md:hidden"
           onClick={onClose}
           aria-hidden="true"
         />
@@ -149,7 +164,7 @@ export function ConsoleSidebar({
       <aside
         id="console-sidebar"
         ref={asideRef}
-        className={`glass-panel fixed bottom-0 left-0 top-12 z-50 flex w-52 flex-col border-r border-glass-border-default bg-glass-elevated shadow-glass transition-transform duration-200 ease-in-out md:static md:inset-auto md:z-auto md:translate-x-0 ${
+        className={`glass-panel fixed bottom-0 left-0 top-16 z-50 flex w-52 flex-col border-r border-glass-border-default bg-glass-elevated shadow-glass transition-transform duration-200 ease-in-out md:static md:inset-auto md:z-auto md:translate-x-0 ${
           open ? 'translate-x-0' : '-translate-x-full'
         }`}
       >

@@ -1,5 +1,7 @@
 import { Body, Controller, Get, Headers, HttpCode, HttpStatus, Param, Patch, Post, UseGuards } from '@nestjs/common'
 import { CurrentUser } from './current-user.decorator'
+import { RequireMfaSetupComplete } from './decorators/require-mfa-setup-complete.decorator'
+import { MfaEnforcementGuard } from './guards/mfa-enforcement.guard'
 import { JwtAuthGuard } from './jwt-auth.guard'
 import { PermissionGuard, RequirePermission } from './permission.guard'
 import {
@@ -21,7 +23,8 @@ interface AuthUser {
 const sessionContext = (user: AuthUser) => ({ impersonatorUserId: user.impersonatorUserId ?? null, impersonation: user.impersonation === true })
 
 @Controller('platform/saas')
-@UseGuards(JwtAuthGuard, PermissionGuard)
+@UseGuards(JwtAuthGuard, PermissionGuard, MfaEnforcementGuard)
+@RequireMfaSetupComplete()
 export class SaasController {
   constructor(private readonly saasService: SaasService) {}
 
@@ -53,7 +56,8 @@ export class SaasController {
 }
 
 @Controller('customer-admin')
-@UseGuards(JwtAuthGuard, PermissionGuard)
+@UseGuards(JwtAuthGuard, PermissionGuard, MfaEnforcementGuard)
+@RequireMfaSetupComplete()
 export class CustomerAdminController {
   constructor(private readonly saasService: SaasService) {}
 

@@ -8,12 +8,15 @@ import {
   Post,
   UseGuards,
 } from '@nestjs/common'
+import { RequireMfaSetupComplete } from './decorators/require-mfa-setup-complete.decorator'
+import { MfaEnforcementGuard } from './guards/mfa-enforcement.guard'
 import { JwtAuthGuard } from './jwt-auth.guard'
 import { PermissionGuard, RequirePermission } from './permission.guard'
 import { AssignPermissionDto, CreateRoleDto, RoleService } from './role.service'
 
 @Controller('platform/roles')
-@UseGuards(JwtAuthGuard, PermissionGuard)
+@UseGuards(JwtAuthGuard, PermissionGuard, MfaEnforcementGuard)
+@RequireMfaSetupComplete()
 export class RoleController {
   constructor(private readonly roleService: RoleService) {}
 

@@ -69,14 +69,71 @@ const WORKBOOK_RELS_XML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"
  * Produces a genuinely openable .xlsx — not a CSV wearing an .xlsx extension.
  */
 export function buildSimpleXlsx(headers: string[], rows: (string | number)[][]): Buffer {
-  const entries: { name: string; data: Buffer }[] = [
+  return zipStore([
     { name: '[Content_Types].xml', data: Buffer.from(CONTENT_TYPES_XML, 'utf8') },
     { name: '_rels/.rels', data: Buffer.from(ROOT_RELS_XML, 'utf8') },
     { name: 'xl/workbook.xml', data: Buffer.from(WORKBOOK_XML, 'utf8') },
     { name: 'xl/_rels/workbook.xml.rels', data: Buffer.from(WORKBOOK_RELS_XML, 'utf8') },
     { name: 'xl/worksheets/sheet1.xml', data: Buffer.from(buildSheetXml(headers, rows), 'utf8') },
-  ]
+  ])
+}
 
+export type WorkbookCell = string | number | null | undefined
+
+export interface WorkbookSheet {
+  name: string
+  rows: WorkbookCell[][]
+}
+
+const SHEET_NAME = /^[^[\]:*?/\\']{1,31}$/
+
+/**
+ * TASK-027.74 — additive multi-sheet workbook (same hand-rolled OOXML / STORED zip). A number is a real numeric cell, text is an inline
+ * string, null / undefined is an EMPTY cell (never 0). XML-illegal control characters are dropped; sheet names are validated.
+ */
+export function buildWorkbookXlsx(sheets: readonly WorkbookSheet[]): Buffer {
+  if (sheets.length === 0) throw new Error('WORKBOOK_EMPTY')
+  const names = new Set<string>()
+  for (const sheet of sheets) {
+    if (!SHEET_NAME.test(sheet.name) || names.has(sheet.name.toLowerCase())) throw new Error('WORKBOOK_SHEET_NAME_INVALID')
+    names.add(sheet.name.toLowerCase())
+  }
+  const overrides = sheets.map((_, i) => `<Override PartName="/xl/worksheets/sheet${i + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`).join('')
+  const contentTypes = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>${overrides}</Types>`
+  const sheetsXml = sheets.map((sheet, i) => `<sheet name="${escapeXml(sheet.name)}" sheetId="${i + 1}" r:id="rId${i + 1}"/>`).join('')
+  const workbook = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>${sheetsXml}</sheets></workbook>`
+  const rels = sheets.map((_, i) => `<Relationship Id="rId${i + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${i + 1}.xml"/>`).join('')
+  const workbookRels = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${rels}</Relationships>`
+  return zipStore([
+    { name: '[Content_Types].xml', data: Buffer.from(contentTypes, 'utf8') },
+    { name: '_rels/.rels', data: Buffer.from(ROOT_RELS_XML, 'utf8') },
+    { name: 'xl/workbook.xml', data: Buffer.from(workbook, 'utf8') },
+    { name: 'xl/_rels/workbook.xml.rels', data: Buffer.from(workbookRels, 'utf8') },
+    ...sheets.map((sheet, i) => ({ name: `xl/worksheets/sheet${i + 1}.xml`, data: Buffer.from(buildTypedSheetXml(sheet.rows), 'utf8') })),
+  ])
+}
+
+function buildTypedSheetXml(rows: WorkbookCell[][]): string {
+  const rowsXml = rows
+    .map((cols, rowIndex) => {
+      const cells = cols
+        .map((value, colIndex) => {
+          if (value === null || value === undefined) return ''
+          const ref = `${columnLetter(colIndex)}${rowIndex + 1}`
+          if (typeof value === 'number') return Number.isFinite(value) ? `<c r="${ref}"><v>${value}</v></c>` : ''
+          return `<c r="${ref}" t="inlineStr"><is><t xml:space="preserve">${escapeXml(stripControl(value))}</t></is></c>`
+        })
+        .join('')
+      return `<row r="${rowIndex + 1}">${cells}</row>`
+    })
+    .join('')
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>${rowsXml}</sheetData></worksheet>`
+}
+
+// eslint-disable-next-line no-control-regex
+const stripControl = (text: string) => text.replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\ufffe\uffff]/g, '')
+
+function zipStore(entries: { name: string; data: Buffer }[]): Buffer {
   const localParts: Buffer[] = []
   const centralParts: Buffer[] = []
   let offset = 0

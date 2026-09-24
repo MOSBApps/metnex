@@ -34,3 +34,9 @@ Her tamamlanan task backlog, METNEX_STATE.md ve append-only PROGRESS_LOG.md ile
 kapatılır. SCADA/DMS kaynakları read-only, migration’lar idempotent ve
 backup/rollback kanıtlı olmalıdır.
 
+## 2026-09-22 — Task ID normalizasyonu
+
+MFA enforcement `TASK-027.48` olarak korunmuştur. Tenant-role delegation artık
+`TASK-027.54`; Wave 5 grafik/export zinciri `TASK-027.55`–`TASK-027.60` aralığındadır.
+Eski duplicate backlog dosyaları kaldırılmış, tarihsel ODC kayıtları append-only
+kuralı nedeniyle değiştirilmemiştir.

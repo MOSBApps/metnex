@@ -12,6 +12,8 @@ import {
   UseGuards,
 } from '@nestjs/common'
 import { CurrentUser } from './current-user.decorator'
+import { RequireMfaSetupComplete } from './decorators/require-mfa-setup-complete.decorator'
+import { MfaEnforcementGuard } from './guards/mfa-enforcement.guard'
 import { JwtAuthGuard } from './jwt-auth.guard'
 import { PermissionGuard, RequirePermission } from './permission.guard'
 import { AssignRoleDto, CreateUserDto, UpdateUserDto, UserListQuery, UserService } from './user.service'
@@ -25,7 +27,8 @@ interface AuthUser {
 const sessionContext = (user: AuthUser) => ({ impersonatorUserId: user.impersonatorUserId ?? null, impersonation: user.impersonation === true })
 
 @Controller('platform/users')
-@UseGuards(JwtAuthGuard, PermissionGuard)
+@UseGuards(JwtAuthGuard, PermissionGuard, MfaEnforcementGuard)
+@RequireMfaSetupComplete()
 export class UserController {
   constructor(private readonly userService: UserService) {}
 

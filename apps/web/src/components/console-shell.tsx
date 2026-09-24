@@ -186,6 +186,7 @@ function ConsoleShellInner({
           themeToggle={<GlassThemeToggle />}
           onMenuToggle={sidebarState.toggle}
           menuButtonRef={menuButtonRef}
+          brandHref={pathname.startsWith('/system') ? '/system' : '/app'}
         />
       </div>
 

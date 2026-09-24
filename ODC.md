@@ -4,17 +4,16 @@ contract-revision: "2026-09-14"
 project:
   name: "Metnex"
   slug: "metnex"
-  description: "Yeniden kullanılabilir kurumsal multi-tenant SaaS platform temeli, güvenlik, yönetişim ve mühendislik iskeleti."
+  description: "Kurumsal multi-tenant SaaS platform temeli — güvenlik, yönetişim ve mühendislik disiplinini birlikte taşıyan monorepo."
 
 documentation:
   discovery: docs/requirements/DISCOVERY.md
   srs: docs/requirements/SRS.md
-  product-baseline: docs/product/PRODUCT_BASELINE_SRS.md
-  project-plan: docs/project/PROJECT_PLAN.json
-  project-scope: docs/project/PROJECT_SCOPE.json
-  project-delivery: docs/project/PROJECT_DELIVERY.json
-  project-traceability: docs/project/PROJECT_TRACEABILITY.json
-  project-execution: docs/project/PROJECT_EXECUTION.json
+  project-plan: docs/project/METNEX_PLAN.json
+  project-scope: docs/project/METNEX_SCOPE.json
+  project-delivery: docs/project/METNEX_DELIVERY.json
+  project-traceability: docs/project/METNEX_TRACEABILITY.json
+  project-execution: docs/project/METNEX_EXECUTION.json
   decisions: docs/decisions/
   backlog: backlog/
   runbooks: docs/runbooks/
@@ -139,87 +138,8 @@ already follow.
 
 Full validation rules (task ID format, status/type enums, hotfix-to-task linkage, AI2
 report consistency, cross-references into the plan/traceability records, and secret/UUID
-leak detection): `scripts/check-project-records.mjs` and
-`docs/runbooks/PROJECT_RECORDS_MAINTENANCE_RUNBOOK.md`.
-
-## Product Baseline SRS
-
-`documentation.product-baseline` (`docs/product/PRODUCT_BASELINE_SRS.md`) is
-this product's long-term vision document — the full, aspirational scope
-(e.g. Teams, Bugs, Support Requests, a Git Observation Engine, CI/test
-observation, Releases, a Unified Activity Stream, a Portfolio Cockpit, a
-Human Attention Engine, an AI Agent Observatory, Global Search) as agreed
-with AI0/the product owner, not a description of what this repository has
-implemented today.
-
-**The Product Baseline SRS is never, by itself, a valid coding source.** No
-AI agent may implement a feature because it appears in the Product Baseline.
-The only valid path from vision to code is:
-
-```text
-Product Baseline SRS
-  → Discovery
-  → Project/Feature SRS (docs/requirements/SRS.md or docs/SRS.md)
-  → AI1 Governance Task
-  → AI2 Implementation
-```
-
-Roadmap epics decomposing the Product Baseline into scoped, trackable units
-of work — each stating its own current vs. target state — live under
-`docs/product/roadmap/`. `docs/domain/DOMAIN_MODEL.md` is still the only
-source of truth for what is actually implemented; a roadmap epic being
-written does not make its feature `Active`.
-
-## Dogfooding note — this repository's own SRS source (ODC-014)
-
-This exact file (`ODC.md`) plays two roles at once in the OpenDevConnect
-repository specifically: it is both **the canonical scaffold template**
-that `scripts/create-project.sh` copies into every new project (with its
-`Metnex`/`metnex`/`TBD — Discovery tamamlandığında doldurulur.` placeholders
-filled in at scaffold time) and **OpenDevConnect's own root ODC contract**,
-since OpenDevConnect manages itself through its own platform.
-
-> **Not (2026-09-17, TASK-024.2):** Bu satır artık projenin güncel Metnex kimliğini
-> yansıtıyor. `scripts/create-project.sh`'ın kendi arama deseni (kod/script içeriği) henüz
-> `openmas`/`AISkeleton` literal string'lerini arıyor — bu script'in kendisi ayrı bir
-> kod/script rename task'ının konusudur, bu task yalnızca dokümantasyon kimliğini kapsar.
-
-Those two roles conflict on one point, and rather than force a fix that
-would break the other, the conflict is documented here explicitly:
-
-- The `project:` block above intentionally keeps its `{{PLACEHOLDER}}`
-  values, even in this repository — filling them with OpenDevConnect's real
-  name/slug would corrupt this file's second role as the literal template
-  `create-project.sh` string-replaces for every other project.
-- Likewise, `documentation.discovery` (`docs/requirements/DISCOVERY.md`) and
-  `documentation.srs` (`docs/requirements/SRS.md`) point at the generic
-  per-project template locations that a *newly scaffolded* project fills in
-  through real customer discovery. In this repository they remain the
-  unfilled templates copied in by ODC-011/ODC-012 — no fabricated customer
-  conversation has been written into them, and none should be.
-- **OpenDevConnect's own real, authoritative, applicable SRS is
-  `docs/SRS.md`** (v0.1, "MVP Development Baseline") — not
-  `docs/requirements/SRS.md`. It was written before this repository adopted
-  its own ODC contract, so it never went through the
-  Discovery-file-in-this-repository step described in §"The flow" below.
-  `docs/product/PRODUCT_BASELINE_SRS.md` (see above) is its longer-term
-  companion vision document.
-- Any AI agent reading this file for OpenDevConnect's own work should treat
-  `docs/SRS.md` as the current/applicable SRS and
-  `docs/requirements/SRS.md`/`docs/requirements/DISCOVERY.md` as intentionally
-  empty, pending templates — never as evidence that no discovery/SRS work
-  was done, and never as something to backfill with invented content.
-- Unlike `discovery`/`srs` above, the five `documentation.project-*` keys
-  (`project-plan`, `project-scope`, `project-delivery`, `project-traceability`,
-  `project-execution`) **are** filled in for real in this repository
-  (`project-execution` added by ODC-029, the other four by ODC-028) — their
-  target files under `docs/project/` are OpenDevConnect's own genuine,
-  backfilled records, sourced only from this repository's existing documents
-  (`docs/SRS.md`, `docs/product/PRODUCT_BASELINE_SRS.md`, `docs/product/
-  roadmap/`, `backlog/`, `docs/domain/DOMAIN_MODEL.md`, `docs/AI_Governance/
-  ODC_TASK_COMMIT_MAP.md`, this session's own real verification runs, and git
-  history) — never new customer discovery, never an estimated date, never a
-  guessed status. Every record that could carry one cites a real `source`.
+leak detection) are not yet implemented as local tooling in this repository — these
+records are currently maintained and reviewed by hand.
 
 ## Roles
 
@@ -274,38 +194,15 @@ never fabricating a requirement: see
 
 ## Remote contract sync
 
-This project can check for and pull updates to the *canonical* ODC
-documents (this file's own shape, the Discovery/SRS templates, this runbook)
-from OpenDevConnect's publishing service, using `scripts/odc-sync.sh`:
+The `remote-contract:` block above declares this project's intent to allow
+canonical ODC documents (this file's own shape, the Discovery/SRS templates)
+to be checked against OpenDevConnect's publishing service, fail-open,
+read-only, and only after Ed25519 signature verification against a locally
+pinned public key — no project data is ever sent, and only an explicit
+allow-list of documents is ever written.
 
-```bash
-./scripts/odc-sync.sh --check   # reports what's out of date, changes nothing
-./scripts/odc-sync.sh --update  # updates only the canonical documents, verified by SHA-256
-```
-
-Rules this sync always follows (never overridden by anything the remote
-server sends):
-
-- The manifest's Ed25519 signature (`manifest.json.sig`) is verified against
-  the public key pinned at
-  `docs/odc/ODC_MANIFEST_SIGNING_PUBLIC_KEY.pem` **before** the manifest is
-  parsed. A missing or invalid signature means nothing is written — `--check`
-  warns that the remote is untrusted, `--update` fails. The remote can never
-  supply its own "trusted" public key; only the locally pinned copy is ever
-  used.
-- Only documents on an explicit allow-list are ever written.
-- A document is written only after its SHA-256 matches what the manifest
-  declares — a hash mismatch means nothing is written, even if the signature
-  was valid.
-- If the remote manifest is unreachable, the project continues with its
-  local copies (fail-open) — this never blocks local development.
-- Nothing under `docs/requirements/`, `docs/decisions/`, `backlog/`, or this
-  file's own `project:` block is ever touched.
-- No project data, secret, token, or prompt content is ever sent to the
-  remote service — sync is read-only, one-directional (remote → local), and
-  unauthenticated.
-- Remote content is never executed — it is written to disk as documentation
-  only.
-
-See `docs/odc/ODC_CONTRACT_SPEC.md` for the manifest schema and
-`docs/runbooks/` for the sync runbook.
+**Status in this repository:** no local sync tooling (`scripts/odc-sync.sh`)
+is implemented yet — the block above is a declared contract, not an active
+integration. Nothing under `docs/requirements/`, `docs/decisions/`,
+`backlog/`, or this file's own `project:` block would ever be touched by a
+future sync.

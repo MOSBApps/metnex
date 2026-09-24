@@ -444,7 +444,7 @@ describe('static guarantees', () => {
     ] as const) {
       const source = readFileSync(join(__dirname, file), 'utf8')
       for (const permission of expected) expect(source).toContain(`@RequirePermission('${permission}')`)
-      expect(source).toContain('@UseGuards(JwtAuthGuard, PermissionGuard)')
+      expect(source).toContain('@UseGuards(JwtAuthGuard, PermissionGuard, MfaEnforcementGuard)')
     }
   })
 

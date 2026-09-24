@@ -22,12 +22,12 @@ Standartlaştırılan yaşam döngüsü:
   → ODC.md contract oluşturma
   → Mimari kararlar (DEC-xxxx)
   → Backlog üretimi (EPIC/Feature/Story/Task)
-  → PROJECT_STATE.md ilk yayını (stage: backlog)
+  → METNEX_STATE.md ilk yayını (stage: backlog)
   → Geliştirme döngüsü (stage: development)
       - task seçilir → status: in_progress
       - iş biter → status: review
       - onaylanır → status: done
-      - PROJECT_STATE.md + PROGRESS_LOG.md her oturumda güncellenir
+      - METNEX_STATE.md + PROGRESS_LOG.md her oturumda güncellenir
   → İlk sürüm / release (stage: released)
   → Sürekli geliştirme (stage: continuous)
 ```
@@ -36,7 +36,7 @@ Standartlaştırılan yaşam döngüsü:
 
 ## 2. Evreler (Lifecycle Stages)
 
-Her evre `PROJECT_STATE.md` içindeki `stage` alanının alabileceği bir
+Her evre `METNEX_STATE.md` içindeki `stage` alanının alabileceği bir
 değerdir. Enum sabittir, serbest metin değildir.
 
 | stage | Anlamı | Giriş Kriteri | Çıkış Kriteri | Zorunlu Artefakt |
@@ -45,7 +45,7 @@ değerdir. Enum sabittir, serbest metin değildir.
 | `srs` | SRS yazılıyor/gözden geçiriliyor | Discovery tamam | SRS onaylandı (Durum: Onaylı) | `docs/SRS.md`, Durum alanı |
 | `architecture` | Temel mimari kararlar alınıyor | SRS onaylı | Kritik DEC'ler Accepted | `docs/decisions/DEC-*.md` |
 | `backlog` | Epic/Feature/Story/Task üretiliyor | Mimari iskelet var | İlk EPIC seti `ready` durumunda | `backlog/EPIC-*.md`, `ODC.md` |
-| `development` | Aktif geliştirme | En az 1 EPIC `in_progress` | — (bu evre sürekli tekrar eder) | `PROJECT_STATE.md`, `PROGRESS_LOG.md` |
+| `development` | Aktif geliştirme | En az 1 EPIC `in_progress` | — (bu evre sürekli tekrar eder) | `METNEX_STATE.md`, `PROGRESS_LOG.md` |
 | `released` | İlk üretim sürümü çıktı | MVP kabul kriterleri karşılandı | — | CHANGELOG etiketi |
 | `continuous` | Sürekli geliştirme/bakım | Release sonrası, backlog akışı sürüyor | — (terminal durum) | aynı yukarıdakiler, düzenli güncel |
 
@@ -59,14 +59,11 @@ DEC ile gerekçelendirilmeli ve `PROGRESS_LOG.md`'e not düşülmelidir.
 Bu dosya, dış araçların (ODC gibi) repoyu AI kullanmadan yorumlayabilmesi
 için gereken sözleşmedir (bkz. opendevcon EPIC-008, FR-210/FR-211).
 
-`ODC.md` **Faz 0'da elle oluşturulmaz** — repo kökünde skeleton içinde bir
-template olarak durur ve `scripts/create-project.sh` yeni proje türetirken
-`Metnex`, `metnex`, `tr-TR`,
-`tr-x-icu`, `icu` placeholder'larını otomatik
-doldurur (bkz. `PRODUCT_OWNER_LIFECYCLE_PLAYBOOK.md` Faz 0). `development`
-evresine geçmeden önce (Faz 3 — Mimari Kararlar) PO yalnızca içeriği
-doğrular; `project.description` alanı Discovery/SRS netleştikçe elle
-güncellenir.
+`ODC.md` repo kökünde bulunur ve `project.name`/`project.slug` alanları
+Metnex kimliğiyle doldurulmuştur (bkz. `PRODUCT_OWNER_LIFECYCLE_PLAYBOOK.md`
+Faz 0). `development` evresine geçmeden önce (Faz 3 — Mimari Kararlar) PO
+yalnızca içeriği doğrular; `project.description` alanı Discovery/SRS
+netleştikçe elle güncellenir.
 
 Zorunlu alanlar:
 
@@ -80,7 +77,7 @@ documentation:
   decisions: docs/decisions/
   backlog: backlog/
   runbooks: docs/runbooks/
-  state: docs/opendevcon/PROJECT_STATE.md
+  state: docs/opendevcon/METNEX_STATE.md
   progress_log: docs/opendevcon/PROGRESS_LOG.md
 task_format: epic-markdown-frontmatter
 task_status_model:
@@ -120,7 +117,7 @@ alanı yalnızca şu değerleri alabilir:
 
 ---
 
-## 5. `docs/opendevcon/PROJECT_STATE.md` — Tek Kaynak Durum Dosyası
+## 5. `docs/opendevcon/METNEX_STATE.md` — Tek Kaynak Durum Dosyası
 
 `docs/opendevcon/` klasöründe, her zaman güncel, tek ve küçük bir dosya
 (bkz. `docs/opendevcon/README.md`):
@@ -141,8 +138,8 @@ notes: >
 Bu dosya, opendevcon gibi araçların tüm backlog'u tarayıp progress
 hesaplamasına gerek kalmadan projenin "şu an ne durumda" olduğunu tek
 istekte anlamasını sağlar. `backlog/EPIC-*.md` dosyaları detay/kanıt
-kaynağıdır; `PROJECT_STATE.md` özet/işaret kaynağıdır — ikisi çelişirse
-EPIC dosyaları esas alınır, `PROJECT_STATE.md` hatalı sayılır ve düzeltilir.
+kaynağıdır; `METNEX_STATE.md` özet/işaret kaynağıdır — ikisi çelişirse
+EPIC dosyaları esas alınır, `METNEX_STATE.md` hatalı sayılır ve düzeltilir.
 
 ---
 
@@ -171,7 +168,7 @@ eklenmelidir:
 > Bir görev "tamamlandı" olarak raporlanmadan önce agent şunları yapmak
 > zorundadır:
 > 1. İlgili `backlog/EPIC-*.md` dosyasının `status` alanını güncelle.
-> 2. `docs/opendevcon/PROJECT_STATE.md`'i güncelle (`stage`, `active_epics`, `updated_at`).
+> 2. `docs/opendevcon/METNEX_STATE.md`'i güncelle (`stage`, `active_epics`, `updated_at`).
 > 3. `docs/opendevcon/PROGRESS_LOG.md`'e bir kayıt ekle.
 >
 > Bu üç adım atlanırsa görev tamamlanmış sayılmaz — `QUALITY_GATES.md`
@@ -186,7 +183,7 @@ eklenmelidir:
 | `ODC.md` | EPIC-008, FR-210/FR-211 |
 | EPIC frontmatter `status` | EPIC-009 (parse), EPIC-010 FR-230/FR-231 |
 | `docs/SRS.md`, decisions, runbooks | EPIC-011 (Documentation Status — varlık kontrolü) |
-| `docs/opendevcon/PROJECT_STATE.md`, `docs/opendevcon/PROGRESS_LOG.md` | EPIC-010, EPIC-013 (Portfolio Dashboard) girdisi |
+| `docs/opendevcon/METNEX_STATE.md`, `docs/opendevcon/PROGRESS_LOG.md` | EPIC-010, EPIC-013 (Portfolio Dashboard) girdisi |
 
 Bu tablo, iki repo (metnex ve opendevcon) arasında sözleşme
 değiştiğinde ilk kontrol edilecek yer olarak kullanılmalıdır.

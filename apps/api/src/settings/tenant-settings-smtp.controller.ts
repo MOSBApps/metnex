@@ -10,6 +10,8 @@ import {
   Put,
   UseGuards,
 } from '@nestjs/common'
+import { RequireMfaSetupComplete } from '../platform/decorators/require-mfa-setup-complete.decorator'
+import { MfaEnforcementGuard } from '../platform/guards/mfa-enforcement.guard'
 import { JwtAuthGuard } from '../platform/jwt-auth.guard'
 import { PermissionGuard, RequirePermission } from '../platform/permission.guard'
 import { TenantHeaderFormatGuard } from '../platform/guards/tenant-header-format.guard'
@@ -18,7 +20,8 @@ import { validateSmtpSettings } from './settings-input.domain'
 import { TenantSettingsService, UpsertSmtpOverrideDto } from './tenant-settings.service'
 
 @Controller('settings/smtp')
-@UseGuards(JwtAuthGuard, TenantHeaderFormatGuard, TenantMembershipGuard, PermissionGuard)
+@UseGuards(JwtAuthGuard, TenantHeaderFormatGuard, TenantMembershipGuard, PermissionGuard, MfaEnforcementGuard)
+@RequireMfaSetupComplete()
 export class TenantSettingsSmtpController {
   constructor(private readonly svc: TenantSettingsService) {}
 

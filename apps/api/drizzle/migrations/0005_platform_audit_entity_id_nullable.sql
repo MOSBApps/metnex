@@ -1,0 +1,1 @@
+ALTER TABLE "platform_audit_logs" ALTER COLUMN "entityId" DROP NOT NULL;

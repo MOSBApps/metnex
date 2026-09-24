@@ -306,6 +306,12 @@ before relying on `tenant_closure` for those rows.
 > drops `demo_sample_definitions`/`demo_sample_transactions` and deletes the `DEMO_SAMPLE_TRANSACTIONS`
 > `report_artifacts` row and the `AIS_DEMO_PACKAGE` `resource_packages` row (skipped if a live
 > subscription still references it) — see DEC-0012.
+>
+> `apps/api/drizzle/migrations/0004_tenant_role_admin_flag.sql` (TASK-027.49) adds
+> `tenant_roles.isAdminRole boolean not null default false` — marks a custom tenant role as that
+> tenant's "administrator" role for the last-tenant-admin floor invariant (the last ACTIVE
+> assignment of an `isAdminRole`-flagged role in a tenant cannot be revoked). Generated with
+> `drizzle-kit generate` from the schema snapshot diff, not run against a live database.
 
 ---
 

@@ -1,4 +1,4 @@
-# Open Mas — Database Metadata Template
+# Metnex — Database Metadata Template
 
 > Fill this file to make the database model self-describing for humans and AI agents.
 > This is a project template, not the live source of truth. The live document should become `docs/domain/DB_META.md`.
@@ -7,7 +7,7 @@
 
 ## 1. Document Control
 
-- Project Name: `Open Mas`
+- Project Name: `Metnex`
 - Project Slug: `metnex`
 - Owner: `<team-or-person>`
 - Last Updated: `<YYYY-MM-DD>`

@@ -21,54 +21,62 @@ import { MfaController } from './mfa.controller'
  * and are REMEDIATED by TASK-027.42; the enforcing tests live in platform-user-admin-privilege-boundary.spec.ts.
  */
 
-describe('B. MFA policy routes — current no-op behaviour is pinned (Q-DP22b)', () => {
+describe('B. MFA policy routes — Q-DP22b Option B implemented (TASK-027.48)', () => {
   const routePath = (handler: object) => Reflect.getMetadata('path', handler) as string
 
-  it('B1: the routes declare no :tenantId segment, so @Param(\'tenantId\') can never be populated', () => {
-    expect(routePath(MfaController.prototype.getPolicy)).toBe('policy')
-    expect(routePath(MfaController.prototype.setPolicy)).toBe('policy')
+  it('B1: the routes now declare a :tenantId segment and @Param(\'tenantId\') is populated', () => {
+    expect(routePath(MfaController.prototype.getPolicy)).toBe('policy/:tenantId')
+    expect(routePath(MfaController.prototype.setPolicy)).toBe('policy/:tenantId')
     expect(Reflect.getMetadata('path', MfaController)).toBe('auth/mfa')
     const source = readFileSync(join(__dirname, 'mfa.controller.ts'), 'utf8')
-    expect(source).toContain("@Get('policy')")
-    expect(source).toContain("@Patch('policy')")
-    expect(source).toMatch(/getPolicy\(@Param\('tenantId'\)/)
+    expect(source).toContain("@Get('policy/:tenantId')")
+    expect(source).toContain("@Patch('policy/:tenantId')")
   })
 
-  it('B2: GET and PATCH answer { mfaRequired: false } with 200 and never reach the service (dead endpoints)', async () => {
+  it('B2: GET and PATCH reach the service (real reads/writes) for a system administrator', async () => {
+    const service = { getTenantPolicy: jest.fn(async () => ({ mfaRequired: true })), setTenantPolicy: jest.fn(async () => ({ mfaRequired: true })) }
+    const controller = new MfaController(service as never)
+    const sysadmin = { id: 'u1', sub: 'u1', email: 'u@example.test', isSystemAdmin: true }
+    await expect(controller.getPolicy(sysadmin, 'tenant-1')).resolves.toEqual({ mfaRequired: true })
+    expect(service.getTenantPolicy).toHaveBeenCalledWith('u1', 'tenant-1')
+  })
+
+  it('B3: both routes are fail-closed in the controller for a non-system-administrator, before the service is called', async () => {
     const service = { getTenantPolicy: jest.fn(), setTenantPolicy: jest.fn() }
     const controller = new MfaController(service as never)
-    const user = { id: 'u1', sub: 'u1', email: 'u@example.test', isSystemAdmin: false }
-    await expect(controller.getPolicy(undefined as never)).resolves.toEqual({ mfaRequired: false })
-    await expect(controller.setPolicy(user, undefined as never, { mfaRequired: true })).resolves.toEqual({ mfaRequired: false })
+    const normal = { id: 'u1', sub: 'u1', email: 'u@example.test', isSystemAdmin: false }
+    await expect(controller.getPolicy(normal, 'tenant-1')).rejects.toBeInstanceOf(ForbiddenException)
+    await expect(controller.setPolicy(normal, 'tenant-1', { mfaRequired: true })).rejects.toBeInstanceOf(ForbiddenException)
     expect(service.getTenantPolicy).not.toHaveBeenCalled()
     expect(service.setTenantPolicy).not.toHaveBeenCalled()
   })
 
-  it('B3: no permission decorator guards them — making them reachable without authorization would reopen Q-DP22', () => {
-    const source = readFileSync(join(__dirname, 'mfa.controller.ts'), 'utf8')
-    const policy = source.slice(source.indexOf("@Get('policy')"))
-    expect(policy).not.toContain('RequirePermission')
-    expect(policy).not.toContain('isSystemAdmin')
-  })
-
-  it('B4b: tenant MFA policy / role requiresMfa have no enforcement effect today: MfaEnforcementGuard is provided but applied to no endpoint, and login looks only at the user’s own MFA', () => {
+  it('B4b: MfaEnforcementGuard + @RequireMfaSetupComplete() are now wired onto real controllers (route matrix, see docs/runbooks/MFA_ENFORCEMENT_ROUTE_MATRIX.md)', () => {
     const { readdirSync } = jest.requireActual<typeof import('node:fs')>('node:fs')
     const walk = (dir: string): string[] => readdirSync(dir, { withFileTypes: true }).flatMap(e => (e.isDirectory() ? walk(join(dir, e.name)) : [join(dir, e.name)]))
-    const users = walk(join(__dirname, '..'))
-      .filter(f => f.endsWith('.ts') && !f.endsWith('.spec.ts'))
-      .filter(f => /@RequireMfaSetupComplete\(|MfaEnforcementGuard\)/.test(readFileSync(f, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '')))
-    expect(users).toEqual([]) // neither the decorator nor the guard is used as an endpoint guard anywhere
+    const wired = walk(join(__dirname, '..'))
+      .filter(f => f.endsWith('.controller.ts'))
+      .filter(f => /@RequireMfaSetupComplete\(\)/.test(readFileSync(f, 'utf8')))
+    // At minimum the platform user/role/tenant/saas surfaces and platform-audit-logs are wired.
+    expect(wired.some(f => f.endsWith('user.controller.ts'))).toBe(true)
+    expect(wired.some(f => f.endsWith('role.controller.ts'))).toBe(true)
+    expect(wired.some(f => f.endsWith('tenant.controller.ts'))).toBe(true)
+    expect(wired.some(f => f.endsWith('platform-audit.controller.ts'))).toBe(true)
+    // The MFA flow itself, identity bootstrap and the pre-authentication surface stay unwired —
+    // otherwise nobody could ever reach the flow that unblocks them.
+    expect(wired.some(f => f.endsWith('mfa.controller.ts'))).toBe(false)
+    expect(wired.some(f => f.endsWith('me.controller.ts'))).toBe(false)
+    expect(wired.some(f => f.endsWith('bootstrap.controller.ts'))).toBe(false)
     const login = readFileSync(join(__dirname, 'auth.service.ts'), 'utf8')
     expect(login).toContain('userMfaSettings.isEnabled')
-    expect(login).not.toContain('mfaRequirement')
-    expect(login).not.toContain('tenantSecuritySettings')
   })
 
-  it('B4: this task made no route reachable: the only MfaService writers of tenant policy are unreachable from the controller today', () => {
-    const source = readFileSync(join(__dirname, 'mfa.controller.ts'), 'utf8')
-    const reachable = [...source.matchAll(/this\.mfaService\.setTenantPolicy\(/g)].length
-    expect(reachable).toBe(1) // present in setPolicy only, behind the `if (!tenantId) return` early exit
-    expect(source).toMatch(/if \(!tenantId\) return \{ mfaRequired: false \}/)
+  it('B4: setTenantPolicy is reachable and re-authorises the actor independently in the service (fail-closed twice)', () => {
+    const source = readFileSync(join(__dirname, 'mfa.service.ts'), 'utf8')
+    const body = source.slice(source.indexOf('async setTenantPolicy'), source.indexOf('private verifyTotpCode'))
+    expect(body).toContain('this.assertActingSystemAdmin(actorId)')
+    expect(body).toContain('this.assertTenantExists(tenantId)')
+    expect(body).toContain("action: 'MFA_POLICY_UPDATED'")
   })
 })
 

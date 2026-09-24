@@ -1,4 +1,4 @@
-# Open Mas — Feature Release Plan Template
+# Metnex — Feature Release Plan Template
 
 ## Phases
 

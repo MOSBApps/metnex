@@ -18,7 +18,7 @@ describe('getMfaErrorGuidance', () => {
       code: 'MFA_SETUP_REQUIRED',
       message: 'Bu alanı kullanmak için MFA kurulumu gerekiyor.',
       ctaLabel: 'MFA Kurulumuna Git',
-      ctaHref: '/profile',
+      ctaHref: '/app/settings/security',
     })
   })
 

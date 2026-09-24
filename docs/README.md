@@ -1,7 +1,6 @@
-# Open Mas — Documentation Map
+# Metnex — Documentation Map
 
-> This index describes the documentation architecture of the project skeleton.
-> Replace placeholder text and expand tables as the project evolves.
+> This index describes Metnex's documentation architecture.
 
 ---
 
@@ -78,8 +77,9 @@ Binding frontend/UI contract. Read this before implementing any screen or compon
 | `platform-operations.md` | System-admin audit/performance operations runbook |
 | `reporting-foundation.md` | Report artifact registry, dataset provider abstraction, and Jasper renderer (`services/jasper-renderer/`) HTTP contract/operations |
 | `REQUIREMENTS_DISCOVERY_AND_SRS_RUNBOOK.md` | Discovery-to-approved-SRS process and document rules |
-| `PROJECT_LIFECYCLE_AND_STATUS_RUNBOOK.md` | Post-SRS lifecycle stages and machine-readable status contract |
+| `METNEX_LIFECYCLE_AND_STATUS_RUNBOOK.md` | Post-SRS lifecycle stages and machine-readable status contract |
 | `PRODUCT_OWNER_LIFECYCLE_PLAYBOOK.md` | Human (PO/Chief Engineer) end-to-end action checklist, discovery to continuous development |
+| `MFA_ENFORCEMENT_ROUTE_MATRIX.md` | MFA enforcement guard route matrix, exemptions, rollout strategy (TASK-027.48) |
 
 ---
 
@@ -92,14 +92,11 @@ requiring an AI to interpret the codebase.
 | File | Purpose |
 |---|---|
 | `README.md` | Explains the reporting surface and update obligation |
-| `PROJECT_STATE.md` | Single-source current stage/status snapshot |
+| `METNEX_STATE.md` | Single-source current stage/status snapshot |
 | `PROGRESS_LOG.md` | Append-only agent session log |
 
-Process: `docs/runbooks/PROJECT_LIFECYCLE_AND_STATUS_RUNBOOK.md`. Note:
+Process: `docs/runbooks/METNEX_LIFECYCLE_AND_STATUS_RUNBOOK.md`. Note:
 the `ODC.md` contract file itself lives at the **repo root**, not here.
-It ships as a placeholder template in the skeleton and is auto-filled by
-`scripts/create-project.sh` when a new project is generated — it is not
-created by hand.
 
 ---
 
@@ -115,6 +112,8 @@ created by hand.
 | `DEC-0009-shared-schema-tenant-isolation-hardening.md` | Composite tenant FK hardening for the shared-schema multi-tenancy model |
 | `DEC-0012-demo-operations-removal.md` | Demo Operations module removal — kept the generic Jasper render adapter and dataset provider abstraction |
 | `DEC-0013-jasper-renderer-service.md` | Jasper renderer provisioned as a standalone Maven/Spring Boot service (`services/jasper-renderer/`) |
+| `DEC-0015-wave5-hourly-consumption-and-scada-decisions.md` | Wave 5 Hourly Consumption ve SCADA karar kapanışları (Q-W501–W515, Q-SC/SP/SA/SR, Q-M05, Q-E04): delta semantiği, katalog control-plane, canlı sorgu, audit sözleşmesi, redaction |
+| `DEC-0016-scada-catalog-verification-and-physical-identity.md` | SCADA katalog: kontrollü read-only preflight doğrulaması (UNVERIFIED→VERIFIED) ve fiziksel database adı ↔ opaque katalog kimliği ayrımı |
 
 ---
 
@@ -161,4 +160,4 @@ When a task changes source-of-truth behavior:
 5b. UI override (Seviye 3) -> update `docs/ui-contract/governance/deviation-log.md`
 6. Auth/security model change -> update `docs/security/APPLICATION_SECURITY_ARCHITECTURE.md`
 7. Deprecated/removed surface -> update `docs/AI_Governance/DEPRECATED_MODULES.md`
-8. Any task completion (always) -> update `docs/opendevcon/PROJECT_STATE.md` and append `docs/opendevcon/PROGRESS_LOG.md`
+8. Any task completion (always) -> update `docs/opendevcon/METNEX_STATE.md` and append `docs/opendevcon/PROGRESS_LOG.md`

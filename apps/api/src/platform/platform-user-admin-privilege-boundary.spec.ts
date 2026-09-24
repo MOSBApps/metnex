@@ -422,7 +422,7 @@ describe('static guarantees', () => {
   it('keeps every route permission and adds none', () => {
     const used = [...controller.matchAll(/@RequirePermission\('([^']+)'\)/g)].map(m => m[1] as string)
     for (const code of used) expect(BUILTIN_PERMISSIONS as readonly string[]).toContain(code)
-    expect(controller).toContain('@UseGuards(JwtAuthGuard, PermissionGuard)')
+    expect(controller).toContain('@UseGuards(JwtAuthGuard, PermissionGuard, MfaEnforcementGuard)')
     expect(used.filter(code => /MFA|PRIVILEGE|SYSTEM_ADMIN/.test(code))).toEqual([])
   })
 

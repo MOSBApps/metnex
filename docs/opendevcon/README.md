@@ -9,10 +9,10 @@ her görev sonunda bu klasördeki dosyaları güncellemekle yükümlüdür. Kura
 
 | File | Purpose |
 |---|---|
-| `PROJECT_STATE.md` | Tek kaynak, her zaman güncel özet durum (stage, aktif EPIC'ler, blocker'lar) |
+| `METNEX_STATE.md` | Tek kaynak, her zaman güncel özet durum (stage, aktif EPIC'ler, blocker'lar) |
 | `PROGRESS_LOG.md` | Append-only agent oturum kaydı — asla düzenlenmez, silinmez, sadece eklenir |
 
-Süreç detayı: `../runbooks/PROJECT_LIFECYCLE_AND_STATUS_RUNBOOK.md`.
+Süreç detayı: `../runbooks/METNEX_LIFECYCLE_AND_STATUS_RUNBOOK.md`.
 
 Not: `ODC.md` contract dosyası repo **kökünde** kalır (dış araçlar kontratı
 orada arar), bu klasörde değildir. `ODC.md` içindeki `documentation.state` ve

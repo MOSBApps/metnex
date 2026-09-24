@@ -72,6 +72,29 @@ describe('resolveNavModules — tenant scope', () => {
   })
 })
 
+/**
+ * TASK-027.54-R2 — the Raporlar (Reporting) sidebar entry, gated by the existing
+ * REPORT:ARTIFACT:VIEW permission (no new permission code introduced).
+ */
+describe('resolveNavModules — Raporlar (Reporting)', () => {
+  it('shows the Raporlar module, pointing at /app/reports, when REPORT:ARTIFACT:VIEW is granted', () => {
+    const modules = resolveNavModules(NAV_MODULES, ctx({ can: code => code === 'REPORT:ARTIFACT:VIEW' }))
+    const reporting = modules.find(m => m.key === 'REPORTING')
+    expect(reporting).toBeDefined()
+    expect(reporting?.sections[0]?.links[0]).toEqual({ label: 'Dashboard', href: '/app/reports' })
+  })
+
+  it('hides the Raporlar module for a user without REPORT:ARTIFACT:VIEW', () => {
+    const modules = resolveNavModules(NAV_MODULES, ctx({ can: code => code !== 'REPORT:ARTIFACT:VIEW' }))
+    expect(modules.find(m => m.key === 'REPORTING')).toBeUndefined()
+  })
+
+  it('never resolves Raporlar on the platform tenant (TENANT scope only)', () => {
+    const modules = resolveNavModules(NAV_MODULES, ctx({ isPlatformRoot: true, can: () => true }))
+    expect(modules.find(m => m.key === 'REPORTING')).toBeUndefined()
+  })
+})
+
 describe('resolveNavModules — platform scope', () => {
   it('gates each platform list link behind its own PLATFORM:*:VIEW permission', () => {
     const modules = resolveNavModules(

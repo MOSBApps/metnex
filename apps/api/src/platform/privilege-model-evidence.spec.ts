@@ -15,8 +15,8 @@ const production = walk(SRC).filter(f => f.endsWith('.ts') && !f.endsWith('.spec
 const read = (rel: string) => strip(readFileSync(join(SRC, rel), 'utf8'))
 
 describe('E1 — catalogue and built-in roles', () => {
-  it('has 30 catalogue permissions and exactly three built-in roles', () => {
-    expect(BUILTIN_PERMISSIONS).toHaveLength(30)
+  it('has 33 catalogue permissions and exactly three built-in roles (30 + TENANT:ROLE:VIEW/ASSIGN/REVOKE, TASK-027.49)', () => {
+    expect(BUILTIN_PERMISSIONS).toHaveLength(33)
     expect([...BUILTIN_ROLE_NAMES]).toEqual(['SYSTEM_ADMIN', 'TENANT_ADMIN', 'VIEWER'])
     expect(BUILTIN_ROLES.map(r => r.name)).toEqual(['SYSTEM_ADMIN', 'TENANT_ADMIN', 'VIEWER'])
   })
@@ -61,16 +61,29 @@ describe('E2 — how PermissionGuard resolves roles', () => {
   })
 })
 
-describe('E3 — tenant roles have no management surface', () => {
-  it('tenant_roles / tenant_role_permissions / user_tenant_role_assignments are only READ by production code (no insert/update/delete anywhere)', () => {
+describe('E3 — tenant-role management surface (TASK-027.49, Q-DP24 decision 8 closed)', () => {
+  it('the only writer of tenant_roles / tenant_role_permissions / user_tenant_role_assignments is TenantRoleService — no other production file inserts/updates/deletes them', () => {
     const writers = production.filter(file => {
       const source = strip(readFileSync(file, 'utf8'))
       return /\.(insert|update|delete)\(\s*(tenantRoles|tenantRolePermissions|userTenantRoleAssignments)\b/.test(source)
     })
-    expect(writers.map(f => f.replace(SRC + '/', ''))).toEqual([])
+    expect(writers.map(f => f.replace(SRC + '/', ''))).toEqual(['platform/tenant-role.service.ts'])
   })
 
-  it('customer-admin exposes no role or permission endpoint, so a customer admin cannot promote anyone', () => {
+  it('the write surface is gated by the new TENANT:ROLE:ASSIGN/REVOKE permissions, not PLATFORM:* or an ad hoc check', () => {
+    const controller = read('platform/tenant-role.controller.ts')
+    expect(controller).toContain("@RequirePermission('TENANT:ROLE:ASSIGN')")
+    expect(controller).toContain("@RequirePermission('TENANT:ROLE:REVOKE')")
+    expect(controller).not.toMatch(/RequirePermission\('PLATFORM:/)
+  })
+
+  it('every mutation re-verifies scope independently of PermissionGuard: CustomerAccessService.assertCustomerAdminScope, not just the route guard', () => {
+    const service = read('platform/tenant-role.service.ts')
+    expect(service).toContain('this.customerAccess.assertCustomerAdminScope(')
+    expect(service).toContain('IMPERSONATION_SESSION') // impersonation refused before scope is even resolved — via .deny() with a reason, not an inline throw
+  })
+
+  it('customer-admin still exposes no role or permission endpoint of its own, so a customer admin cannot promote anyone through that surface', () => {
     const controller = readFileSync(join(SRC, 'platform', 'saas.controller.ts'), 'utf8')
     const customerAdmin = controller.slice(controller.indexOf("@Controller('customer-admin')"))
     expect(customerAdmin).not.toMatch(/assignRole|revokeRole|@(Get|Post|Patch|Delete|Put)\('[^']*(role|permission)[^']*'\)/i)

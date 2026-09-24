@@ -277,3 +277,5 @@ Rules implemented today:
 - Performance diagnostics currently expose platform-global threshold and trace settings, not per-tenant overrides.
 - Super admin user-management surface is lighter than the full target model: role revoke, tenant membership removal, and richer detail tabs remain future work.
 - Governance source-of-truth now reflects the implemented foundation, but UI-contract compliance and permission-source normalization still need follow-up review.
+
+- **SCADA source catalog (TASK-027.63, in-memory only):** `CatalogSource` (opaque UUID id, versioned/immutable, physical database name kept as-is, verification `UNVERIFIED|VERIFIED|BLOCKED`, tenant mappings `UNRESOLVED|RESOLVED|BLOCKED`, source time zone, limit profile, declared tables/columns with per-column verification) lives under `apps/api/src/reporting/scada/catalog/`. No PostgreSQL table/migration exists yet; persistence, write permission (Q-W516) and audit action names (Q-W519) are pending. See DEC-0015/DEC-0016.

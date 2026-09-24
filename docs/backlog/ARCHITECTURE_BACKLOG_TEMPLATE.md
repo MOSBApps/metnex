@@ -1,4 +1,4 @@
-# Open Mas — Architecture Backlog Template
+# Metnex — Architecture Backlog Template
 
 **Status:** Planning Only
 **Purpose:** Capture architecture-level backlog items before implementation.

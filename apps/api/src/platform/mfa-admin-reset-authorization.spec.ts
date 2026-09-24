@@ -122,8 +122,11 @@ describe('an authorised system administrator keeps the existing behaviour', () =
     expect(update.set).toHaveBeenCalledWith(expect.objectContaining({ isEnabled: false, secretEncrypted: null, keyVersion: null, enabledAt: null }))
     expect(h.db.delete).toHaveBeenCalledTimes(1)
     expect(h.audit.log).toHaveBeenCalledTimes(1)
+    // ADMIN's own mfaEnabled is unset in the mocked row (Q-DP22c(1)): the reset is temporarily
+    // allowed but the audit records that the actor's own MFA was not enabled at the time.
     expect(h.audit.log).toHaveBeenCalledWith(expect.objectContaining({
-      actorId: 'admin-1', actionCode: 'MFA_ADMIN_RESET', entityType: 'UserMfaSettings', entityId: 'target-1', metadata: { targetUserId: 'target-1' },
+      actorId: 'admin-1', actionCode: 'MFA_ADMIN_RESET', entityType: 'UserMfaSettings', entityId: 'target-1',
+      metadata: { targetUserId: 'target-1', actorMfaBypassWarning: 'ACTOR_HAS_NO_MFA_ENABLED' },
     }))
   })
 
@@ -142,8 +145,41 @@ describe('an authorised system administrator keeps the existing behaviour', () =
     h.db.delete.mockReturnValueOnce(chain(undefined))
     await h.service.adminResetMfa('admin-1', null, 'target-1')
     const entry = (h.audit.log.mock.calls[0] as unknown[])[0] as Record<string, unknown>
-    expect(Object.keys(entry.metadata as object)).toEqual(['targetUserId'])
+    expect(Object.keys(entry.metadata as object).sort()).toEqual(['actorMfaBypassWarning', 'targetUserId'])
     expect(JSON.stringify(entry)).not.toMatch(/secret|otp|recovery|token|password|hash/i)
+  })
+})
+
+describe('Q-DP22c(1): actor mfaVerified requirement when the actor has MFA enabled', () => {
+  it('refuses (403) when the actor has MFA enabled but the session is not MFA-verified', async () => {
+    const h = harness()
+    h.db.select.mockReturnValueOnce(actorRow({ mfaEnabled: true }))
+    const error = await h.service.adminResetMfa('admin-1', null, 'target-1', { actorMfaVerified: false }).catch(e => e)
+    expect(error).toBeInstanceOf(ForbiddenException)
+    expect(h.db.update).not.toHaveBeenCalled()
+    expect(h.db.delete).not.toHaveBeenCalled()
+  })
+
+  it('the DENIED audit for an unverified MFA-enabled actor carries only the static reason, no target lookup happens', async () => {
+    const h = harness()
+    h.db.select.mockReturnValueOnce(actorRow({ mfaEnabled: true }))
+    await h.service.adminResetMfa('admin-1', null, 'target-1', { actorMfaVerified: false }).catch(() => undefined)
+    expect(h.db.select).toHaveBeenCalledTimes(1) // actor lookup only — target is never looked up
+    expect(h.audit.log).toHaveBeenCalledWith(expect.objectContaining({
+      actorId: 'admin-1', actionCode: 'MFA_ADMIN_RESET', entityId: 'target-1',
+      metadata: { result: 'DENIED', reason: 'ACTOR_MFA_NOT_VERIFIED' },
+    }))
+    expect(h.db.update).not.toHaveBeenCalled()
+    expect(h.db.delete).not.toHaveBeenCalled()
+  })
+
+  it('succeeds without the bypass warning when the actor has MFA enabled and the session is MFA-verified', async () => {
+    const h = harness()
+    h.db.select.mockReturnValueOnce(actorRow({ mfaEnabled: true })).mockReturnValueOnce(chain([{ id: 'target-1' }]))
+    h.db.update.mockReturnValueOnce(chain(undefined))
+    h.db.delete.mockReturnValueOnce(chain(undefined))
+    await expect(h.service.adminResetMfa('admin-1', null, 'target-1', { actorMfaVerified: true })).resolves.toEqual({ success: true })
+    expect(h.audit.log).toHaveBeenCalledWith(expect.objectContaining({ metadata: { targetUserId: 'target-1' } }))
   })
 })
 
@@ -153,7 +189,7 @@ describe('static guarantees', () => {
   const service = strip(readFileSync(join(__dirname, 'mfa.service.ts'), 'utf8'))
 
   it('the endpoint keeps authentication and refuses non-admins before the service call', () => {
-    const method = controller.slice(controller.indexOf("@Post('admin/:userId/reset')"), controller.indexOf("@Get('policy')"))
+    const method = controller.slice(controller.indexOf("@Post('admin/:userId/reset')"), controller.indexOf("@Get('policy/:tenantId')"))
     expect(method).toContain("@UseGuards(AuthGuard('jwt'))")
     expect(method.indexOf('if (!admin.isSystemAdmin) throw new ForbiddenException')).toBeGreaterThan(-1)
     expect(method.indexOf('isSystemAdmin')).toBeLessThan(method.indexOf('this.mfaService'))

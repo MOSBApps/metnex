@@ -13,7 +13,7 @@
     "Demo Operations & Reporting Foundation (HTML, PDF, XLSX)",
     "Glassmorphic Console UI (Next.js 15, Tailwind, React 19)",
     "PostgreSQL ICU collation (tr-TR) & Drizzle ORM standardı",
-    "ODC Governance Pipeline & Scripting (create-project.sh, check.sh)"
+    "ODC Governance Pipeline & Scripting (check.sh)"
   ],
   "outOfScope": [
     "Canlı Ödeme Sistemleri Entegrasyonu (Stripe/Iyzico)",

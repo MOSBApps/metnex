@@ -6,7 +6,7 @@ import { authenticator } from 'otplib'
 import * as QRCode from 'qrcode'
 import { PlatformAuditService } from '../audit/platform-audit.service'
 import { DB, type Db } from '../db/db.module'
-import { tenantSecuritySettings, userMfaRecoveryCodes, userMfaSettings, users } from '../db/schema'
+import { tenantSecuritySettings, userMfaRecoveryCodes, userMfaSettings, users, tenants } from '../db/schema'
 import { AuthService } from './auth.service'
 import { validateMfaPathId } from './domain/mfa-input.domain'
 import { PRIVILEGE_DENIAL } from './domain/privilege-ceiling.domain'
@@ -165,7 +165,7 @@ export class MfaService {
     actorId: string,
     tenantId: string | null,
     targetUserId: string,
-    context: { impersonation?: boolean; impersonatorUserId?: string | null } = {},
+    context: { impersonation?: boolean; impersonatorUserId?: string | null; actorMfaVerified?: boolean } = {},
   ): Promise<{ success: boolean }> {
     // Impersonation sessions never administer credentials (TASK-027.46): refused before any lookup, with a static code,
     // no detail about the target and only a best-effort DENIED audit (writeAudit never throws).
@@ -185,10 +185,29 @@ export class MfaService {
     // Nothing is written and nothing is audited before this check passes.
     const actorCheck = validateMfaPathId(actorId, 'Kullanıcı')
     const [actor] = actorCheck.valid
-      ? await this.db.select({ id: users.id, status: users.status, isSystemAdmin: users.isSystemAdmin }).from(users).where(eq(users.id, actorId)).limit(1)
+      ? await this.db
+          .select({ id: users.id, status: users.status, isSystemAdmin: users.isSystemAdmin, mfaEnabled: userMfaSettings.isEnabled })
+          .from(users)
+          .leftJoin(userMfaSettings, eq(userMfaSettings.userId, users.id))
+          .where(eq(users.id, actorId))
+          .limit(1)
       : []
     if (!actor || actor.status !== 'ACTIVE' || !actor.isSystemAdmin) {
       throw new ForbiddenException('Bu işlem için yetkiniz bulunmuyor')
+    }
+
+    // Q-DP22c(1): if the actor's own account has MFA enabled, this admin surface requires the
+    // current session to itself be MFA-verified (not just password-authenticated) — a stolen
+    // password-only session must not be able to strip another user's MFA. An actor who has not
+    // enabled MFA yet is temporarily allowed through (no bootstrap/recovery path would exist
+    // otherwise) but the allowance is recorded in the audit trail for later review.
+    const actorMfaEnabled = actor.mfaEnabled === true
+    if (actorMfaEnabled && context.actorMfaVerified !== true) {
+      await this.writeAudit({
+        actorId, tenantId, action: 'MFA_ADMIN_RESET', entityId: targetUserId,
+        newValue: { result: 'DENIED', reason: 'ACTOR_MFA_NOT_VERIFIED' },
+      })
+      throw new ForbiddenException('Bu işlem için mevcut oturumunuzun MFA ile doğrulanmış olması gerekiyor')
     }
 
     const targetCheck = validateMfaPathId(targetUserId, 'Kullanıcı')
@@ -219,7 +238,7 @@ export class MfaService {
       tenantId,
       action: 'MFA_ADMIN_RESET',
       entityId: targetUserId,
-      newValue: { targetUserId },
+      newValue: actorMfaEnabled ? { targetUserId } : { targetUserId, actorMfaBypassWarning: 'ACTOR_HAS_NO_MFA_ENABLED' },
     })
     this.logger.warn(`MFA admin reset: actor=${actorId} target=${targetUserId}`)
     return { success: true }
@@ -311,7 +330,30 @@ export class MfaService {
     return { recoveryCodes }
   }
 
-  async getTenantPolicy(tenantId: string): Promise<{ mfaRequired: boolean }> {
+  /**
+   * Fail-closed, controller-independent authorization for the tenant MFA policy surface
+   * (Q-DP22b): only an ACTIVE system administrator may read or change any tenant's policy. No
+   * per-tenant permission code exists for this yet (interim rule, same shape as Q-DP22 admin
+   * reset) — the actor is re-read from the database so a stale/forged JWT claim cannot authorize.
+   */
+  private async assertActingSystemAdmin(actorId: string): Promise<void> {
+    const actorCheck = validateMfaPathId(actorId, 'Kullanıcı')
+    const [actor] = actorCheck.valid
+      ? await this.db.select({ status: users.status, isSystemAdmin: users.isSystemAdmin }).from(users).where(eq(users.id, actorId)).limit(1)
+      : []
+    if (!actor || actor.status !== 'ACTIVE' || !actor.isSystemAdmin) {
+      throw new ForbiddenException('Bu işlem için yetkiniz bulunmuyor')
+    }
+  }
+
+  private async assertTenantExists(tenantId: string): Promise<void> {
+    const [tenant] = await this.db.select({ id: tenants.id }).from(tenants).where(eq(tenants.id, tenantId)).limit(1)
+    if (!tenant) throw new NotFoundException('Kiracı bulunamadı')
+  }
+
+  async getTenantPolicy(actorId: string, tenantId: string): Promise<{ mfaRequired: boolean }> {
+    await this.assertActingSystemAdmin(actorId)
+    await this.assertTenantExists(tenantId)
     const [row] = await this.db
       .select({ mfaRequired: tenantSecuritySettings.mfaRequired })
       .from(tenantSecuritySettings)
@@ -320,9 +362,12 @@ export class MfaService {
     return { mfaRequired: row?.mfaRequired ?? false }
   }
 
-  async setTenantPolicy(tenantId: string, mfaRequired: boolean, actorId: string): Promise<{ mfaRequired: boolean }> {
+  async setTenantPolicy(actorId: string, tenantId: string, mfaRequired: boolean): Promise<{ mfaRequired: boolean }> {
+    await this.assertActingSystemAdmin(actorId)
+    await this.assertTenantExists(tenantId)
+
     const [existing] = await this.db
-      .select({ tenantId: tenantSecuritySettings.tenantId })
+      .select({ tenantId: tenantSecuritySettings.tenantId, mfaRequired: tenantSecuritySettings.mfaRequired })
       .from(tenantSecuritySettings)
       .where(eq(tenantSecuritySettings.tenantId, tenantId))
       .limit(1)
@@ -339,6 +384,14 @@ export class MfaService {
         updatedBy: actorId,
       })
     }
+
+    await this.writeAudit({
+      actorId,
+      tenantId,
+      action: 'MFA_POLICY_UPDATED',
+      entityId: tenantId,
+      newValue: { mfaRequired, previous: existing?.mfaRequired ?? false },
+    })
 
     return { mfaRequired }
   }

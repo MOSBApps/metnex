@@ -1,6 +1,7 @@
 import { CanActivate, ExecutionContext, ForbiddenException, Inject, Injectable, SetMetadata } from '@nestjs/common'
 import { Reflector } from '@nestjs/core'
 import { and, eq, isNull } from 'drizzle-orm'
+import { PlatformAuditService } from '../audit/platform-audit.service'
 import { DB, type Db } from '../db/db.module'
 import { permissions, rolePermissions, systemRoles, tenantRolePermissions, tenantRoles, tenants, userSystemRoleAssignments, userTenantRoleAssignments } from '../db/schema'
 import { checkPermission } from './domain/permission.domain'
@@ -8,11 +9,22 @@ import { checkPermission } from './domain/permission.domain'
 export const PERMISSION_KEY = 'permission'
 export const RequirePermission = (permission: string) => SetMetadata(PERMISSION_KEY, permission)
 
+/**
+ * TASK-027.57 — reporting export ("REPORT:ARTIFACT:EXPORT") is the one permission code this guard
+ * audits a denial for. This is deliberately narrow: `PermissionGuard` is shared by nearly every
+ * protected endpoint in the platform, and this task only asked for export's permission/audit
+ * contract — auditing every denial platform-wide would be a much bigger, unrequested behavior
+ * change. The actual authorization decision below is completely unchanged for every permission
+ * code, including this one; only a best-effort audit write is added on the deny path.
+ */
+const AUDITED_DENIAL_PERMISSIONS = new Set(['REPORT:ARTIFACT:EXPORT'])
+
 @Injectable()
 export class PermissionGuard implements CanActivate {
   constructor(
     private readonly reflector: Reflector,
     @Inject(DB) private readonly db: Db,
+    private readonly auditService: PlatformAuditService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -25,6 +37,7 @@ export class PermissionGuard implements CanActivate {
     const request = context.switchToHttp().getRequest<{
       user?: { id: string; isSystemAdmin: boolean }
       headers?: Record<string, string | undefined>
+      params?: Record<string, string | undefined>
     }>()
     const tenantId = request.headers?.['x-tenant-id']
     const user = request.user
@@ -82,7 +95,36 @@ export class PermissionGuard implements CanActivate {
     }
 
     const result = checkPermission(codes, required)
-    if (!result.granted) throw new ForbiddenException(`Permission required: ${required}`)
+    if (!result.granted) {
+      if (AUDITED_DENIAL_PERMISSIONS.has(required)) {
+        await this.writeExportDenialAudit(user.id, tenantId, request.params)
+      }
+      throw new ForbiddenException(`Permission required: ${required}`)
+    }
     return true
+  }
+
+  // Best-effort: an audit-write failure must never itself change the (already-decided) deny
+  // outcome. entityId falls back to 'unknown' rather than throwing if the route has no :code
+  // param — this guard is generic and must not assume every audited route shares reporting's
+  // exact param names.
+  private async writeExportDenialAudit(userId: string, tenantId: string | undefined, params: Record<string, string | undefined> | undefined): Promise<void> {
+    try {
+      await this.auditService.log({
+        actorId: userId,
+        actionCode: 'REPORT_EXPORT_DENIED',
+        entityType: 'ReportArtifact',
+        entityId: params?.['code'] ?? 'unknown',
+        summary: 'Export reddedildi: REPORT:ARTIFACT:EXPORT izni yok',
+        metadata: {
+          tenantId: tenantId ?? null,
+          format: params?.['format'] ?? null,
+          result: 'DENIED',
+          reasonCode: 'PERMISSION_DENIED',
+        },
+      })
+    } catch {
+      // logged inside PlatformAuditService already; nothing else to do here
+    }
   }
 }

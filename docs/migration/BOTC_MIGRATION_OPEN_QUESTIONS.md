@@ -1234,3 +1234,482 @@ Açık: kontrollü yerel DB smoke test onayı (AI1/kullanıcı kararı bekliyor)
 
 **Güncelleme (TASK-027.47-R1, 2026-09-22) — kontrollü yerel DB smoke test TAMAMLANDI (kullanıcı onayıyla):** yukarıdaki "yapılmadı, onay bekliyor" maddesi kapatıldı. Kullanıcı onayı alındıktan sonra izole, tek seferlik, kalıcı volume'suz bir Postgres container'ı (`docker run --rm`) başlatıldı; `DATABASE_URL` yalnızca bu geçici container'a işaret etti (production'a hiç bağlanılmadı); tüm migration'lar (0000–0003) derlenmiş `dist/migrate.js` ile uygulandı; break-glass servisi gerçek `PlatformAuditService` ile birlikte örneklenip 15 senaryo elle tetiklendi — **15/15 geçti**, en önemlisi **gerçek eşzamanlı iki `recover()` çağrısının** aynı token üzerinde yarıştığı senaryoda yalnızca birinin başarılı olduğu, kaybeden çağrının `TOKEN_ALREADY_USED` ile reddedildiği doğrulandı (bu, mock'larla kanıtlanamayan tek senaryoydu). Audit tablosunda hiçbir credential bulunmadı. Container `docker stop` ile durduruldu (`--rm` ile otomatik silindi), kalıcı volume hiç oluşmadı. Tam sonuçlar `METNEX_PLATFORM_PRIVILEGE_MODEL_DECISION_PACKAGE.md` §14.11'de.
 Açık: TASK-027.48 (MFA enforcement), TASK-027.49 (tenant-rol delegasyonu), F6'nın kalan audit kapsamı, Q-DP22b/c, Q-DP21d, Q-DP17, Q-DP04, Q-ENV01, dev ROOT backfill, formal SYSTEM_ADMIN demotion yolu (kod değişikliği gerektirir, henüz tasarlanmadı), `BREAK_GLASS_RECOVERY_TOKEN` üretimi/saklanması ve runbook onayı (operasyonel, Ops/AI1/PO kararı).
+
+---
+
+## MFA Policy Activation ve Enforcement Geçişi — Q-DP22b/c KAPANDI (TASK-027.48, 2026-09-22)
+
+Karar paketleri (`METNEX_AUTHORIZATION_ENDPOINT_AUDIT_AND_MFA_POLICY_DECISION.md` §5–§6) Product
+Owner tarafından kapatıldı ve uygulandı. **Q-DP22b:** MFA policy route'ları `GET/PATCH
+auth/mfa/policy/:tenantId` olarak düzeltildi, `isSystemAdmin`-only yetki eklendi (controller +
+service'te bağımsız fail-closed kontrol), `MFA_POLICY_UPDATED` audit'i eklendi. **Q-DP22c:** admin
+MFA reset (`POST auth/mfa/admin/:userId/reset`) için tek yeni kural eklendi — aktörün kendi MFA'sı
+etkinse mevcut oturumun `mfaVerified` olması zorunlu (aksi halde 403 + `ACTOR_MFA_NOT_VERIFIED`
+audit'i); MFA'sı etkin olmayan aktör için geçici izin + `actorMfaBypassWarning` audit uyarısı
+kaydedilir. Self-reset ve impersonation reddi zaten TASK-027.46/47'den beri kod seviyesinde
+uygulanıyordu, bu task'ta değiştirilmedi (yalnızca teyit edildi).
+
+**Enforcement wiring (kullanıcı kararıyla, yalnızca hazırlık değil gerçek aktivasyon):**
+`MfaEnforcementGuard` + `@RequireMfaSetupComplete()`, `docs/runbooks/MFA_ENFORCEMENT_ROUTE_MATRIX.md`'de
+listelenen tüm korumalı controller'lara uygulandı (platform/roles/tenants/users/saas,
+customer-admin, reports, platform/settings, tenant settings, admin/perf, platform-audit-logs,
+auth/change-password). MFA akışının kendisi, kimlik bootstrap'i (`auth/me`, `platform/me/*`) ve
+login/logout **bilinçli olarak muaf** tutuldu — aksi halde hiç kimse MFA kurulumunu
+tamamlayamazdı.
+
+**Kritik bulgu ve kapatılması — web'de MFA setup UI hiç yoktu:** implementasyona başlamadan önce
+`totp/setup`/`totp/verify-setup`/`mfa/status`'ı çağıran hiçbir web bileşeni bulunmadığı, ayrıca
+login'in `requiresMfa` yanıtını hiç ele almadığı tespit edildi — bu haliyle enforcement açılsaydı
+gerçek bir kilitlenme (task'ın kendi kritik güvenlik kuralının ihlali) olurdu. Kullanıcı "MFA'yı
+komple geliştir" kararıyla kapsamı genişletti: `apps/web/src/app/(app)/app/settings/security/page.tsx`
+(TOTP kurulum/QR/kurtarma kodu/devre dışı bırakma/yenileme) ve login sayfasının MFA challenge
+adımı (TOTP veya kurtarma kodu) eklendi; `apps/web/src/lib/api.ts` merkezi `request()` artık
+`MFA_SETUP_REQUIRED`/`MFA_SESSION_NOT_VERIFIED` 403'lerini yakalayıp otomatik yönlendiriyor.
+
+**Yan bulgu (kod düzeltmesi):** `POST auth/mfa/challenge/verify` yalnızca body'de
+`{accessToken, refreshToken}` döndürüyordu, httpOnly refresh cookie'sini hiç set etmiyordu — login
+ile aynı sözleşmeye getirildi (`POST auth/login`'in kullandığı cookie kodu `auth.controller.ts`'ten
+export edilip paylaşıldı), aksi halde MFA ile giren bir kullanıcı sayfa yenilemesinde oturumunu
+kaybederdi.
+
+**Geçiş stratejisi:** setup-required (kullanıcı kararı) — kademeli rollout veya grace period
+uygulanmadı; MFA'sı gerekli ama kurulu olmayan kullanıcı yalnızca MFA setup akışına yönlendirilir,
+kilitlenmez.
+
+**Doğrulama:** yeni `apps/api/src/platform/guards/mfa-enforcement.guard.spec.ts` (10 test, guard'ın
+kendi karar ağacı); `endpoint-authorization-inventory.spec.ts` snapshot'ı 91 endpoint'e güncellendi
+(guard sessizce kaldırılır/eklenirse kırılır); `mfa-admin-reset-authorization.spec.ts`,
+`authorization-audit-findings.spec.ts`, `mfa-settings-perf-validation.spec.ts`,
+`platform-user-admin-privilege-boundary.spec.ts`, `platform-dto-validation.spec.ts` güncellendi.
+`pnpm --filter api exec jest --runInBand` → **54 suite / 1520 test PASS**;
+`pnpm --filter api exec eslint "src/**/*.ts"` temiz; `pnpm --filter web exec tsc --noEmit` temiz;
+`pnpm --filter web run test` (vitest) → 8 dosya / 117 test PASS; `pnpm run build` → api + web
+PASS. `./scripts/check.sh --skip-docker` lint adımı apps/web'in önceden var olan
+`eslint-plugin-react-hooks` çözümleme sorunuyla (TASK-027-36'da kayıtlı, bu task'tan bağımsız)
+durdu — audit/typecheck adımları PASS, kalan adımlar yukarıdaki gibi elle doğrulandı. Gerçek
+DB/HTTP/MFA sağlayıcısı kullanılmadı; enforcement gerçek ortamda henüz hiç çalıştırılmadı. Git
+commit/push yapılmadı.
+
+Açık: Q-DP22a (kalıcı permission modeli), TASK-027.49 (tenant-rol delegasyonu), F6'nın kalan audit
+kapsamı, Q-DP21d, Q-DP17, Q-DP04, Q-ENV01, dev ROOT backfill, formal SYSTEM_ADMIN demotion yolu,
+`BREAK_GLASS_RECOVERY_TOKEN` üretimi/saklanması ve runbook onayı.
+
+## Task ID Normalizasyonu — 2026-09-22
+
+`TASK-027.49` tenant-role delegation kimliği olarak korunmuştur. Aynı kimliği
+kullanan export placeholder'ları kaldırılmış, Wave 5 grafik/export zinciri
+`TASK-027.54`–`TASK-027.59` aralığına normalize edilmiştir.
+Önceki tarihsel kayıtlar append-only kuralı gereği değiştirilmedi.
+
+---
+
+## Tenant-Role Delegation ve Tenant Permission Yönetimi — Q-DP24 madde 8 KAPANDI (TASK-027.49, 2026-09-22)
+
+Task'ın kendi "zorunlu başlangıç kapısı" gereği implementasyondan önce gerçek permission
+katalogu ve `PermissionGuard` çözümleme mantığı incelendi: **tenant-role delegation için onaylı
+bir permission kodu yoktu** (`TENANT:ROLE:*` katalogda yoktu; bu belgede tekrar tekrar "açık"
+olarak listelenmişti — bkz. yukarıdaki tüm "Açık:" satırları). Task kuralı gereği kod
+uydurulmadı; 10 karar sorusu Product Owner'a AskUserQuestion ile soruldu, kararlar alındıktan
+sonra implementasyon başladı.
+
+**Kararlar (Product Owner):** permission kodları `TENANT:ROLE:VIEW`/`ASSIGN`/`REVOKE` (mevcut
+`PLATFORM:ROLE:*` deseniyle tutarlı, üç ayrı kod); atama yetkisi o customer root'un
+`TENANT_ADMIN`'i + sistem yöneticisi (gerçek delegasyon — `assertCustomerAdminScope` yeniden
+kullanıldı); kendine atama izinli (yalnızca ceiling ile sınırlı); tenant rolleri yalnızca
+customer root düzeyinde (child tenant'a özel rol yönetimi yok); rol kaldırma için "son tenant
+yöneticisi" invariant'ı **gerekli** — yeni `tenant_roles.isAdminRole` boolean kolonu (migration
+`0004_tenant_role_admin_flag.sql`) ile işaretlenen rolün bir tenant'taki son ACTIVE ataması
+kaldırılamaz.
+
+**Uygulama:** yeni `apps/api/src/platform/tenant-role.{controller,service}.ts`,
+`domain/tenant-role-ceiling.domain.ts` (SYSTEM_ADMIN/TENANT_ADMIN ceiling modelinden ayrı, pure
+fonksiyon — TASK-027.46'nın `privilege-ceiling.domain.ts`'i değiştirilmedi). Route:
+`tenant-roles[/assignable|/users/:userId[/:assignmentId]]`, `X-Tenant-Id` header ile (mevcut
+`settings/*` deseni), tam guard zinciri + TASK-027.48 MFA enforcement kapsamına da eklendi. Her
+mutasyon impersonation reddi → actor DB'den ACTIVE yeniden okuma → `assertCustomerAdminScope` ile
+bağımsız scope teyidi → işleme-özel kural sırasıyla fail-closed. Duplicate atama, DB'nin gerçek
+unique constraint'i (`user_tenant_role_assignments_userId_roleId_key`) üzerinden
+`onConflictDoNothing()` ile race-safe şekilde 409'a çevriliyor (uygulama-seviyesi check-then-insert
+değil).
+
+**Bilinçli kapsam dışı:** tenant rolü oluşturma/düzenleme endpoint'i (task'ın kendi sözleşmesi
+yalnızca listeleme/atama/kaldırmayı istiyordu — `tenant_roles` satırları hâlâ ayrı bir
+mekanizmayla oluşturulmalı); web UI (task metninde MFA'daki gibi açık bir UI talebi yoktu, ikisi
+de ayrı follow-up olabilir); Global role/SYSTEM_ADMIN/TENANT_ADMIN sistem-rol ataması (bu yüzey
+yalnızca `tenant_roles`/`user_tenant_role_assignments` tablolarına dokunuyor, `system_roles`/
+`user_system_role_assignments` hiç dokunulmadı — yapısal olarak erişilemez).
+
+**Doğrulama:** yeni `tenant-role-ceiling.domain.spec.ts` (13 test), `tenant-role.service.spec.ts`
+(27 test) + `endpoint-authorization-inventory.spec.ts`/`privilege-model-evidence.spec.ts`
+güncellendi (E1: 30→33 katalog; E3 "tenant roles have no management surface" artık "tenant-role
+management surface" olarak yeniden yazıldı — TenantRoleService'in tek yazıcı olduğunu doğruluyor).
+**4 mutasyon kontrolü bizzat çalıştırılıp doğrulandı ve geri alındı:** scope kontrolü kaldırılınca
+12 test, impersonation reddi kaldırılınca 2 test, privilege ceiling kaldırılınca 2 test, duplicate/
+idempotency kontrolü kaldırılınca 1 test kırıldı. `pnpm --filter api exec jest --runInBand` → **57
+suite / 1570 test PASS**; api eslint/tsc temiz. Gerçek DB/HTTP kullanılmadı (tüm testler mock'lu);
+migration `drizzle-kit generate` ile üretildi, gerçek ortama uygulanmadı. Git commit/push
+yapılmadı.
+
+Açık: F6'nın kalan audit kapsamı, Q-DP21d, Q-DP17, Q-DP04, Q-ENV01, dev ROOT backfill, formal
+SYSTEM_ADMIN demotion yolu, `BREAK_GLASS_RECOVERY_TOKEN` üretimi/saklanması ve runbook onayı,
+tenant rolü oluşturma/düzenleme endpoint'i (bu task'ın bilinçli kapsam dışı bıraktığı, ayrı bir
+follow-up gerektiren madde).
+
+---
+
+## Tenant-Role Delegation — AI1 review düzeltmeleri (TASK-027.49, ikinci tur, 2026-09-22)
+
+TASK-027.49'un ilk teslimi AI1 tarafından `review`'da tutuldu; genel mimari doğru bulundu ama iki
+teknik nokta düzeltme olarak istendi: (1) son-tenant-yöneticisi sayımı kullanıcının `status`'unu
+filtrelemiyordu — pasif/kilitli bir kullanıcının `isAdminRole` ataması "hâlâ bir yönetici var"
+sanılabiliyordu; (2) kontrol ile silme arasında atomiklik yoktu — paralel iki revoke isteği aynı
+anda kontrolü geçip son iki yöneticiyi birlikte kaldırabilirdi.
+
+**Düzeltmeler:** `revokeRole`'daki son-yönetici sayımı artık kilitli atamaların sahibi
+kullanıcıları ayrıca `users.status = 'ACTIVE'` ile sorguluyor. `isAdminRole` yolunda tüm kontrol +
+silme artık tek bir `db.transaction()` içinde; tenant'taki tüm `isAdminRole` atamaları
+`SELECT ... FOR UPDATE` ile kilitleniyor (break-glass'ın TASK-027.47'de kurduğu aynı desen).
+Admin-flagged olmayan revoke'lar için transaction/kilit yükü eklenmedi.
+
+**Doğrulama:** 3 yeni test (pasif kullanıcı sayılmıyor, `status='ACTIVE'` filtresinin statik
+kontrolü, transaction+FOR UPDATE'in statik+davranışsal kontrolü). 2 mutasyon kontrolü bizzat
+çalıştırılıp doğrulandı ve geri alındı: `eq(users.status,...)` kaldırılınca 1 statik test,
+`.for('update')` kaldırılınca 1 test kırıldı. `pnpm --filter api exec jest --runInBand` → **57
+suite / 1573 test PASS**; `NODE_PATH=... TURBO_ENV_MODE=loose ./scripts/check.sh --skip-docker`
+→ tam PASS (lint dahil).
+
+**Açık kalan (bilinçli, onay bekliyor):** gerçek Postgres'te paralel iki revoke isteğinin
+gerçekten serileştiği canlı bir smoke test (TASK-027.47-R1'deki break-glass smoke testine benzer,
+geçici/izole bir Postgres container'ı gerektirir) bu turda çalıştırılmadı — istenirse ayrı bir
+kullanıcı onayıyla eklenebilir.
+
+Açık: F6'nın kalan audit kapsamı, Q-DP21d, Q-DP17, Q-DP04, Q-ENV01, dev ROOT backfill, formal
+SYSTEM_ADMIN demotion yolu, `BREAK_GLASS_RECOVERY_TOKEN` üretimi/saklanması ve runbook onayı,
+tenant rolü oluşturma/düzenleme endpoint'i, gerçek Postgres paralel-revoke smoke testi onayı.
+
+## TASK-027.58'de Yeni Tespit Edilen Sorular (Q-SP serisi — SCADA güvenlik/performans test sözleşmesi)
+
+- **Q-SP01 — SCADA okuma zincirinin eksik halkaları:** SQL Server adapter'ı, kaynak kataloğu, allowlist
+  veri modeli, dinamik sorgu sözleşmesi ve limitler hiç implement edilmedi (TASK-027.31–36 ID'leri başka
+  işler için kullanıldı). Wave 5 SCADA işleri bu halkalar olmadan başlayamaz; hangi task ID'leriyle yeniden
+  planlanacağı AI1 kararıdır. Bağlı: Q-M05, Q-SC02, Q-SC03, Q-AD01.
+- **Q-SP02 — Sayısal performans eşikleri:** sorgu timeout'u, satır/kolon/payload sınırı, azami tarih aralığı,
+  pool boyutu, eşzamanlılık sınırı ve retry politikası için sözleşmede sayı yok; test sözleşmesi bilerek
+  sayı içermez (limitler dışarıdan verilir, eksik limit hata). Değerleri PO/AI1 belirler.
+- **Q-SP03 — `scrubSecrets` kapsamı (F-1):** paylaşılan audit redaction yalnızca kısa bir anahtar listesini
+  maskeliyor; connectionString/secret/cookie/otp/host/rawSql/schemaName ve değer içi connection string
+  maskelenmiyor. Genişletme paylaşılan davranış değişikliğidir; yapılırsa 7 `it.failing` test normal teste çevrilmeli.
+- **Q-SP04 — DEC-0014 ile migration kodu (F-2):** DEC-0014 MOSEDAŞ'ı tenant saymıyor; identity migration
+  kodu (`ApprovedTenantSlug = MOSB | MOSEDAS | MOSBIO`, kapsam/mapping) hâlâ üç tenant varsayıyor. Bu kodun
+  ve Q-M02/Q-SC01/Q-V20/Q-V25'teki "MOSEDAŞ tenant'ı" ifadelerinin DEC-0014'e göre hizalanması AI1 kararıdır.
+  Not: Q-SC01'deki "MOSEDAŞ mı MOSB mı" sorusu DEC-0014 ile yeniden çerçevelenmelidir.
+
+| Q-SP01 | SCADA adapter/katalog/allowlist/dynamic query/limit halkaları yok | Wave 5 SCADA implementasyonu | **Evet** |
+| Q-SP02 | SCADA sayısal performans eşikleri | Adapter limitleri | **Evet** (PO) |
+| Q-SP03 | scrubSecrets kapsamı dar | Audit redaction | Hayır (AI1 kararı) |
+| Q-SP04 | DEC-0014 vs migration kodu (MOSEDAS slug) | Kimlik migration hizalaması | **Evet** (AI1) |
+
+## TASK-027.58-R1'de Yeni Tespit Edilen Sorular (Q-SR / Q-SA serisi — scrubber kalan sınırı, slug hizalaması, SCADA audit)
+
+- **Q-SR01 — `scrubSecrets` kalan sınırı:** scrubber R1'de genişletildi (istenen anahtar sınıfları, normalize
+  eşleşme); hâlâ yalnızca **anahtar** bazlı. Karar bekleyenler: değerin içine gömülü connection string/`Bearer …`
+  taraması; `rawSql`, `schemaName`, `server`, `datasource`, `uid` anahtarları. SCADA audit'i alan-allowlist'iyle
+  inşa edildiğinden buna bağımlı değil. (Q-SP03 R1'de büyük ölçüde kapandı — kalanı Q-SR01.)
+- **Q-SP04 (güncelleme) / Q-SP04b — DEC-0014 hizalaması:** (a) identity migration `ApprovedTenantSlug` kümesi
+  (`MOSB`,`MOSEDAS`,`MOSBIO`) DEC-0014 ile çelişiyor; (b) `MOSB` slug'ının DEC-0014'teki "MOSB Enerji" tenant'ına
+  karşılığı belirsiz; (c) `DISCOVERY.md` iç çelişkili (satır 68/686 tenant değil, 164/198/251/410 tenant);
+  **Q-SP04b** MOSEDAŞ'a atanacak BOTC kullanıcılarının Metnex'teki hedefi (MOSEDAŞ tenant değil). Tam envanter:
+  `backlog/TASK-027-58-R1-scada-contract-closure.md` §2. Q-M02/Q-SC01/Q-V20/Q-V25'teki "MOSEDAŞ tenant'ı"
+  ifadeleri DEC-0014 ile yeniden çerçevelenmelidir (tarihsel kayıtlara dokunulmadı).
+- **Q-SA01–Q-SA07 — SCADA audit sözleşmesi:** action adı(lar)ı ve permission ilişkisi; entityType/entityId; tenant/
+  root kapsamı, satır birimi (kaynak başına mı) ve görünürlük (audit okuma yalnızca sistem yöneticisine açık);
+  source key kaydı ve E9 dışı alanlar (tarih aralığı/satır sayısı/süre); Q-AD01 (genel/ayrı/hibrit + saklama);
+  başarı/ret/hata davranışı (limit aşımı DENIED mı FAILED mı, fail-open/closed, örnekleme, iptal); correlation-id
+  kaynağı (bugün yok). Detay: `docs/migration/METNEX_SCADA_AUDIT_CONTRACT_DECISION_PACKAGE.md`.
+
+| Q-SR01 | scrubSecrets kalan sınırı (değer taraması, rawSql/schemaName…) | Audit redaction | Hayır (AI1) |
+| Q-SP04b | MOSEDAŞ kullanıcılarının hedefi (tenant yok) | Kimlik migration hizalaması | **Evet** (AI1/PO) |
+| Q-SA01–07 | SCADA audit sözleşmesi kararları | Wave 5 SCADA audit implementasyonu | **Evet** (AI1/PO) |
+
+## TASK-027.62'de Yeni Tespit Edilen Sorular (Q-W5 serisi — Wave 5 Hourly Consumption görev bölme)
+
+BOTC `HourlyConsumptionWindow` (`../BOTC/BOT/HourlyConsumptionWindow.xaml.cs`, `BOT.Services/Reports/ReportService.cs`, `BOT.Domain/VirtualColumn.cs`) kaynak koddan okunarak SRS FEAT-008…017 ile karşılaştırıldı; aşağıdaki noktalar SRS’te tanımsız (TBD) ya da BOTC ile **çelişiyor**. Hiçbiri implementation kararı olarak yazılmadı; ilgili Wave 5 task’ları `planned` kalır. Ayrıntı ve BOTC↔SRS karşılaştırma tablosu: `backlog/TASK-027-62-wave5-hourly-consumption-task-decomposition.md`.
+
+- **Q-W501** — Endeks saatlik delta semantiği: BOTC `LEAD(sonraki) − mevcut` ↔ SRS FR-025 “saatin son − ilk endeksi” (etkilenen: TASK-027.65/.66)
+- **Q-W502** — Sayaç devri/reset kuralı ve veri kalite bayrakları (BOTC: SQL negatif→0 + istemci `<−50 → +100000`, ad tabanlı) (etkilenen: TASK-027.66/.67)
+- **Q-W503** — Gerçek Değer davranışı (BR-004): günlük −30 dk kayması, SUM vs ortalama, tablo-adı tabanlı varsayılan (etkilenen: TASK-027.63/.66/.67)
+- **Q-W504** — Sanal kolon kuralları: operatör/fonksiyon, sıfıra bölme/null/negatif/NaN/∞, sonuç sınırı, derinlik (TBD-W5-001..004) (etkilenen: TASK-027.70)
+- **Q-W505** — Sanal kolon ve preset saklama yeri (control-plane mı data-plane mi), sahiplik, paylaşım, kullanıcı silinince (etkilenen: TASK-027.70/.71)
+- **Q-W506** — Preset kapsamı: karşılaştırma ve ölçek ayarı kaydı; aynı ad üzerine yazma; göreceli aralık (etkilenen: TASK-027.70/.71/.73)
+- **Q-W507** — Dönem karşılaştırması eşleme kuralı (BOTC pozisyonel satır eşleme), farklı uzunluk (etkilenen: TASK-027.69)
+- **Q-W508** — İkinci kaynak zaman eşleme (BR-005 TBD) (etkilenen: TASK-027.69)
+- **Q-W509** — İstatistik kuralı: minimum yalnız >0 mı (TBD-W5-005), null/boş davranışı (etkilenen: TASK-027.68/.73)
+- **Q-W510** — Ölçek kuralları: BOTC otomatik limit formülü ve özel maksimum sıfırlama birebir mi (FR-043) (etkilenen: TASK-027.68/.73)
+- **Q-W511** — Analiz yetkisi: mevcut `REPORT:ARTIFACT:VIEW/EXPORT` yeterli mi, SCADA’ya özel izin mi (yeni izin uydurulmaz) (etkilenen: TASK-027.63/.65/.69/.70/.71/.72/.74)
+- **Q-W512** — Zaman modeli: saat dilimsiz `datetime`, tarih+saat birleştirme, DST, sınır ve tampon kuralları (etkilenen: TASK-027.64/.65/.66/.69)
+- **Q-W513** — Export için çok-seri veri şeması (`ReportDatasetRow` finans-şekilli), PDF’te grafik, XLSX düzeni (etkilenen: TASK-027.74)
+- **Q-W514** — E2E kabulün gerçek (test) SQL Server/PostgreSQL/Jasper/tarayıcı ortamı gerektirmesi ve onayı (etkilenen: TASK-027.59)
+- **Q-W515** — Katalog/allowlist veri modeli ve yönetimi (config mi DB mi, kim değiştirir, kaynak↔tenant eşleme kaynağı) (etkilenen: TASK-027.63)
+
+**Not (kanıt):** Q-W501 gerçek bir çelişkidir — BOTC saatlik değeri `LEAD(sonraki okuma) − mevcut okuma` ile (satır t = sonraki okumaya kadarki tüketim, +2 saat sorgu tamponu, son satır 0) hesaplar; SRS FR-025 "saatin son endeksi − ilk endeksi" der. Q-W502: BOTC iki ayrı mekanizma kullanır (SQL negatif→0; istemcide adı Turbin/Fark/(S) olan kolonlarda `< −50 ise +100000`) ve sayaç başına azami değer verisi kaynakta yoktur. Q-W504: BOTC sanal kolon sonucunu negatif/NaN/∞/`> 50000` için sessizce 0 yapar ve formülü `DataTable.Compute` ile çalıştırır.
+
+| Q-W501 | Endeks saatlik delta semantiği: BOTC `LEAD(sonraki) − mevcut` ↔ SRS FR-025 “saatin son − ilk endeksi” | TASK-027.65/.66 | **Evet** (ilgili task ready olmadan önce) |
+| Q-W502 | Sayaç devri/reset kuralı ve veri kalite bayrakları (BOTC: SQL negatif→0 + istemci `<−50 → +100000`, ad tabanlı) | TASK-027.66/.67 | **Evet** (ilgili task ready olmadan önce) |
+| Q-W503 | Gerçek Değer davranışı (BR-004): günlük −30 dk kayması, SUM vs ortalama, tablo-adı tabanlı varsayılan | TASK-027.63/.66/.67 | **Evet** (ilgili task ready olmadan önce) |
+| Q-W504 | Sanal kolon kuralları: operatör/fonksiyon, sıfıra bölme/null/negatif/NaN/∞, sonuç sınırı, derinlik (TBD-W5-001..004) | TASK-027.70 | **Evet** (ilgili task ready olmadan önce) |
+| Q-W505 | Sanal kolon ve preset saklama yeri (control-plane mı data-plane mi), sahiplik, paylaşım, kullanıcı silinince | TASK-027.70/.71 | **Evet** (ilgili task ready olmadan önce) |
+| Q-W506 | Preset kapsamı: karşılaştırma ve ölçek ayarı kaydı; aynı ad üzerine yazma; göreceli aralık | TASK-027.70/.71/.73 | **Evet** (ilgili task ready olmadan önce) |
+| Q-W507 | Dönem karşılaştırması eşleme kuralı (BOTC pozisyonel satır eşleme), farklı uzunluk | TASK-027.69 | **Evet** (ilgili task ready olmadan önce) |
+| Q-W508 | İkinci kaynak zaman eşleme (BR-005 TBD) | TASK-027.69 | **Evet** (ilgili task ready olmadan önce) |
+| Q-W509 | İstatistik kuralı: minimum yalnız >0 mı (TBD-W5-005), null/boş davranışı | TASK-027.68/.73 | **Evet** (ilgili task ready olmadan önce) |
+| Q-W510 | Ölçek kuralları: BOTC otomatik limit formülü ve özel maksimum sıfırlama birebir mi (FR-043) | TASK-027.68/.73 | **Evet** (ilgili task ready olmadan önce) |
+| Q-W511 | Analiz yetkisi: mevcut `REPORT:ARTIFACT:VIEW/EXPORT` yeterli mi, SCADA’ya özel izin mi (yeni izin uydurulmaz) | TASK-027.63/.65/.69/.70/.71/.72/.74 | **Evet** (ilgili task ready olmadan önce) |
+| Q-W512 | Zaman modeli: saat dilimsiz `datetime`, tarih+saat birleştirme, DST, sınır ve tampon kuralları | TASK-027.64/.65/.66/.69 | **Evet** (ilgili task ready olmadan önce) |
+| Q-W513 | Export için çok-seri veri şeması (`ReportDatasetRow` finans-şekilli), PDF’te grafik, XLSX düzeni | TASK-027.74 | **Evet** (ilgili task ready olmadan önce) |
+| Q-W514 | E2E kabulün gerçek (test) SQL Server/PostgreSQL/Jasper/tarayıcı ortamı gerektirmesi ve onayı | TASK-027.59 | **Evet** (ilgili task ready olmadan önce) |
+| Q-W515 | Katalog/allowlist veri modeli ve yönetimi (config mi DB mi, kim değiştirir, kaynak↔tenant eşleme kaynağı) | TASK-027.63 | **Evet** (ilgili task ready olmadan önce) |
+
+## Q-E04 Kapandı — SCADA Modülünün Yeri (AI1/PO kararı, 2026-09-23)
+
+**Karar:** SCADA/DMS analiz işleri **reporting altında, ayrı bir SCADA bounded module** olarak konumlanır (mevcut `apps/api/src/reporting/` kapsamı içinde kendi sınırı olan ayrı bir modül; reporting çekirdeğine gömülmez, ayrı üst düzey platform modülü de açılmaz). Bu karar yalnızca **modülün yerini** kapatır; kesin dizin/dosya adları TASK-027.63 uygulanırken belirlenir. Kararın içeriği kullanıcı mesajından alınmıştır; başka bir karar bu kayda dahil değildir.
+
+| Q-E04 | Kapandı — reporting altında ayrı SCADA bounded module | TASK-027.63–027.74 | — |
+
+## AI1/PO Karar Kapanışları — Wave 5 Hourly Consumption ve SCADA (2026-09-23)
+
+Aşağıdaki kararlar **AI1/Product Owner kararıdır, bağlayıcıdır** (öneri değil). Tam metin ve sonuçlar: `docs/decisions/DEC-0015-wave5-hourly-consumption-and-scada-decisions.md`. Önceki girdiler (soru metinleri, TASK-027.58/R1/62 kayıtları) append-only ilkesiyle **değiştirilmemiştir**; bu bölüm onları **kapatır**. Q-E04 zaten yukarıda kapatılmıştı; aşağıda dizin yerleşimiyle tamamlanmıştır.
+
+### Q-W501 Kapandı — Karar A
+Endeks saatlik değeri `LEAD(sonraki okuma) − mevcut okuma`. Her okuma kendisinden sonraki aralığın başlangıcı sayılır; SRS FR-025 bu davranışa hizalanacaktır; son okumada sonraki veri yoksa **sentetik delta üretilmez**; negatif fark/devir → Q-W502.
+### Q-W502 Kapandı — Karar B
+Sayaç devri **kaynak/kolon katalog yapılandırmasıyla**. Kolon adına göre otomatik karar yok; sabit `+100000` taşınmaz; devri tanımsız negatif fark sessizce 0 yapılmaz, veri kalite uyarısıyla işaretlenir; devir değeri kaynak/kolon bazında.
+### Q-W503 Kapandı — Karar C
+Gerçek Değer davranışı katalog + analiz parametreleriyle. Tablo adına göre varsayım yok; saatlik/günlük işlem tipi katalogda; toplam/ortalama/min/max/zaman kaydırması parametrik; yeni parametreler katalog versiyonlarıyla.
+### Q-W504 Kapandı — Karar C
+Sanal kolon: kontrollü, allowlist tabanlı, **versiyonlu formül dili**. Serbest JS/SQL/`DataTable.Compute` yok; izinli operatör/fonksiyon/katalog kolonu; kayıt öncesi sözdizimi doğrulama; sıfıra bölme/null/NaN/∞/taşma/derinlik limitleri; hatalı sonuç sessizce 0 yapılmaz; formüller versiyonlanır ve audit edilir.
+### Q-W505 Kapandı — Karar B
+Sanal kolon ve preset metadata’sı **control-plane**’de; `tenantId` + `ownerUserId`; versiyonlama/audit/rollback; data-plane’e yeni payload tablosu yok.
+### Q-W506 Kapandı — Karar C
+`PRIVATE` ve `TENANT_SHARED` preset; paylaşım ayrıca yetki kontrolünden geçer; aynı ad sessizce üzerine yazılmaz; versiyonlu; karşılaştırma, ölçek, filtre ve sanal kolon referansları saklanır.
+### Q-W507 Kapandı — Karar B
+Dönem karşılaştırması normalize zaman kovalarıyla; satır pozisyonu eşlemesi yok; eksik kova sessizce 0 yapılmaz; eşleşmeyenler veri kalite durumu.
+### Q-W508 Kapandı — Karar B
+Farklı kaynaklar normalize zaman kovalarıyla; satır sırası esas değil; gizli/otomatik tolerans yok (gerekirse kaynak kataloğunda açık); eşleşmeyen kovalar kalite durumuyla.
+### Q-W509 Kapandı — Karar C
+İstatistikler metrik ve kaynak katalog tanımına göre; min/max/toplam/ortalama ayrı kurallar; sıfırın anlamı kaynak/kolon politikasına göre; null/boş seri/eksik veri sessizce 0 yapılmaz; veri yoksa null/kalite durumu.
+### Q-W510 Kapandı — Karar C
+Otomatik ölçek varsayılan; kullanıcı ölçeği yalnızca izinli sınırlarda; geçersiz/aşırı değer reddedilir; otomatiğe dönüş açık işlem; ölçek yalnızca görsel; preset’te saklanabilir.
+### Q-W511 Kapandı — Karar C
+Katmanlı yetki: analiz görüntüleme/export için mevcut `REPORT:ARTIFACT:VIEW` / `REPORT:ARTIFACT:EXPORT`; SCADA kaynak/katalog/allowlist yönetimi analiz kullanıcılarına verilmez; yeni permission kodu uydurulmaz; kaynak yönetimi ayrı, daha yüksek yetkili platform operasyon kapsamı.
+### Q-W512 Kapandı — Karar C
+Kaynak saat dilimi katalogda; veri **UTC’ye normalize**; ekranda **tenant saat diliminde**; naive datetime belirsizliği taşınmaz; saat dilimi bilinmeyen kaynak fail-closed; DST açıkça ele alınır; başlangıç/bitiş sınırları ve sorgu tamponu sözleşmede tanımlı.
+### Q-W513 Kapandı — Karar C
+Versiyonlu normalize analiz sonucu sözleşmesi (zaman kovası, seri, ham/analiz/karşılaştırma değeri, kalite durumu tipli); grafik, tablo, CSV, PNG, PDF, XLSX aynı sonucu tüketir; hesap tek sözleşmeden.
+### Q-W514 Kapandı — Karar B
+Wave 5 kabulü kontrollü, izole, **sentetik verili** test ortamında (test SQL Server/eşdeğeri, PostgreSQL, Jasper, browser); production verisi/secret yok; Docker/gerçek servis çalıştırma ayrıca açık kullanıcı onayına bağlı; production kabulü kapsam dışı.
+### Q-W515 Kapandı — Karar B
+SCADA kaynak/tablo/kolon allowlist’i **control-plane DB’de versiyonlu ve audit’li**; kaynak, tablo, kolon, zaman, ölçüm ve analiz parametreleri merkezi katalogda; kaynak↔tenant eşlemesi katalog sözleşmesinin parçası; yalnızca yetkili platform operasyonları değiştirir; tek doğruluk kaynağı.
+### Q-SC01 Kapandı — Karar C
+**MOSEDAS tenant değildir.** DB adı ve varlık sahipliği tenant otoritesi değildir; SCADA kaynağı yalnızca onaylı operasyon mapping’iyle tenant kapsamına girer; mapping yoksa `UNRESOLVED/BLOCKED`; MOSEDAS kaynak adı olarak kalabilir, tenant olarak oluşturulamaz.
+### Q-SC02 Kapandı — Karar C
+Yeni **allowlist tabanlı SCADA adapter**; `DynamicDataSources`/hardcoded `FromSqlRaw` taşınmaz (yalnızca referans); profiller control-plane katalogdan; browser’dan raw SQL/identifier yok; canlı `INFORMATION_SCHEMA` keşfi yok.
+### Q-SC03 Kapandı — Karar B
+SCADA için **ayrı analiz veri sözleşmesi**; `ReportDatasetProvider` finansal/genel raporlar için korunur; ortak tenant/audit/export/reporting altyapısı yeniden kullanılır.
+### Q-SP02 Kapandı — Karar B
+Performans eşikleri kod içine sabitlenmez; ortam/kaynak profilinden yapılandırılır; **eksik/geçersiz limit → fail-closed ret**; production/test farklı değer alabilir; limit değişiklikleri versiyon + audit.
+### Q-SP04 Kapandı — Karar B
+MOSEDAS aktif Metnex tenant hedeflerinden çıkarılır; fiziksel DB/tarihsel referans olarak belgelerde kalabilir; **otomatik MOSB eşlemesi yok**; mapping yoksa `UNRESOLVED/PENDING_MAPPING`; `DISCOVERY.md` iç çelişkisi ayrı doküman düzeltmesiyle.
+### Q-SP04b Kapandı — Karar C
+MOSEDAS ilişkili kullanıcılar otomatik tenant’a atanmaz; gerekirse identity-only staging; membership `UNRESOLVED/PENDING_MAPPING`; parola `RESET_REQUIRED`; onaylı mapping olmadan login/runtime erişimi yok; BEAM/ERP bilgisi tenant yetkisi yerine kullanılamaz.
+### Q-SA01 / D1 Kapandı — Karar A
+Audit action’ları: `SCADA_QUERY_SUCCEEDED`, `SCADA_QUERY_DENIED`, `SCADA_QUERY_FAILED` (permission kodu değildir).
+### Q-SA02 / D2 Kapandı
+`entityType = ScadaAnalysisQuery`; `entityId = katalog kaydı UUID’si` (fiziksel adlar audit’e girmez; source key entity ID olamaz).
+### Q-SA03 / D3 Kapandı
+Kapsam = `tenantId` + gerektiğinde `customerRootTenantId`; kaynak başına bir audit satırı; görünürlük = mevcut sistem yöneticisi audit görünürlüğü; kaynak sahibi tenant audit kapsamını belirlemez.
+### Q-SA04 / D4 Kapandı
+Yalnızca güvenli katalog referansı (bilinen kaynak için UUID; kapsam dışı/bilinmeyen için source key `null`); sınırlı metadata `rowCount`, `columnCount`, `durationMs`, `limitReason`; tarih aralığı, kolon/tablo adı, ham filtre, SQL, credential tutulmaz; audit nesnesi allowlist ile kurulur.
+### Q-SA05 / Q-AD01 Kapandı — Karar A
+İlk aşamada mevcut `platform_audit_logs`; yeni SCADA audit tablosu/migration yok; hacim artarsa partition/retention ayrı karar.
+### Q-SA06 / D6 Kapandı
+D6.1 limit aşımı = `DENIED`; D6.2 her başarılı sorgu audit edilir; D6.3 audit yazımı başarısızsa işlem **fail-closed** (sonuç dönmez); D6.4 eşzamanlılık reddi audit edilir; D6.5 iptaller audit edilir (sonuç durumu `CANCELLED`); audit SQL/satır/credential/ham kaynak bilgisi içermez.
+### Q-SA07 / D7 Kapandı — Karar A
+Correlation/event ID sunucuda ortak mekanizmayla üretilir; istemci header’ı güvenilir değildir; servis/audit/uygulama log zincirinde aynı ID.
+### Q-SR01 Kapandı — Karar B
+Katmanlı redaction: allowlist ile nesne kurma + hassas anahtar maskeleme + değer içine gömülü connection string/Bearer/credential desenleri + `rawSql`/`schemaName`/`server`/`datasource`/`uid` redaksiyonu; `userId`/`targetUserId`/`tenantId` gibi meşru kimlikler maskelenmez. (Genişletme henüz bir task’a bağlanmadı.)
+### Q-M05 Kapandı — Karar C
+İlk sürümde **canlı read-only SQL Server sorgusu**; PostgreSQL’e kopyalama yok; sıkı limitler; gerçek performans ölçümü toplanır; cache/read-model ihtiyacı ayrı karar/task; ilk sürümde cache/fan-out yok.
+### Q-E04 (tamamlama) — Kapandı
+`apps/api/src/reporting/` altında `dataset/` (mevcut genel/finansal) ve `scada/` (SCADA katalog, adapter, analiz sözleşmeleri) ayrımı; ayrı veri sözleşmesi ve adapter portu; ortak tenant/audit/export/reporting altyapısı.
+
+### Kararların yan etkisi — TASK-027.58 sözleşme varsayımları
+Test-only referans model ve audit matrisi şu varsayımlarla yazılmıştı: limit aşımı `FAILED`, audit yazım hatası **fail-open**, audit alanları yalnızca altı alan, kaynak `sourceKey` string, istemci correlation id, tek test etiketi. Kararlar bunları değiştirir (D6.1 → `DENIED`, D6.3 → fail-closed, D4 → ek metadata + katalog UUID, D7 → sunucu üretimi, D1 → `SCADA_QUERY_*`). Sözleşme suite/matris **TASK-027.64 içinde** güncellenir; bu kayıt testleri değiştirmedi.
+
+## TASK-027.62 Karar Kapanışlarından Doğan Yeni Sorular (Q-W516–Q-W522)
+
+- **Q-W516** — Katalog/allowlist **yönetim yetkisi**: “daha yüksek yetkili platform operasyon kapsamı” mevcut hangi izin/rolle ifade edilecek (yeni permission kodu uydurulmaz; Q-W511 C). Etkilenen: TASK-027.63 (yazma yüzeyi), 027.72.
+- **Q-W517** — `TENANT_SHARED` preset’i paylaşma/yönetme yetkisi hangi mevcut izinle sınırlanacak (Q-W506 C, Q-W511 C). Etkilenen: 027.71, 027.72, 027.73.
+- **Q-W518** — **Tenant saat dilimi kaynağı:** `tenants` şemasında saat dilimi alanı yok; “tenant saat diliminde gösterim” (Q-W512 C) için kaynak/migration gerekir. Etkilenen: 027.73 (ve olası ayrı task).
+- **Q-W519** — Katalog, sanal kolon ve preset **değişiklik** audit’i action/entity adları (`SCADA_QUERY_*` yalnızca sorgu için); formül metninin audit’e yazılıp yazılmayacağı. Etkilenen: 027.63, 027.70, 027.71.
+- **Q-W520** — `CANCELLED` sonucunun hangi action koduyla audit edileceği ve güncel `reasonCode` sözlüğü (üç action tanımlı; limit aşımı artık `DENIED`). Etkilenen: 027.64, 027.72.
+- **Q-W521** — Sorgu tamponu ve sınır kuralı **değerleri** (BOTC referansı: +2 saat, +30 dk, 59. dakika +1 dk); sözleşmede tanımlanacak, değer onayı gerekir (Q-W512 C). Etkilenen: 027.65, 027.66.
+- **Q-W522** — Tanımlı devri olmayan **negatif farkın çıktıdaki değeri** (ham negatif korunur mu, null mu) ve istatistik/grafik davranışı (Q-W502 B, Q-W509 C). Etkilenen: 027.66, 027.67, 027.68.
+
+| Q-W516 | Katalog yönetim yetkisi (mevcut izin/rol eşlemesi) | TASK-027.63/.72 | **Evet** (027.63 yazma yüzeyi için) |
+| Q-W517 | TENANT_SHARED preset yönetim yetkisi | TASK-027.71–.73 | **Evet** (027.71 ready öncesi) |
+| Q-W518 | Tenant saat dilimi kaynağı | TASK-027.73 | **Evet** (027.73 ready öncesi) |
+| Q-W519 | Değişiklik audit’i adları / formül metni | TASK-027.63/.70/.71 | **Evet** (027.63 audit’i için) |
+| Q-W520 | CANCELLED action kodu ve reasonCode sözlüğü | TASK-027.64/.72 | **Evet** (027.64 ready öncesi) |
+| Q-W521 | Tampon/sınır kuralı değerleri | TASK-027.65/.66 | **Evet** (027.65 ready öncesi) |
+| Q-W522 | Negatif fark çıktı değeri | TASK-027.66/.67/.68 | **Evet** (027.66 ready öncesi) |
+
+## TASK-027.63 Appsettings Envanteri Entegrasyonunda Yeni Tespit Edilen Sorular (Q-W523–Q-W525)
+
+Kaynak: `../BOTC/BOT/appsettings.json` (canonical) salt-okuma incelemesi; karşılaştırma `bin/Debug`, `bin/Release` ve iki `publish` kopyasıyla. **Hiçbir credential değeri bu kayda veya task dosyasına yazılmamıştır.** Envanter: `backlog/TASK-027-63-scada-source-catalog.md` (“BOTC kaynak envanteri”).
+
+- **Q-W523 — BOTC deposunda düz metin credential (bilgi/uyarı, Metnex kapsamı dışı):** canonical `BOT/appsettings.json` ve `publish` kopyaları `DynamicDataSources[]` ve `ConnectionStrings` bağlantı dizelerini **düz metin** (sunucu/veritabanı/kullanıcı/parola tokenları okunabilir), `Telegram:BotToken`’ı token biçiminde ve diğer gizli ayarları (parola tuzu, SMTP) taşır; yalnızca `bin/Debug` ve `bin/Release` kopyalarındaki `DynamicDataSources` değerleri şifreli/opaktır. Credential rotasyonu ve ifşa değerlendirmesi bu görevin **kapsamı dışındadır ve yapılmamıştır**; karar/uyarı PO/AI1’dedir. Metnex tarafında bu değerler kataloğa, migration’a, seed’e, loglara ve raporlara **taşınmaz**.
+- **Q-W524 — Kolon/şema doğrulama süreci:** katalogdaki tüm tarih/saat kolonları (`TableDateMappings`, 7 tablo) yalnızca BOTC yapılandırma iddiasıdır (`UNVERIFIED`); gerçek SQL Server şeması görülmeden doğrulanmış sayılmaz. **Hangi süreçle** (kim, ne zaman, hangi ortam — Q-W514 B’nin kontrollü test ortamı mı, ayrı read-only metadata onayı mı) `VERIFIED` yapılacağı karar bekliyor. Debug kopyası `sg_endeksler`, `komur_endeksler`, `gt_endeksler` için saat alanını `KAYIT_TARIHI` (canonical: `KAYIT_SAATI`) veriyor; Debug dosyası daha eskidir, hangisinin şemaya uyduğu doğrulanamaz. İki tablonun (`MUSTERI_CEKIS_SAATLIK`, `Saatlik_Ort_Veriler`) fiziksel kaynağı da kanıtsızdır (Q-S03).
+- **Q-W525 — Boşluk içeren fiziksel DB adı:** `MOSB ENERJI DB` adı boşluk içerir; TASK-027.58 referans modelindeki katı identifier kuralı (`[A-Za-z_][A-Za-z0-9_]*`) bu adı reddeder. Katalog identifier politikası (öneri: bracket-quoted **tam eşleşmeli allowlist**, `]`/`;`/tırnak/yorum karakterleri yasak, kullanıcı girdisinden identifier yok) AI1 teyidi ister; TASK-027.64 sözleşme testleri buna göre güncellenir.
+
+| Q-W523 | BOTC düz metin credential’lar (rotasyon/ifşa değerlendirmesi; Metnex dışı) | Bilgi/uyarı | **Hayır** (PO bilgilendirme) |
+| Q-W524 | Kolon/şema doğrulama süreci + Debug↔canonical saat alanı farkı | TASK-027.63/.64/.59 | **Evet** (027.64 gerçek veri erişimi öncesi) |
+| Q-W525 | Boşluklu DB adı için identifier politikası | TASK-027.63/.64 | **Evet** (027.63 implementation öncesi teyit) |
+
+## AI1/PO Karar Kapanışları — Q-W524, Q-W525 ve Q-W523 Devri (2026-09-23)
+
+Bağlayıcı karar; tam metin: `docs/decisions/DEC-0016-scada-catalog-verification-and-physical-identity.md`.
+
+### Q-W524 Kapandı — Kontrollü read-only preflight doğrulaması
+Katalog kaydı başlangıçta `UNVERIFIED`; kullanıcı kaynak/kolon keşfi yapamaz; adapter yalnızca allowlist’i okur; yetkili ve kontrollü bir **read-only preflight** bağlantıyı, database/schema/table/column varlığını, tarih/saat kolonlarını ve veri tiplerini doğrular; başarılı doğrulama sonrası kayıt `VERIFIED`; doğrulanmamış kayıt sürücüye gönderilmez; serbest şema keşfi yok; **gerçek preflight ayrı açık onay olmadan çalıştırılmaz.**
+### Q-W525 Kapandı — Fiziksel isim korunur, katalog kimliği ayrılır
+`MOSB ENERJI DB` değiştirilmez ve otomatik reddedilmez; fiziksel ad yalnızca onaylı kaynak profilinde; kullanıcıdan database adı alınmaz; kaynak profili **opaque katalog ID’siyle** seçilir; SQL identifier ham kullanıcı girdisiyle oluşturulmaz (gerekirse driver’ın güvenli identifier mekanizması); ad `MOSB_ENERJI_DB` gibi normalize edilip farklı bir database varmış gibi davranılmaz.
+### Q-W523 Devredildi
+TASK-027.63 kapsamı değil; **ayrı credential rotation/security task’ı** (`backlog/TASK-027-75-botc-plaintext-credential-rotation-security.md`, `planned`). Düz metin credential’lar Metnex’e taşınmaz; gerçek rotasyon ayrıca açık onay ister.
+
+| Q-W524 | Kapandı — kontrollü read-only preflight | TASK-027.63/.64/.59 | — |
+| Q-W525 | Kapandı — fiziksel isim korunur, opaque katalog ID | TASK-027.63/.64 | — |
+| Q-W523 | Devredildi — TASK-027.75 (credential rotation/security) | TASK-027.75 | Ayrı onay |
+
+## 2026-09-23 — AI1 Kararı: Q-W520 kapandı; TASK-027.64 R1 kararları
+- **Q-W520 (kapandı):** `CANCELLED` için ayrı action kodu yok; iptal `action=SCADA_QUERY_FAILED`, `reasonCode=CANCELLED`, çağırana `CANCELLED`. Yeni action uydurulmaz.
+- **Geçersiz katalog UUID:** `entityId=null`, `reasonCode=INVALID_CATALOG_ID`, `action=SCADA_QUERY_DENIED`; nil UUID/ham girdi yok. **Yeni açık nokta:** `platform_audit_logs.entityId` `NOT NULL` — eşleyici geçici olarak `''` yazar; gerçek `null` için sütun nullable kararı/migration'ı ayrıca gerekir.
+- **Schema:** VERIFIED katalog kaydının zorunlu alanı; `dbo` varsayılanı yok; schema yoksa UNVERIFIED/BLOCKED; gerçek preflight schema/table/column varlığını doğrular.
+- **Eski TASK-027.58 suite'i** DEC-0015'e hizalanacak (R1'de yapıldı).
+
+## 2026-09-23 — TASK-027.65 teslimi sırasında ortaya çıkan açık noktalar (yeni sorular; Q-W521/Q-W522 açık kalır)
+- **Q-W526** — Servis-seviyesi retlerin (adapter'a hiç gitmeyen: geçersiz istek, katalog kapıları, aralık/tampon) audit'i: `SCADA_QUERY_DENIED` için ortak audit portu serviste de kullanılsın mı? Etkilenen: 027.65, 027.72.
+- **Q-W527** — Adapter tarih koşulunun kaynak-yerel naif DATE/TIME kolonlarına karşı davranışı (gün hizalama, saat dilimi çevirisi); gerçek preflight/sürücü turunda çözülmeli. Etkilenen: 027.64 takibi, 027.65.
+- **Q-W528** — `runMany`'de okunamayan kaynak için davranış (hariç tut + raporla vs. tümünü reddet) ve pencere sınır kuralı (yarı-açık `[start,end)`); Q-W521'in "59. dakika +1 dk" kuralı ile birlikte. Etkilenen: 027.65, 027.66.
+- **Q-W529** — DST belirsiz/boşluk saatlerinin nihai davranışı (bugün: ilk oluşum + `UNVERIFIED`; boşluk → `INVALID`, geçici işaretler) ve tamponun `REAL_VALUE` için de zorunlu olup olmadığı. Etkilenen: 027.65, 027.67.
+
+## 2026-09-23 — TASK-027.65 R1: AI1 karar önerileri işlendi (Q-W526–Q-W529)
+- **Q-W526 (kapandı, AI1):** Query Service dahil tüm retler audit edilir; audit tek üst orkestrasyon sınırında (`ScadaAnalysisQueryService`) üretilir, adapter ile çift kayıt yok; audit yazılamazsa fail-closed (`SCADA_AUDIT_FAILED`, hata listesine ek statik kod).
+- **Q-W527 (kapandı, AI1):** adapter kaynak saat dilimi + güvenli (kaynak-yerel, kayıpsız) sorgu penceresi kullanır; parametreler naif string + açık tip; sürücüye özel varsayım yok.
+- **Q-W528 (kapandı, AI1):** açık çok-kaynaklı istekte tek ret tüm isteği bloklar (`EXPLICIT`); root aggregation'da her kaynak ayrı durumla raporlanır, unresolved kaynak veri üretmez (`ROOT_AGGREGATION`).
+- **Q-W529 (kapandı, AI1):** ileri tampon yalnızca INDEX için zorunlu; REAL_VALUE için eklenmez.
+- **Q-W521 (AÇIK — kısmi):** yarı-açık `[start, end)` pencere uygulanan kural olarak kayda geçti; **"59. dakika +1 dk" kuralının içeriği/değeri** ve tampon **değeri** AI1'den bekleniyor (uydurulmadı).
+- **Q-W522 (AÇIK):** ham negatif değer korunur; nihai çıktı davranışı 027.66/027.67 ile birlikte karara bağlanacak.
+- **Q-W529b (AÇIK, yeni):** DST belirsiz/boşluk saatlerinin nihai davranışı (bugün geçici işaretler: ilk oluşum+`UNVERIFIED`, boşluk→`INVALID`) — TASK-027.67 ile.
+
+## 2026-09-23 — AI1 Kararı: Q-W521 kapandı; TASK-027.65 R2 düzeltmeleri
+- **Q-W521 (kapandı):** iç aralık daima `[startAt, endAt)`; kapsayıcı bitiş dakikası (12:59 → 13:00 exclusive) UI/query sınırında **açıkça** dönüştürülür, serviste gizli/koşulsuz +1 dk yok; `forwardBufferMs` yalnızca INDEX için zorunlu, REAL_VALUE için eklenmez, kodda sabitlenmez, eksikse konfigürasyon hatası.
+- **`SCADA_AUDIT_FAILED` reddedildi:** yeni action yok → `SCADA_QUERY_FAILED` + `reasonCode=AUDIT_FAILED`. **`MULTI_SOURCE_REQUEST_BLOCKED`** = reason code (`SCADA_QUERY_DENIED`).
+- **Q-W522 (korundu):** tanımlı devri olmayan negatif fark: `rawValue` korunur, `deltaValue=null`, `dataQuality=COUNTER_RESET_UNRESOLVED`, `isComplete=false`. **DST:** geçici işaretler (tekrar eden saat `UNVERIFIED`, olmayan saat `INVALID`) kabul; nihai politika TASK-027.67 (Q-W529b açık).
+
+## 2026-09-24 — TASK-027.67: Q-W522 ve Q-W529b uygulandı
+- **Q-W522 (uygulandı):** tanımlı sayaç devri yoksa `rawValue` korunur, `deltaValue=null`, `dataQuality=COUNTER_RESET_UNRESOLVED`, `isComplete=false`; geçersiz policy aynı sonucu `POLICY_INVALID` ile verir; geçerli policy `COUNTER_RESET_RESOLVED`+`isComplete=true`, version izlenir. Devir yalnızca açık policy ile (kolon adı/sabit değer yok).
+- **Q-W529b (uygulandı, AI1 kararı — task yetkili):** tekrar eden yerel saat → iki okuma ayrı, `DST_AMBIGUOUS`, UTC sıralı; var olmayan yerel saat → taşınmaz/düşürülmez, `DST_NONEXISTENT`; saat dilimi tanımsız → `TIMEZONE_UNVERIFIED`, production analizi yok.
+- **Yeni açık noktalar:** kalite önem sırası ve `FIXED_MAXIMUM`/`MODULO` formüllerinin AI1 onayı; policy'lerin katalogdan gelişi/saklanması (Q-W516) ve kalite servisinin engine/query zincirine bağlanması (027.72).
+
+## 2026-09-24 — TASK-027.67 R1: AI1 kararı (DST çözümsüz saat) ve yeni açık nokta
+- **Q-W529b (netleşti, AI1):** gerçek UTC/fold bilgisi yoksa tekrar eden yerel saat okumaları **aynı UTC'ye yazılmaz**, delta üretilmez, `analysisAllowed=false`, `dataQuality=DST_AMBIGUOUS`, çözümleme `UNRESOLVED`; kaynak fold/offset verirse doğru UTC'ye çevrilir, vermezse tahmin yok. (Uygulandı: 027.65 `occurredAtUtc=null`+`dstCandidatesUtc`, 027.67 `dstStatus`.)
+- **Q-W529c (AÇIK, yeni):** (a) katalog/kaynak modelinde tekrar eden saati ayırt edecek **offset/fold kolonunun** tanımı (bugün yok → üretimde çözümsüz kalır); (b) var olmayan yerel saat (`GAP`) için de "tahmini an atanmaz" ilkesinin uygulanıp uygulanmayacağı (bugün: sıçrama öncesi offset ile geçici an + `INVALID`).
+
+## 2026-09-24 — AI1 Kararı: Q-W529c (GAP) kapandı; TASK-027.67 R2
+- **Q-W529c / GAP (kapandı, AI1):** var olmayan yerel saat → `occurredAtUtc=null`, `analysisAllowed=false`, `DST_NONEXISTENT`, delta yok, etkilenen komşu delta'lar da yok; sıçrama öncesi/sonrası offset ile tahmini UTC atanmaz; kayıt silinmez, `localWallTime` korunur, `dstCandidatesUtc` boş. (Uygulandı: 027.65 `dstUncertainRangeUtc`, 027.67 komşu-delta bloğu.)
+- **Q-W529c / fold-offset kolonu (AÇIK):** tekrar eden yerel saati ayırt edecek offset/fold bilgisinin katalog/kaynak modelinde tanımı; bugün yok → üretimde ambiguous çözümsüz kalır.
+
+## 2026-09-24 — TASK-027.68 teslimi sırasında ortaya çıkan açık soru
+- **Q-W530** — `ready` spesifikasyonu ölçek önerisi (Q-W510 C), istatistik başına sıfır politikası (Q-W509 C "min yalnızca >0" gibi) ve renk atamasını kapsamadı: bunlar 027.68'e ek iş mi, 027.72/027.73'e mi ait? Ayrıca özel ölçek için **izinli sınırların kaynağı** (katalog alanı önerisi) hâlâ karar bekliyor. Etkilenen: 027.68 (ek), 027.71 (preset), 027.73.
+
+## 2026-09-24 — AI1 Kararı: Q-W530 yönlendirildi
+Ölçekleme ve renk ataması → TASK-027.73; özel ölçek sınırlarının kaynağı → 027.73 öncesi UI sözleşmesinde netleşecek (**açık**); istatistik sıfır politikası 027.68'de uygulanmış kabul edildi.
+
+## 2026-09-24 — TASK-027.69 teslimi sırasında ortaya çıkan açık sorular
+- **Q-W531** — (a) **Dönem modunda kova eşleştirme anahtarı:** iki farklı dönemin kovaları aynı `bucketStartUtc`'ye sahip olamayacağından spesifikasyondaki anahtar literal uygulanamadı; dönem başına **yerel duvar-saati offset**i normalizasyon olarak seçildi (DST'de yerel saat hizalı). Onay/alternatif (ör. takvim tabanlı: gün-ayın-saati) gerekir. (b) **"Mutlak fark"** işaretli fark mı, büyüklük mü (`absoluteDelta` işaretli; özet `total/average/max` işaretli, `largestMagnitudeDelta` büyüklük). Etkilenen: 027.69, 027.73.
+
+## 2026-09-24 — AI1 Kararı: Q-W531 kapandı
+(a) Dönem modu hizalaması: `seriesKey` + dönem başlangıcına göre yerel duvar saati farkı + `bucketInterval` (dizi indeksi yok). (b) `absoluteDelta` işaretli kalır; "en yüksek mutlak fark" büyüklüğe göre = kanonik `largestMagnitudeDelta`; `maxAbsoluteDelta` → `maxSignedDelta`.
+
+## 2026-09-24 — TASK-027.70 teslimi sırasında ortaya çıkan açık sorular
+- **Q-W532** — (a) Sanal kolon kalite durumları (`VIRTUAL_COLUMN_INPUT_UNRESOLVED`, `VIRTUAL_COLUMN_DIVISION_INVALID`) merkezi 027.67 sabitine eklendi; önem sırası yerleşimi (`DIVISION_INVALID` `INVALID_NUMERIC_VALUE` altında, `INPUT_UNRESOLVED` nedenlerinin altında/`MISSING_VALUE` üstünde) AI1 onayı bekliyor. (b) Sanal kolon audit'i best-effort port; gerçek yazma yüzeyinde fail-closed olup olmayacağı ve action adları (Q-W519). (c) İfade limitlerinin (`VirtualColumnLimits`) üretimdeki kaynağı. (d) Anı olmayan girdi + birden çok ACTIVE sürümde noktadaki `version=null` davranışı. Etkilenen: 027.70, 027.71, 027.72.
+
+## 2026-09-24 — AI1 Kararı: Q-W532 kapandı
+Sanal kolon kalite durumları merkezi kümede kalır, önerilen önem sırası korunur; audit davranışı → TASK-027.72; ifade limit kaynağı → katalog/API tasarımı; belirsiz zaman noktasında `version=null` kabul.
+
+
+## 2026-09-24 — TASK-027.71 teslimi sırasında ortaya çıkan açık sorular
+- **Q-W517 (hâlâ açık)** — `TENANT_SHARED` paylaşma/yönetme yetkisi: motor yalnızca `PresetAuthorizationPort` çağırır, port yoksa reddeder; hangi mevcut izin olacağı 027.72 öncesi kararlaştırılmalı (izin uydurulmadı).
+- **Q-W533** — (a) spec hata listesine `PRESET_NOT_ACTIVE` eklendi (pasif/etkin sürümü olmayan preset için); (b) preset `timezone`'ı her kaynağın doğrulanmış diliminine eşit olmalı, aksi `PRESET_TIMEZONE_UNVERIFIED` (sessiz dönüşüm yok); (c) filtre (`qualityStates`, `onlyAnalysisAllowed`) ve display (`chartType`, `tableOptions`) allowlist içerikleri; (d) `PresetLimits` kaynağı (katalog/API tasarımı). Onay/karar gerekir.
+
+## 2026-09-24 — AI1 Kararı: Q-W517 ve Q-W533 kapandı
+Q-W517: PRIVATE owner; TENANT_SHARED aynı customer-root; paylaşma/değiştirme/silme customer-root TENANT_ADMIN veya sistem yöneticisi; kullanma `REPORT:ARTIFACT:VIEW`; yeni permission yok. Q-W533: `PRESET_NOT_ACTIVE` korunur, timezone kaynaklarla eşleşmek zorunda, allowlist'ler kabul, `PresetLimits` env/source profile'dan (eksik ⇒ blok).
+
+## 2026-09-24 — TASK-027.72 teslimi sırasında ortaya çıkan açık sorular
+- **Q-W534** — Zincir ve semantik seçimleri onay ister: (a) analiz zinciri 027.65 → **027.67 kalite** → 027.68 (DAILY için `rollUpToDaily`); 027.66 toplama motoru zincire alınmadı (027.67 DST/roll-over-farkında ve ham kayıtları doğrudan tüketiyor) ve kaynağın **saatlik okuma** ürettiği varsayıldı; (b) DAILY: INDEX ⇒ SUM, REAL_VALUE ⇒ katalog `dailyOperation` kuralı zorunlu (yoksa `SCADA_AGGREGATION_POLICY_REQUIRED`); (c) tek istekte karışık INDEX/REAL_VALUE reddedilir (`SCADA_MIXED_VALUE_TYPES`); (d) preset `filters.qualityStates` yalnız listelenen noktaları daraltır, istatistikler tüm aralıkta kalır; `onlyAnalysisAllowed` analiz edilemeyen serileri `excluded`'a taşır; (e) hata taksonomisi/HTTP eşlemesi (404 = bilinmeyen ve "senin değil", 409 alan reddi, 503 yapılandırma/kaynak/audit); (f) API düzeyi retler ve preset okumaları mevcut üç action ile audit edilir (`entityId=null` olabilir); preset okumaları için ayrı action adı Q-W519 kapsamında; (g) guard sırası platformdaki mevcut örnekten (`Jwt,HeaderFormat,Membership,Permission,Mfa`) bilerek farklı: spec sırası `Jwt→Mfa→HeaderFormat→Membership→Permission`; (h) ortam değişkeni adları (`SCADA_API_*`) ve dev-fixture limitlerinin dev-only olması.
+- **Q-W535** — Üretim provider'ları: katalog portu, 027.65 sorgu servisinin gerçek adaptörle kurulumu, preset/sanal-kolon depoları ve roll-over politikaları hangi task/kararla kaydedilecek? Kayıt olana dek tüm uçlar 503 `SCADA_SOURCE_NOT_CONFIGURED` döner (güvenli varsayılan). Ayrıca TENANT_SHARED paylaşma/değiştirme/silme uçları ve `PresetAuthorizationPort` adaptörü (TENANT_ADMIN/sistem yöneticisi) hangi CRUD task'ında?
+
+## 2026-09-24 — AI1 Kararı: Q-W534 kapandı, Q-W535 açık
+Q-W534: zincir 027.66 içerir; DAILY INDEX=SUM, REAL_VALUE için açık katalog policy şart; qualityStates yalnız görüntü; mevcut hata/action kodları; guard sırası ve 13 değişkenli limit modeli korunur. Q-W535: `TASK-027.72-R1` ile ele alınacak (blocker).
+
+## 2026-09-24 — TASK-027.72-R1 teslimi sırasında ortaya çıkan açık sorular
+- **Q-W536** — (a) Dev CSV fixture'ın kaynak saat dilimi: manifest `UNVERIFIED`; fixture yalnız dev-only `REPORTING_DEV_FIXTURE_SOURCE_TIMEZONE` ile dilim alır (yoksa analiz reddedilir). Bu değişken adı ve "manifest'e doğrulanmış dilim yazmama" tercihi onay ister; (b) 027.66 günlük kovayı yerel tarihin UTC gece yarısı ile etiketler (yerel gece yarısı anı değil). Motor değiştirilmedi; additive katman yerel gece yarısı anına çevirir. 027.66'nın kendi etiketinin düzeltilmesi ayrı karar; (c) 027.67'nin çözdüğü saatlik değer 027.66'ya `hourlyOperation: RAW` ile girer (delta tek yerde: 027.67); 027.66'nın kendi `LEAD_DELTA`/negatif-delta yolu API zincirinde kullanılmaz; (d) 027.65 `forwardBufferMs` (Q-W521) üretimde hâlâ açık; dev fixture 1 saat kullanır (yalnız dev); (e) fixture için kaynak listeleme ucu (ekran kaynak seçimi) yok — 027.73 için opak katalog UUID'lerinin nereden geleceği; (f) sorgu okuması başarılı olup sonrasında zincir hata verirse (nadir: kalite/aggregation istisnası) hem sorgu servisinin SUCCEEDED kaydı hem API'nin FAILED kaydı yazılır.
+- **Q-W535 (kalan)** — gerçek üretim provider'ları (SQL Server adaptörü, kalıcı katalog/preset/sanal-kolon/roll-over depoları) hâlâ kayıtsız; tarayıcıda gerçek veri bunlar olmadan yalnız dev fixture ile görünür.
+
+## 2026-09-24 — PO / AI1 Kararı: Q-W536 kararları ve TASK-027.72-R1 Onayı
+`TASK-027.72-R1` için `done` onayı verilmiştir.
+- **Q-W536 (Çözüldü):**
+  1. **Development timezone override:** Kabul edildi. `REPORTING_DEV_FIXTURE_SOURCE_TIMEZONE` yalnızca development fixture için geçerlidir. Production'da veya katalog doğrulaması yerine kullanılamaz.
+  2. **Günlük kova etiketi:** Yerel gün başlangıcının UTC karşılığı kullanılacak; timezone metadata'sı korunacak.
+  3. **Delta sorumluluğu:** Delta tek yerde, TASK-027.67 kalite/rollover katmanında hesaplanacak. TASK-027.66 zincirde yalnızca aggregation/bucket rolünü sürdürecek; ikinci kez delta hesaplamayacak.
+- **Q-W535 Durumu:** Gerçek SQL Server provider kısmı production blocker'ı olarak açık kalmaktadır; dev CSV fixture için API zinciri çalışır durumdadır.
+
+## 2026-09-24 — TASK-027.73-R1 teslimi sırasında ortaya çıkan açık sorular
+- **Q-W537** — (a) Dilim değişkeni yokken artifact listelenir ama `UNVERIFIED` + seçilemez (spec "üç koşulda etkin" ile "dilim yoksa keşif bloklanır" arasındaki yorum); yalnız üç koşulun tamamında listeleme istenirse tek satır değişir; (b) CSV kaynak/seri **valueType = INDEX** varsayıldı (endeks kolonları); REAL_VALUE kolonu tanımı manifest'te yok; (c) seri etiketi = kolon adı, birim son ek kuralından (`_KWH`, `_TON`, `_SM3`) türetilir — gerçek etiket/birim katalog kararı; (d) keşifte `schemaStatus` fixture için sabit `UNVERIFIED`; (e) SOURCE karşılaştırmasında ikinci kaynak aynı `seriesKey`'lere sahip olmalıdır (mapping aynı anahtar); farklı anahtar eşlemesi için ekranda seri eşleme arayüzü yok; (f) 027.73 ekranı bu task'ta bilerek değiştirildi (sahte varsayılanlar ve otomatik analiz kaldırıldı); 027.73'ün `done` kaydı bu değişikliği içermiyordu; (g) 027.72-R1 için AI1 onayı henüz işlenmedi.
+
+## 2026-09-24 — AI1 Kararı: Q-W537 kapandı; yeni açık nokta
+Q-W537 kapandı (artifact dilimsiz UNVERIFIED/selectable:false görünür; env'siz grafik yok; INDEX/birim-türetme varsayımı kanonik değil). **Q-W538 (açık):** `veriler/manifest/scada-fixtures.manifest.json` kolon bildirimi içermiyor; gerçek CSV kolonlarının `valueType`/`unit`/`dailyOperation` doğrulaması kim tarafından, hangi kaynağa dayanarak yazılacak? Yazılana dek geliştirme ekranında seçilebilir seri yoktur.
+
+## 2026-09-24 — TASK-027.73-R2: Q-W538 kapanışı ve yeni açık noktalar
+**Q-W538 kapandı (kanıtla):** dört CSV'nin kolon semantiği manifest `columns[]` bloğuna BOTC kaynak kodu (`HourlyConsumptionWindow.xaml.cs:166-177`, `IsletmeRaporlariWindow.xaml.cs:385-447`, `IsletmeModelleri.cs`) ve CSV istatistiği ile yazıldı: 30 kolon INDEX doğrulandı, kalanı (BOTC'de kullanılmayan) doğrulanmadı; birim yalnız BOTC etiket/dönüşüm kanıtı olduğunda (Sm3, ton, IcIhtiyacTrafo kWh) yazıldı.
+- **Q-W539 (açık)** — (a) BOTC elektrik sayaç farkını "MWh" etiketiyle gösteriyor, kolon adı KWH diyor ve dönüşüm yok (`IsletmeRaporlariWindow.xaml.cs:213/225/167/234`, `:385-387/404-406/439-444`); GT/SG elektrik ve `Turbin1/2_Enerji_kWh` biriminin gerçekte ne olduğu **BOTC sahibince** teyit edilmeli (şimdilik birimsiz); (b) INDEX doğrulaması BOTC'nin kolon-düzeyi "last−first" kullanımına + tablo varsayılanına dayanıyor; BOTC'de kullanılmayan (ör. `SICAK_SU_URETIM_KWH`, `MCC_*_ENDEKS`) kolonlar veri sayaç gibi görünse de doğrulanmadı — kanıt (BOTC/işletme teyidi) gelirse manifeste eklenebilir; (c) `GT{1,2}_DOGALGAZ_TUKETIM_SM3` gibi bazı doğrulanmış sayaçlarda azalan çift oranı %4-5 (sayaç sıfırlama/geçici sıfır): roll-over politikası (Q-W502/Q-W522) olmadan bu noktalar `COUNTER_RESET_UNRESOLVED` kalır; (d) 027.68'e boş `unit` (= doğrulanmamış birim) additive olarak kabul ettirildi — onay gerekir; (e) hiçbir kolon `REAL_VALUE` olarak doğrulanamadı.
+
+## 2026-09-24 — AI1 Kararı: TASK-027.73-R2 kararları
+Q-W539 açık kalır (elektrik MWh/KWH çelişkisi teyit edilene dek birim yazılmaz). Boş birim (`unit: null`) geçerlidir ve tek başına analizi engellemez (027.68 gevşetmesi onaylandı); doğrulanmış valueType ile seri analiz edilebilir; kanıtsız birim türetme yasak.
+
+## 2026-09-24 — TASK-027.73-R4 teslimi sırasında ortaya çıkan açık nokta
+- **Q-W540** — (a) Bridge `dataScopeTenantIds`'i **yalnız tenant'ın kendisi** yapar; ROOT tenant `canAggregateChildren=true` olsa da child'lar eklenmez (onaylı aggregate kuralı yok). Development'ta root'un child verisini görmesi gerekirse hangi kuralın onaylanacağı kararı gerekir; (b) `tenantMemberships`/`REPORT:ARTIFACT:VIEW` yerel veritabanında yoksa (ör. sistem yöneticisi dışı kullanıcı) ekran bridge'e rağmen guard'larda durur — bu bilinçli (bridge guard'ları atlamaz); yerel test kullanıcısı/üyeliği hazırlığı (tenant seed) kapsam dışıdır.
+
+## 2026-09-24 — AI1 Kararı: Q-W540 kapandı
+Local kullanıcı otomatik oluşturulmayacak; membership/MFA/`REPORT:ARTIFACT:VIEW` mevcut yerel bootstrap/tenant yönetimiyle sağlanır; bridge bunları bypass etmez; eksikse "Erişim yok" beklenen davranış. (Q-W540 (a) child kapsamı: karar verilmedi, bridge yalnız tenant'ın kendisi olarak kalır.)
+
+## 2026-09-24 — TASK-027.71-R1 teslimi sırasında ortaya çıkan açık noktalar
+- **Q-W541** — (a) İstek örneğindeki `name` alanı TASK-027.70 tanımında yoktur; yalnız `label` takma adı olarak kabul edildi (ikisi farklıysa ret). Ayrı bir `name` alanı istenirse 027.70 sözleşmesinin genişletilmesi gerekir; (b) `valueType` istekte alınmaz, girdi serilerinin (manifest doğrulamalı) tipinden türetilir; (c) yönetim yetkisi mevcut `PresetAuthorizationPort` kuralını (aktif sistem yöneticisi / kök `TENANT_ADMIN`) yeniden kullanır — sanal kolon için ayrı bir izin modeli kararı yok; (d) activate her zaman **son sürümü** etkinleştirir (belirli sürüm seçme yok) ve diğer ACTIVE sürümleri DISABLED yapar; (e) sanal kolon tanımları API yeniden başlatınca silinir — kalıcılık (PostgreSQL repository) ayrı karar (Q-W505/Q-W535); (f) analizde sanal kolon değerlendirmesi mevcut zincirde multi-series çıktısı üzerinde çalışır (027.70 sözleşmesi) — spec'teki "Virtual Column → Multi-Series" sıralaması aynı sonucu verir ama istatistik sanal seriler için de üretilir.
+
+## 2026-09-24 — AI1 Kararı: Q-W541 kapandı
+`name` reddedilir (yalnız `label`); activate son sürümü etkinleştirir, diğer aktif sürümleri devre dışı bırakır; işlem sırası Physical query → Quality/Rollover → Aggregation → Virtual Column Evaluation → Multi-Series/Statistics kabul; development-only bellek-içi store kabul.
+
+## 2026-09-24 — TASK-027.74 teslimi sırasında ortaya çıkan açık noktalar
+- **Q-W542** — (a) **Jasper şablonu / renderer Java değişikliği:** ready spec "mevcut renderer, yeni renderer yok" dedi; eski plan dosyası şablon/Java değişikliğini ayrı onaya bağlamıştı. Mevcut tek şablon (`sample-report`) sabit finans satır şekline (Integer/BigDecimal) bağlı olduğundan SCADA çıktısı için **yeni allowlist şablonu `scada-analysis-report`** ve `RenderRow` DTO'suna **additive** `kind,c1..c8` metin alanları eklendi (mevcut şablonlar etkilenmez). Onay yoksa alternatif: veriyi sample-report şekline (kayıplı) sıkıştırmak. (b) **Türkçe glif:** Alpine JRE imajında font yok; PDF'te Türkçe karakter çıktısı gerçek Jasper'da doğrulanmadı (yerel harness yalnız derleme+doldurma+PDF üretimini gösterdi); `Cp1254` kodlaması şablonda ayarlı, gerçek doğrulama ayrı onaylı dev-renderer smoke testi ister. (c) **PNG audit'i:** PNG tarayıcıda çizildiği için audit, caption üretimi sırasında (`delivery: CLIENT_RENDERED`) yazılır — dosya baytı sunucuda hiç oluşmaz; "başarı yalnız bayt oluştuktan sonra" kuralının PNG için tek istisnası. (d) **XLSX** Jasper yerine mevcut in-process yazıcıyla (çok-sayfalı) üretilir çünkü Jasper XLSX tek sayfadır; PDF Jasper'dan gelir. (e) **PDF "grafik":** PDF'te grafik çizimi yok; "grafik/özet" özet (istatistik) tablosuyla karşılandı. (f) **Boyut sınırı:** PDF için renderer'ın mevcut 5000 satır / 10 MB sınırı geçerli (aşarsa `SCADA_LIMIT_EXCEEDED`); CSV/XLSX için ek satır sınırı yok (dönem sınırı sorgu limitlerinden gelir). (g) Fallback PDF (Jasper yapılandırılmamışken) mevcut basit yazıcıdır: Türkçe karakter/çok satır düzeni sınırlıdır.
+
+## 2026-09-24 — AI1 Onayı: TASK-027.74 `done` — açık operasyonel not
+PNG completion context'i bellek içi (restart / çoklu instance'ta yeniden deneme); production için Redis/kalıcı kısa ömürlü store kararı ayrı production-hardening işi olarak açık. Türkçe font doğrulaması ayrı dev-renderer smoke testi.
+
+## 2026-09-24 — TASK-027.59 kabulü sırasında ortaya çıkan açık noktalar (blocker değil, kabulde raporlandı)
+- **Q-W543** — (a) **Preset seçimi UI'da seçim alanlarını doldurmuyor:** `handleSelectPreset` yalnız `form` state'ini günceller; kaynak/seri/tarih seçimini tutan katalog paneli (`ScadaCatalogPanel`) preset'ten beslenmez (test: preset seçilince "Kaynak" ve "Başlangıç tarihi" boş kalır). Preset çalıştırma (`presetId` gövdesi) çalışır, ama kabul senaryosu 8 "preset uygulanınca kaynak, seri, tarih ve istatistik seçimleri doldurulmalı" UI'da karşılanmıyor. (b) **UI SOURCE karşılaştırması seriyi diğer kaynakta AYNI anahtarla eşler** (`seriesMapping` baseline `s` → comparison `s`); gerçek snapshot kaynaklarında kolon adları farklı (GT1_… / SG50_1_…), bu yüzden UI'dan GT↔SG karşılaştırması `BLOCKED`/hata verir; "açık seri eşlemesi" yalnız API'den yapılabilir, UI'da eşleme seçimi yok. Karar: bu iki UI boşluğu ayrı bir task mı (özellik) olsun?
+- **Q-W544** — Development'ta **preset store kaydı yok** (`SCADA_PRESET_STORE` hiçbir yerde register edilmiyor; kalıcı preset repository kapsam dışı): gerçek dev ortamında preset listesi boş/503 döner, preset akışı yalnız stub store ile testlerde kanıtlandı. Dev'de preset'i elle denemek için sanal kolon store'una benzer bir development bellek-içi preset store'u (ve oluşturma yolu) ayrı task ister.
+
+## 2026-09-24 — TASK-027.59-R1 teslimi: Q-W543 ve Q-W544 giderildi (onay bekliyor)
+AI1 kararları uygulandı: (a) preset seçimi formu doldurur (hepsi-ya-hiç doğrulama), (b) SOURCE karşılaştırmada açık sol→sağ seri eşleme (otomatik yalnız aynı anahtar; yinelenen sağ seri yok; eksik eşlemede istek yok), Q-W544 development bellek-içi preset store (dört kapı, API restart'ında silinir). Yeni blocker yok. Kalan bilgi notları: preset'ler yalnız development'ta oluşturulabilir (production repository kapsam dışı); manuel tarayıcı kabulü yapılamadı.
+
+## 2026-09-24 — AI1 Onayı (2026-09-24): TASK-027.59-R1 ve TASK-027.59 `done`; Wave 5 development kabulü tamamlandı. Q-W543(a/b) ve Q-W544 giderildi (preset hydration, açık SOURCE seri eşleme, dev bellek-içi preset store; tenant-izole, in-memory sınırında). Operasyonel not: tarayıcıda manuel kabul yapılmadı; test ve gerçek CSV entegrasyon kanıtlarıyla kapanışa engel değil.

@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { BadRequestException, NotFoundException } from '@nestjs/common'
 import { assertJrxmlSandboxSafe, TemplateRegistryService } from './template-registry'
 
@@ -62,5 +64,15 @@ describe('TemplateRegistryService', () => {
 
     expect(resolved.id).toBe('sample-report')
     expect(resolved.content).toContain('name="sample-report"')
+  })
+
+  it('resolves the "scada-analysis-report" templateId (TASK-027.74): sandbox-safe, bean-fed text rows only, identical to the renderer\'s copy', () => {
+    expect(registry.has('scada-analysis-report')).toBe(true)
+    const resolved = registry.resolve('scada-analysis-report')
+    expect(resolved.content).toContain('name="scada-analysis-report"')
+    expect(resolved.content).not.toMatch(/queryString|jdbc:|java\.sql|java\.net|java\.io\.File/)
+    for (const f of ['kind', 'c1', 'c2', 'c3', 'c4', 'c5', 'c6', 'c7', 'c8']) expect(resolved.content).toContain(`<field name="${f}" class="java.lang.String"/>`)
+    const renderer = readFileSync(resolve(__dirname, '../../../../../services/jasper-renderer/src/main/resources/templates/scada-analysis-report.jrxml'), 'utf8')
+    expect(resolved.content).toBe(renderer)
   })
 })
