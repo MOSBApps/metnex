@@ -180,7 +180,9 @@ describe('ReportingService — dev fixture artifact substitution (env-gated, no 
 
     const result = await h.service.listArtifacts('tenant-1')
     expect(result.artifacts[0]).toEqual(DEV_FIXTURE_ARTIFACT)
-    expect(result.artifacts).toHaveLength(2)
+    // TASK-027.73-R1: the in-memory development CSV snapshot artifact follows it (same flag, never persisted)
+    expect((result.artifacts[1] as { code: string }).code).toBe('SCADA_HOURLY_ANALYSIS')
+    expect(result.artifacts).toHaveLength(3)
   })
 
   it('listArtifacts never includes the fixture artifact when disabled', async () => {

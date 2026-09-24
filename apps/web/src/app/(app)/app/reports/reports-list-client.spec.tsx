@@ -35,6 +35,33 @@ describe('ReportsListClient', () => {
     expect(mockedGet).toHaveBeenCalledWith('/api/v1/reports/artifacts')
   })
 
+  it('marks the development CSV snapshot artifact with its label; a normal artifact has none (TASK-027.73-R1)', async () => {
+    mockedGet.mockResolvedValueOnce({
+      artifacts: [
+        { code: 'SCADA_HOURLY_ANALYSIS', title: 'SCADA Saatlik/Günlük Analiz', description: null, isActive: true, developmentOnly: true, developmentLabel: 'Geliştirme CSV snapshot verisi' },
+        { code: 'A1', title: 'Normal Rapor', description: null, isActive: true },
+      ],
+    })
+    render(<ReportsListClient />)
+
+    expect(await screen.findByText('Geliştirme CSV snapshot verisi')).toBeInTheDocument()
+    expect(screen.getAllByText('Geliştirme CSV snapshot verisi')).toHaveLength(1)
+  })
+
+  it('shows the SCADA_HOURLY_ANALYSIS artifact with its analysis link when the API lists it (fixture on) and shows nothing of it when it does not (TASK-027.73-R3)', async () => {
+    mockedGet.mockResolvedValueOnce({
+      artifacts: [{ code: 'SCADA_HOURLY_ANALYSIS', title: 'SCADA Saatlik/Günlük Analiz', description: null, isActive: true, developmentOnly: true, developmentLabel: 'Geliştirme CSV snapshot verisi' }],
+    })
+    const { unmount } = render(<ReportsListClient />)
+    expect(await screen.findByRole('link', { name: 'Analiz' })).toHaveAttribute('href', '/app/reports/SCADA_HOURLY_ANALYSIS/analysis')
+    unmount()
+    mockedGet.mockResolvedValueOnce({ artifacts: [{ code: 'A1', title: 'Normal Rapor', description: null, isActive: true }] })
+    render(<ReportsListClient />)
+    expect(await screen.findByText('Normal Rapor')).toBeInTheDocument()
+    expect(screen.queryByText('SCADA_HOURLY_ANALYSIS')).not.toBeInTheDocument()
+    expect(screen.queryByText('Geliştirme CSV snapshot verisi')).not.toBeInTheDocument()
+  })
+
   it('does not render an analysis link for an inactive artifact', async () => {
     mockedGet.mockResolvedValueOnce({
       artifacts: [{ code: 'A2', title: 'Pasif Rapor', description: null, isActive: false }],

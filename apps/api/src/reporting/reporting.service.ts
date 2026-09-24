@@ -12,9 +12,12 @@ import {
 } from './dataset/dev-fixture-dataset.provider'
 import type { ReportDatasetRow } from './dataset/report-dataset.contract'
 import { ReportDatasetResolver } from './dataset/report-dataset.resolver'
+import { ScadaCsvFixtureProvider } from './scada/fixture/scada-csv-fixture.provider'
+import { SCADA_FIXTURE_ARTIFACT_CODE, buildScadaFixtureArtifact, scadaFixtureArtifactRow } from './scada/fixture/scada-fixture-artifact'
 import { buildReportFileName, getDefaultReportContentType, type ReportOutputFormat } from './report-output.util'
 import { ReportRenderService } from './report-render.service'
 import { TemplateRegistryService } from './templates/template-registry'
+import { buildSimplePdf } from './pdf-fallback'
 import { buildSimpleXlsx } from './xlsx-writer'
 
 export type { ReportOutputFormat } from './report-output.util'
@@ -32,31 +35,6 @@ function escapeHtml(value: unknown) {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
-}
-
-function buildSimplePdf(title: string, lines: string[]) {
-  const bodyText = [title, '', ...lines].join('\\n').replace(/[()\\]/g, '')
-  const stream = `BT /F1 12 Tf 50 780 Td (${bodyText}) Tj ET`
-  const objects = [
-    '1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj',
-    '2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj',
-    '3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >> endobj',
-    '4 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> endobj',
-    `5 0 obj << /Length ${Buffer.byteLength(stream)} >> stream\n${stream}\nendstream endobj`,
-  ]
-  const chunks = ['%PDF-1.4\n']
-  const offsets = [0]
-  for (const object of objects) {
-    offsets.push(Buffer.byteLength(chunks.join('')))
-    chunks.push(`${object}\n`)
-  }
-  const xrefAt = Buffer.byteLength(chunks.join(''))
-  chunks.push(`xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`)
-  for (let i = 1; i <= objects.length; i += 1) {
-    chunks.push(`${String(offsets[i]).padStart(10, '0')} 00000 n \n`)
-  }
-  chunks.push(`trailer << /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefAt}\n%%EOF`)
-  return Buffer.from(chunks.join(''), 'utf8')
 }
 
 /**
@@ -99,12 +77,18 @@ export class ReportingService {
     // TASK-027.55 — an in-memory-only entry, never written to report_artifacts, appended when both
     // NODE_ENV=development and REPORTING_DEV_FIXTURES=true. isDevFixtureEnabled() is re-evaluated
     // on every call (not cached at boot), so this can never appear outside that exact env state.
-    const artifacts = isDevFixtureEnabled() ? [DEV_FIXTURE_ARTIFACT, ...rows] : rows
+    // TASK-027.73-R1 — the development CSV snapshot artifact, in memory only, present ONLY while the same flag is on.
+    const scadaFixture = buildScadaFixtureArtifact(process.env, new ScadaCsvFixtureProvider())
+    const artifacts = isDevFixtureEnabled() ? [DEV_FIXTURE_ARTIFACT, ...(scadaFixture ? [scadaFixtureArtifactRow(scadaFixture)] : []), ...rows] : rows
     return { artifacts }
   }
 
   async getArtifact(_tenantId: string, code: string) {
     if (isDevFixtureEnabled() && code === DEV_FIXTURE_ARTIFACT_CODE) return DEV_FIXTURE_ARTIFACT
+    if (code === SCADA_FIXTURE_ARTIFACT_CODE) {
+      const scadaFixture = buildScadaFixtureArtifact(process.env)
+      if (scadaFixture) return scadaFixtureArtifactRow(scadaFixture) as unknown as typeof DEV_FIXTURE_ARTIFACT
+    }
 
     const [artifact] = await this.db
       .select()

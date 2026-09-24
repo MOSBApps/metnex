@@ -10,7 +10,7 @@ export const platformAuditLogs = pgTable(
     actorSnapshot: jsonb('actorSnapshot'),
     actionCode: text('actionCode').notNull(),
     entityType: text('entityType').notNull(),
-    entityId: text('entityId').notNull(),
+    entityId: text('entityId'),
     summary: text('summary').notNull(),
     metadata: jsonb('metadata'),
     createdAt: timestamp('createdAt', { precision: 3 }).notNull().defaultNow(),

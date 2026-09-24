@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useCallback, useEffect, useState } from 'react'
-import { EmptyState, PageIntro, SectionHeader, StatusBadge } from '@/components/platform-admin-ui'
+import { Badge, EmptyState, PageIntro, SectionHeader, StatusBadge } from '@/components/platform-admin-ui'
 import { ApiError, tenantApiGet } from '@/lib/api'
 import { TENANT_CHANGE_EVENT } from '@/lib/tenant-context'
 
@@ -11,6 +11,9 @@ interface ReportArtifact {
   title: string
   description: string | null
   isActive: boolean
+  /** TASK-027.73-R1: present only on the in-memory development CSV artifact (fixture on). */
+  developmentOnly?: boolean
+  developmentLabel?: string
 }
 
 function analysisHref(code: string) {
@@ -72,6 +75,7 @@ export function ReportsListClient() {
                 <div className="min-w-0 space-y-0.5">
                   <p className="truncate text-sm font-medium text-ink">{artifact.title}</p>
                   <p className="font-mono text-xs text-ink-subtle">{artifact.code}</p>
+                  {artifact.developmentOnly ? <Badge tone="warning">{artifact.developmentLabel ?? 'Geliştirme CSV snapshot verisi'}</Badge> : null}
                 </div>
                 <div className="flex shrink-0 items-center gap-3">
                   <StatusBadge status={artifact.isActive ? 'ACTIVE' : 'INACTIVE'} density="compact" />

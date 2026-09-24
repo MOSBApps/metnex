@@ -38,3 +38,8 @@ backup/
 *.log
 npm-debug.log*
 pnpm-debug.log*
+
+# SCADA CSV Data Snapshots (development only - never commit raw data)
+veriler/raw/
+veriler/normalized/
+!veriler/manifest/

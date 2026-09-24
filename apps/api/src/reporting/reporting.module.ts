@@ -11,6 +11,10 @@ import { ReportingController } from './reporting.controller'
 import { ReportingService } from './reporting.service'
 import { ReportRenderService } from './report-render.service'
 import { TemplateRegistryService } from './templates/template-registry'
+import { scadaApiControllers, scadaApiProviders } from './scada/api/scada-api.providers'
+import { TenantScopeModule } from '../tenant-scope/tenant-scope.module'
+import { TenantHeaderFormatGuard } from '../platform/guards/tenant-header-format.guard'
+import { TenantMembershipGuard } from '../platform/tenant-membership.guard'
 
 // TASK-027.55 — evaluated once, when this module is loaded at boot (same moment `main.ts` has
 // already run `dotenv.config()`), never re-checked per-request here. DEC-0012 still holds: outside
@@ -28,8 +32,8 @@ const reportDatasetProvidersProvider: Provider = isDevFixtureEnabled()
   : { provide: REPORT_DATASET_PROVIDERS, useValue: [] satisfies ReportDatasetProvider[] }
 
 @Module({
-  imports: [DbModule, AuditModule],
-  controllers: [ReportingController],
+  imports: [DbModule, AuditModule, TenantScopeModule],
+  controllers: [ReportingController, ...scadaApiControllers()],
   providers: [
     ReportingService,
     ReportRenderService,
@@ -37,7 +41,10 @@ const reportDatasetProvidersProvider: Provider = isDevFixtureEnabled()
     TemplateRegistryService,
     ...devFixtureProviders,
     reportDatasetProvidersProvider,
+    ...scadaApiProviders(),
     JwtAuthGuard,
+    TenantHeaderFormatGuard,
+    TenantMembershipGuard,
     PermissionGuard,
     MfaRequirementService,
   ],

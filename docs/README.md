@@ -112,6 +112,8 @@ the `ODC.md` contract file itself lives at the **repo root**, not here.
 | `DEC-0009-shared-schema-tenant-isolation-hardening.md` | Composite tenant FK hardening for the shared-schema multi-tenancy model |
 | `DEC-0012-demo-operations-removal.md` | Demo Operations module removal — kept the generic Jasper render adapter and dataset provider abstraction |
 | `DEC-0013-jasper-renderer-service.md` | Jasper renderer provisioned as a standalone Maven/Spring Boot service (`services/jasper-renderer/`) |
+| `DEC-0015-wave5-hourly-consumption-and-scada-decisions.md` | Wave 5 Hourly Consumption ve SCADA karar kapanışları (Q-W501–W515, Q-SC/SP/SA/SR, Q-M05, Q-E04): delta semantiği, katalog control-plane, canlı sorgu, audit sözleşmesi, redaction |
+| `DEC-0016-scada-catalog-verification-and-physical-identity.md` | SCADA katalog: kontrollü read-only preflight doğrulaması (UNVERIFIED→VERIFIED) ve fiziksel database adı ↔ opaque katalog kimliği ayrımı |
 
 ---
 

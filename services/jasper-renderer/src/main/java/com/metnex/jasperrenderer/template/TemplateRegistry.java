@@ -27,7 +27,8 @@ public class TemplateRegistry {
 
     /** Empty by default aside from the one demonstration template shipped with this service. */
     private static final Map<String, String> ALLOWLIST = Map.of(
-        "sample-report", "templates/sample-report.jrxml");
+        "sample-report", "templates/sample-report.jrxml",
+        "scada-analysis-report", "templates/scada-analysis-report.jrxml");
 
     private static final String DEFAULT_TEMPLATE_RESOURCE = "templates/default-report.jrxml";
 

@@ -6,7 +6,7 @@
 #   2. Docker infra başlatma (postgres + redis + minio)
 #   3. Jasper renderer image build + compose ile başlatma + healthcheck bekleme
 #   4. Uygulama .env dosyalarını doğru portlarla yazma
-#      - apps/api/.env       → PORT, DATABASE_URL, REDIS_URL, REPORT_RENDER_*, ...
+#      - apps/api/.env       → PORT, DATABASE_URL, REDIS_URL, REPORT_RENDER_*, geliştirme CSV fixture değişkenleri ...
 #      - apps/web/.env.local → PORT, NEXT_PUBLIC_API_URL
 #   5. Geliştirici için URL özeti
 #
@@ -33,6 +33,10 @@ INFRA_ENV_EXAMPLE="$INFRA_DIR/.env.example"
 API_ENV="$REPO_ROOT/apps/api/.env"
 WEB_ENV_LOCAL="$REPO_ROOT/apps/web/.env.local"
 PROJECT_DEFAULTS="$REPO_ROOT/.project-defaults"
+
+# TASK-027.73-R3 — development CSV fixture environment (yalnız local apps/api/.env için)
+# shellcheck source=scripts/dev-fixture-env.sh
+source "$REPO_ROOT/scripts/dev-fixture-env.sh"
 
 POSTGRES_CONTAINER="metnex-postgres-dev"
 REDIS_CONTAINER="metnex-redis-dev"
@@ -441,10 +445,9 @@ if [[ "$JASPER_RENDERER_HEALTHY" != "true" ]]; then
   fail "Jasper renderer $MAX_RETRIES deneme sonrasında healthcheck geçmedi (http://127.0.0.1:${JASPER_RENDERER_LOCAL_PORT}/health). 'docker logs $JASPER_RENDERER_CONTAINER' ile inceleyin."
 fi
 
-header "▶ Uygulama .env dosyaları yazılıyor..."
-
-mkdir -p "$(dirname "$API_ENV")"
-cat > "$API_ENV" <<APIENV
+write_api_env() {
+  mkdir -p "$(dirname "$API_ENV")"
+  cat > "$API_ENV" <<APIENV
 # Metnex API — local development environment
 # Otomatik üretildi: ./dev.sh
 
@@ -476,8 +479,25 @@ SYSTEM_ROOT_TENANT_SLUG=platform
 REPORT_RENDER_ENDPOINT=http://127.0.0.1:${JASPER_RENDERER_LOCAL_PORT}/render
 REPORT_RENDER_INTERNAL_TOKEN=${REPORT_RENDER_INTERNAL_TOKEN}
 REPORT_RENDER_TIMEOUT_MS=15000
+
+# Geliştirme CSV fixture (yalnız local development; production yapılandırmasına EKLENMEZ)
+# REPORTING_DEV_FIXTURES=false ile kapatılır; geçersiz saat dilimi düzeltilmez, API analiz yapmaz.
+REPORTING_DEV_FIXTURES=${DEV_FIXTURE_FLAG}
+REPORTING_DEV_FIXTURE_SOURCE_TIMEZONE=${DEV_FIXTURE_TZ}
+# Registry'siz geliştirme veri kapsamı (yalnız SCADA CSV fixture API'si; guard zincirini geçemez, registry/tenant yazmaz).
+REPORTING_DEV_FIXTURE_SCOPE_BRIDGE=${DEV_FIXTURE_BRIDGE}
 APIENV
+}
+
+header "▶ Uygulama .env dosyaları yazılıyor..."
+
+# Fixture değişkenleri MEVCUT .env yazılmadan ÖNCE çözülür (kullanıcının önceki değeri korunur).
+if ! resolve_dev_fixture_env "$API_ENV"; then
+  fail "Geliştirme CSV fixture değişkenleri güvenli değil; düzeltip tekrar çalıştırın."
+fi
+write_api_env
 ok "apps/api/.env yazıldı (PORT=${API_PORT}, REPORT_RENDER_ENDPOINT=http://127.0.0.1:${JASPER_RENDERER_LOCAL_PORT}/render)"
+while IFS= read -r line; do info "$line"; done < <(dev_fixture_status_message)
 
 if [[ -d "$REPO_ROOT/apps/web" ]]; then
   mkdir -p "$(dirname "$WEB_ENV_LOCAL")"

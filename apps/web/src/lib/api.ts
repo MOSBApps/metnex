@@ -182,3 +182,24 @@ export async function tenantApiDownload(path: string) {
         ?.match(/filename="([^"]+)"/)?.[1] ?? 'report.bin',
   }
 }
+
+/** POST variant of `tenantApiDownload` (JSON body, tenant header). A failure keeps the static error body (`code`) on the ApiError. */
+export async function tenantApiDownloadPost(path: string, body: unknown) {
+  const res = await fetch(`${getApiBase()}${path}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...authHeaders(),
+      ...tenantHeaders(),
+    },
+    body: JSON.stringify(body),
+  })
+  if (!res.ok) {
+    const data = (await res.json().catch(() => ({}))) as Record<string, unknown>
+    throw new ApiError(errorMessage(data, res.status), res.status, data)
+  }
+  return {
+    blob: await res.blob(),
+    fileName: res.headers.get('content-disposition')?.match(/filename="([^"]+)"/)?.[1] ?? 'report.bin',
+  }
+}

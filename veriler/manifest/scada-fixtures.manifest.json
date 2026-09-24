@@ -1,0 +1,1030 @@
+{
+  "version": "1.0.0",
+  "generatedAt": "2026-09-23T22:45:00Z",
+  "description": "SCADA CSV Snapshot Development Fixtures Manifest for Metnex Development/Test Analysis Provider",
+  "developmentOnly": true,
+  "sources": [
+    {
+      "catalogId": "scada-cat-endeksler",
+      "sourceKey": "endeksler",
+      "logicalSourceName": "Endeksler SCADA Snapshot Fixture",
+      "file": "veriler/raw/endeksler.csv",
+      "table": "endeksler",
+      "idColumn": "RaporID",
+      "dateColumn": "KayitTarihi",
+      "timeColumn": "KayitSaati",
+      "timezone": "UNVERIFIED",
+      "status": "DEVELOPMENT_FIXTURE",
+      "mappingStatus": "UNVERIFIED",
+      "sha256": "be219f33096a1649ee0bd7419a70cea7d5def79d995dd15bb15c9c7bb728f66f",
+      "rowCount": 7727,
+      "columnCount": 33,
+      "developmentOnly": true,
+      "columns": [
+        {
+          "sourceColumn": "Turbin1_Enerji_kWh",
+          "label": "Turbin1_Enerji_kWh",
+          "verified": true,
+          "valueType": "INDEX",
+          "evidenceRefs": [
+            "BOTC:BOT/IsletmeRaporlariWindow.xaml.cs:439 (the column is used as a COUNTER: last − first over a day)",
+            "BOTC:BOT.Domain/IsletmeModelleri.cs:48-58 (MosbioEndeks) (column exists in the BOTC domain model)",
+            "BOTC:BOT/HourlyConsumptionWindow.xaml.cs:166-177 (GetDefaultValueTypeForTable: this table is not one of the three \"Gerçek Değer\" tables, so the per-column default is \"Endeks\")",
+            "CSV-STAT:endeksler.Turbin1_Enerji_kWh numeric-unparsable=0, empty-ratio=0, non-decreasing-pairs=1, decreasing-pairs=0",
+            "UNIT-NOT-VERIFIED: the delta is added to \"Üretim (MWh)\" without conversion (BOTC:BOT/IsletmeRaporlariWindow.xaml.cs:167/234, :439-444) while the column name says kWh — contradictory, so no unit is declared"
+          ]
+        },
+        {
+          "sourceColumn": "Turbin2_Enerji_kWh",
+          "label": "Turbin2_Enerji_kWh",
+          "verified": true,
+          "valueType": "INDEX",
+          "evidenceRefs": [
+            "BOTC:BOT/IsletmeRaporlariWindow.xaml.cs:440 (the column is used as a COUNTER: last − first over a day)",
+            "BOTC:BOT.Domain/IsletmeModelleri.cs:48-58 (MosbioEndeks) (column exists in the BOTC domain model)",
+            "BOTC:BOT/HourlyConsumptionWindow.xaml.cs:166-177 (GetDefaultValueTypeForTable: this table is not one of the three \"Gerçek Değer\" tables, so the per-column default is \"Endeks\")",
+            "CSV-STAT:endeksler.Turbin2_Enerji_kWh numeric-unparsable=0, empty-ratio=0.001, non-decreasing-pairs=0.9997, decreasing-pairs=2",
+            "UNIT-NOT-VERIFIED: the delta is added to \"Üretim (MWh)\" without conversion (BOTC:BOT/IsletmeRaporlariWindow.xaml.cs:167/234, :439-444) while the column name says kWh — contradictory, so no unit is declared"
+          ]
+        },
+        {
+          "sourceColumn": "IcIhtiyacTrafo1_kWh",
+          "label": "IcIhtiyacTrafo1_kWh",
+          "verified": true,
+          "valueType": "INDEX",
+          "unit": "kWh",
+          "evidenceRefs": [
+            "BOTC:BOT/IsletmeRaporlariWindow.xaml.cs:441-442 (the column is used as a COUNTER: last − first over a day)",
+            "BOTC:BOT.Domain/IsletmeModelleri.cs:48-58 (MosbioEndeks) (column exists in the BOTC domain model)",
+            "BOTC:BOT/HourlyConsumptionWindow.xaml.cs:166-177 (GetDefaultValueTypeForTable: this table is not one of the three \"Gerçek Değer\" tables, so the per-column default is \"Endeks\")",
+            "CSV-STAT:endeksler.IcIhtiyacTrafo1_kWh numeric-unparsable=0, empty-ratio=0, non-decreasing-pairs=1, decreasing-pairs=0",
+            "UNIT: BOTC:BOT/IsletmeRaporlariWindow.xaml.cs:445 (iht / 1000.0 converts the counter delta to the \"(MWh)\" axis, BOTC:BOT/IsletmeRaporlariWindow.xaml.cs:234, i.e. the raw counter is kWh)"
+          ]
+        },
+        {
+          "sourceColumn": "IcIhtiyacTrafo2_kWh",
+          "label": "IcIhtiyacTrafo2_kWh",
+          "verified": true,
+          "valueType": "INDEX",
+          "unit": "kWh",
+          "evidenceRefs": [
+            "BOTC:BOT/IsletmeRaporlariWindow.xaml.cs:441-442 (the column is used as a COUNTER: last − first over a day)",
+            "BOTC:BOT.Domain/IsletmeModelleri.cs:48-58 (MosbioEndeks) (column exists in the BOTC domain model)",
+            "BOTC:BOT/HourlyConsumptionWindow.xaml.cs:166-177 (GetDefaultValueTypeForTable: this table is not one of the three \"Gerçek Değer\" tables, so the per-column default is \"Endeks\")",
+            "CSV-STAT:endeksler.IcIhtiyacTrafo2_kWh numeric-unparsable=0, empty-ratio=0, non-decreasing-pairs=1, decreasing-pairs=0",
+            "UNIT: BOTC:BOT/IsletmeRaporlariWindow.xaml.cs:445 (iht / 1000.0 converts the counter delta to the \"(MWh)\" axis, BOTC:BOT/IsletmeRaporlariWindow.xaml.cs:234, i.e. the raw counter is kWh)"
+          ]
+        },
+        {
+          "sourceColumn": "AcilDurumJeneratoru_kWh",
+          "label": "AcilDurumJeneratoru_kWh",
+          "verified": false,
+          "valueType": null,
+          "unit": null,
+          "evidenceRefs": [
+            "UNVERIFIED: no BOTC reader uses it (absent from BOTC:BOT.Domain/IsletmeModelleri.cs:48-58 and from IsletmeRaporlariWindow.xaml.cs:385-447); nothing may be inferred from the column name",
+            "CSV-STAT:endeksler.AcilDurumJeneratoru_kWh numeric-unparsable=0, empty-ratio=0, non-decreasing-pairs=1, decreasing-pairs=0"
+          ]
+        },
+        {
+          "sourceColumn": "ToplamElektrikUretim_kWh",
+          "label": "ToplamElektrikUretim_kWh",
+          "verified": false,
+          "valueType": null,
+          "unit": null,
+          "evidenceRefs": [
+            "UNVERIFIED: no BOTC reader uses it (absent from BOTC:BOT.Domain/IsletmeModelleri.cs:48-58 and from IsletmeRaporlariWindow.xaml.cs:385-447); nothing may be inferred from the column name",
+            "CSV-STAT:endeksler.ToplamElektrikUretim_kWh numeric-unparsable=0, empty-ratio=0, non-decreasing-pairs=0.5955, decreasing-pairs=3125"
+          ]
+        },
+        {
+          "sourceColumn": "AnaBuharM1",
+          "label": "AnaBuharM1",
+          "verified": true,
+          "valueType": "INDEX",
+          "unit": "ton",
+          "evidenceRefs": [
+            "BOTC:BOT/IsletmeRaporlariWindow.xaml.cs:443 (the column is used as a COUNTER: last − first over a day)",
+            "BOTC:BOT.Domain/IsletmeModelleri.cs:48-58 (MosbioEndeks) (column exists in the BOTC domain model)",
+            "BOTC:BOT/HourlyConsumptionWindow.xaml.cs:166-177 (GetDefaultValueTypeForTable: this table is not one of the three \"Gerçek Değer\" tables, so the per-column default is \"Endeks\")",
+            "CSV-STAT:endeksler.AnaBuharM1 numeric-unparsable=0, empty-ratio=0, non-decreasing-pairs=1, decreasing-pairs=0",
+            "UNIT: BOTC:BOT/IsletmeRaporlariWindow.xaml.cs:246/503/453 (series \"Ana Buhar (ton)\" = the AnaBuharM1 counter delta)"
+          ]
+        },
+        {
+          "sourceColumn": "AnaBuharE1",
+          "label": "AnaBuharE1",
+          "verified": false,
+          "valueType": null,
+          "unit": null,
+          "evidenceRefs": [
+            "UNVERIFIED: no BOTC reader uses it (absent from BOTC:BOT.Domain/IsletmeModelleri.cs:48-58 and from IsletmeRaporlariWindow.xaml.cs:385-447); nothing may be inferred from the column name",
+            "CSV-STAT:endeksler.AnaBuharE1 numeric-unparsable=0, empty-ratio=0, non-decreasing-pairs=1, decreasing-pairs=0"
+          ]
+        },
+        {
+          "sourceColumn": "MusteriBuharSatis_M1",
+          "label": "MusteriBuharSatis_M1",
+          "verified": false,
+          "valueType": null,
+          "unit": null,
+          "evidenceRefs": [
+            "UNVERIFIED: no BOTC reader uses it (absent from BOTC:BOT.Domain/IsletmeModelleri.cs:48-58 and from IsletmeRaporlariWindow.xaml.cs:385-447); nothing may be inferred from the column name",
+            "CSV-STAT:endeksler.MusteriBuharSatis_M1 numeric-unparsable=0, empty-ratio=0, non-decreasing-pairs=1, decreasing-pairs=0"
+          ]
+        },
+        {
+          "sourceColumn": "MusteriBuharSatis_E1",
+          "label": "MusteriBuharSatis_E1",
+          "verified": false,
+          "valueType": null,
+          "unit": null,
+          "evidenceRefs": [
+            "UNVERIFIED: no BOTC reader uses it (absent from BOTC:BOT.Domain/IsletmeModelleri.cs:48-58 and from IsletmeRaporlariWindow.xaml.cs:385-447); nothing may be inferred from the column name",
+            "CSV-STAT:endeksler.MusteriBuharSatis_E1 numeric-unparsable=0, empty-ratio=0, non-decreasing-pairs=1, decreasing-pairs=0"
+          ]
+        },
+        {
+          "sourceColumn": "Bar13BuharTedari_ton",
+          "label": "Bar13BuharTedari_ton",
+          "verified": true,
+          "valueType": "INDEX",
+          "evidenceRefs": [
+            "BOTC:BOT/IsletmeRaporlariWindow.xaml.cs:447 (the column is used as a COUNTER: last − first over a day)",
+            "BOTC:BOT.Domain/IsletmeModelleri.cs:48-58 (MosbioEndeks) (column exists in the BOTC domain model)",
+            "BOTC:BOT/HourlyConsumptionWindow.xaml.cs:166-177 (GetDefaultValueTypeForTable: this table is not one of the three \"Gerçek Değer\" tables, so the per-column default is \"Endeks\")",
+            "CSV-STAT:endeksler.Bar13BuharTedari_ton numeric-unparsable=0, empty-ratio=0, non-decreasing-pairs=0.9997, decreasing-pairs=2",
+            "UNIT-NOT-VERIFIED: its series (\"Mosbio Deg.\", BOTC:BOT/IsletmeRaporlariWindow.xaml.cs:194) carries no unit label"
+          ]
+        },
+        {
+          "sourceColumn": "Bar13BuharTedari_MWh",
+          "label": "Bar13BuharTedari_MWh",
+          "verified": false,
+          "valueType": null,
+          "unit": null,
+          "evidenceRefs": [
+            "UNVERIFIED: no BOTC reader uses it (absent from BOTC:BOT.Domain/IsletmeModelleri.cs:48-58 and from IsletmeRaporlariWindow.xaml.cs:385-447); nothing may be inferred from the column name",
+            "CSV-STAT:endeksler.Bar13BuharTedari_MWh numeric-unparsable=0, empty-ratio=0, non-decreasing-pairs=0.9997, decreasing-pairs=2"
+          ]
+        },
+        {
+          "sourceColumn": "SH2_Atemperator_ton",
+          "label": "SH2_Atemperator_ton",
+          "verified": false,
+          "valueType": null,
+          "unit": null,
+          "evidenceRefs": [
+            "UNVERIFIED: no BOTC reader uses it (absent from BOTC:BOT.Domain/IsletmeModelleri.cs:48-58 and from IsletmeRaporlariWindow.xaml.cs:385-447); nothing may be inferred from the column name",
+            "CSV-STAT:endeksler.SH2_Atemperator_ton numeric-unparsable=0, empty-ratio=0, non-decreasing-pairs=0.9975, decreasing-pairs=19"
+          ]
+        },
+        {
+          "sourceColumn": "SH3_Atemperator_ton",
+          "label": "SH3_Atemperator_ton",
+          "verified": false,
+          "valueType": null,
+          "unit": null,
+          "evidenceRefs": [
+            "UNVERIFIED: no BOTC reader uses it (absent from BOTC:BOT.Domain/IsletmeModelleri.cs:48-58 and from IsletmeRaporlariWindow.xaml.cs:385-447); nothing may be inferred from the column name",
+            "CSV-STAT:endeksler.SH3_Atemperator_ton numeric-unparsable=0, empty-ratio=0, non-decreasing-pairs=0.9956, decreasing-pairs=34"
+          ]
+        },
+        {
+          "sourceColumn": "MosbSicakSuTedari_M1",
+          "label": "MosbSicakSuTedari_M1",
+          "verified": false,
+          "valueType": null,
+          "unit": null,
+          "evidenceRefs": [
+            "UNVERIFIED: no BOTC reader uses it (absent from BOTC:BOT.Domain/IsletmeModelleri.cs:48-58 and from IsletmeRaporlariWindow.xaml.cs:385-447); nothing may be inferred from the column name",
+            "CSV-STAT:endeksler.MosbSicakSuTedari_M1 numeric-unparsable=0, empty-ratio=0, non-decreasing-pairs=1, decreasing-pairs=0"
+          ]
+        },
+        {
+          "sourceColumn": "MosbSicakSuTedari_E1",
+          "label": "MosbSicakSuTedari_E1",
+          "verified": false,
+          "valueType": null,
+          "unit": null,
+          "evidenceRefs": [
+            "UNVERIFIED: no BOTC reader uses it (absent from BOTC:BOT.Domain/IsletmeModelleri.cs:48-58 and from IsletmeRaporlariWindow.xaml.cs:385-447); nothing may be inferred from the column name",
+            "CSV-STAT:endeksler.MosbSicakSuTedari_E1 numeric-unparsable=0, empty-ratio=0, non-decreasing-pairs=1, decreasing-pairs=0"
+          ]
+        },
+        {
+          "sourceColumn": "RO_Tuketimi_ton",
+          "label": "RO_Tuketimi_ton",
+          "verified": false,
+          "valueType": null,
+          "unit": null,
+          "evidenceRefs": [
+            "UNVERIFIED: no BOTC reader uses it (absent from BOTC:BOT.Domain/IsletmeModelleri.cs:48-58 and from IsletmeRaporlariWindow.xaml.cs:385-447); nothing may be inferred from the column name",
+            "CSV-STAT:endeksler.RO_Tuketimi_ton numeric-unparsable=0, empty-ratio=0, non-decreasing-pairs=1, decreasing-pairs=0"
+          ]
+        },
+        {
+          "sourceColumn": "KazanBesiSuyu_ton",
+          "label": "KazanBesiSuyu_ton",
+          "verified": false,
+          "valueType": null,
+          "unit": null,
+          "evidenceRefs": [
+            "UNVERIFIED: no BOTC reader uses it (absent from BOTC:BOT.Domain/IsletmeModelleri.cs:48-58 and from IsletmeRaporlariWindow.xaml.cs:385-447); nothing may be inferred from the column name",
+            "CSV-STAT:endeksler.KazanBesiSuyu_ton numeric-unparsable=0, empty-ratio=0, non-decreasing-pairs=0.9797, decreasing-pairs=157"
+          ]
+        },
+        {
+          "sourceColumn": "EDI_TON",
+          "label": "EDI_TON",
+          "verified": false,
+          "valueType": null,
+          "unit": null,
+          "evidenceRefs": [
+            "UNVERIFIED: no BOTC reader uses it (absent from BOTC:BOT.Domain/IsletmeModelleri.cs:48-58 and from IsletmeRaporlariWindow.xaml.cs:385-447); nothing may be inferred from the column name",
+            "CSV-STAT:endeksler.EDI_TON numeric-unparsable=0, empty-ratio=0, non-decreasing-pairs=0.9995, decreasing-pairs=4"
+          ]
+        },
+        {
+          "sourceColumn": "HamSuKuyu_m3",
+          "label": "HamSuKuyu_m3",
+          "verified": false,
+          "valueType": null,
+          "unit": null,
+          "evidenceRefs": [
+            "UNVERIFIED: the column is constant zero in the snapshot, so no behaviour can be shown; nothing may be inferred from the column name",
+            "CSV-STAT:endeksler.HamSuKuyu_m3 numeric-unparsable=0, empty-ratio=0, non-decreasing-pairs=1, decreasing-pairs=0, all-zero"
+          ]
+        },
+        {
+          "sourceColumn": "DogalgazHat1_Sm3",
+          "label": "DogalgazHat1_Sm3",
+          "verified": false,
+          "valueType": null,
+          "unit": null,
+          "evidenceRefs": [
+            "UNVERIFIED: no BOTC reader uses it (absent from BOTC:BOT.Domain/IsletmeModelleri.cs:48-58 and from IsletmeRaporlariWindow.xaml.cs:385-447); nothing may be inferred from the column name",
+            "CSV-STAT:endeksler.DogalgazHat1_Sm3 numeric-unparsable=0, empty-ratio=0, non-decreasing-pairs=1, decreasing-pairs=0"
+          ]
+        },
+        {
+          "sourceColumn": "DogalgazHat2_Sm3",
+          "label": "DogalgazHat2_Sm3",
+          "verified": false,
+          "valueType": null,
+          "unit": null,
+          "evidenceRefs": [
+            "UNVERIFIED: no BOTC reader uses it (absent from BOTC:BOT.Domain/IsletmeModelleri.cs:48-58 and from IsletmeRaporlariWindow.xaml.cs:385-447); nothing may be inferred from the column name",
+            "CSV-STAT:endeksler.DogalgazHat2_Sm3 numeric-unparsable=0, empty-ratio=0, non-decreasing-pairs=1, decreasing-pairs=0"
+          ]
+        },
+        {
+          "sourceColumn": "Turbin1_CalismaSaati",
+          "label": "Turbin1_CalismaSaati",
+          "verified": false,
+          "valueType": null,
+          "unit": null,
+          "evidenceRefs": [
+            "UNVERIFIED: the column is constant zero in the snapshot, so no behaviour can be shown; nothing may be inferred from the column name",
+            "CSV-STAT:endeksler.Turbin1_CalismaSaati numeric-unparsable=0, empty-ratio=0, non-decreasing-pairs=1, decreasing-pairs=0, all-zero"
+          ]
+        },
+        {
+          "sourceColumn": "Turbin2_CalismaSaati",
+          "label": "Turbin2_CalismaSaati",
+          "verified": false,
+          "valueType": null,
+          "unit": null,
+          "evidenceRefs": [
+            "UNVERIFIED: the column is constant zero in the snapshot, so no behaviour can be shown; nothing may be inferred from the column name",
+            "CSV-STAT:endeksler.Turbin2_CalismaSaati numeric-unparsable=0, empty-ratio=0, non-decreasing-pairs=1, decreasing-pairs=0, all-zero"
+          ]
+        },
+        {
+          "sourceColumn": "KurutmaAnalizor1",
+          "label": "KurutmaAnalizor1",
+          "verified": false,
+          "valueType": null,
+          "unit": null,
+          "evidenceRefs": [
+            "UNVERIFIED: no BOTC reader uses it (absent from BOTC:BOT.Domain/IsletmeModelleri.cs:48-58 and from IsletmeRaporlariWindow.xaml.cs:385-447); nothing may be inferred from the column name",
+            "CSV-STAT:endeksler.KurutmaAnalizor1 numeric-unparsable=0, empty-ratio=0, non-decreasing-pairs=1, decreasing-pairs=0"
+          ]
+        },
+        {
+          "sourceColumn": "KurutmaAnalizor2",
+          "label": "KurutmaAnalizor2",
+          "verified": false,
+          "valueType": null,
+          "unit": null,
+          "evidenceRefs": [
+            "UNVERIFIED: no BOTC reader uses it (absent from BOTC:BOT.Domain/IsletmeModelleri.cs:48-58 and from IsletmeRaporlariWindow.xaml.cs:385-447); nothing may be inferred from the column name",
+            "CSV-STAT:endeksler.KurutmaAnalizor2 numeric-unparsable=0, empty-ratio=0, non-decreasing-pairs=0.9999, decreasing-pairs=1"
+          ]
+        },
+        {
+          "sourceColumn": "KurutmaBuhar",
+          "label": "KurutmaBuhar",
+          "verified": false,
+          "valueType": null,
+          "unit": null,
+          "evidenceRefs": [
+            "UNVERIFIED: no BOTC reader uses it (absent from BOTC:BOT.Domain/IsletmeModelleri.cs:48-58 and from IsletmeRaporlariWindow.xaml.cs:385-447); nothing may be inferred from the column name",
+            "CSV-STAT:endeksler.KurutmaBuhar numeric-unparsable=0, empty-ratio=0, non-decreasing-pairs=1, decreasing-pairs=0"
+          ]
+        },
+        {
+          "sourceColumn": "MCC_1_ENDEKS",
+          "label": "MCC_1_ENDEKS",
+          "verified": false,
+          "valueType": null,
+          "unit": null,
+          "evidenceRefs": [
+            "UNVERIFIED: no BOTC reader uses it (absent from BOTC:BOT.Domain/IsletmeModelleri.cs:48-58 and from IsletmeRaporlariWindow.xaml.cs:385-447); nothing may be inferred from the column name",
+            "CSV-STAT:endeksler.MCC_1_ENDEKS numeric-unparsable=0, empty-ratio=0.3043, non-decreasing-pairs=1, decreasing-pairs=0"
+          ]
+        },
+        {
+          "sourceColumn": "MCC_2_ENDEKS",
+          "label": "MCC_2_ENDEKS",
+          "verified": false,
+          "valueType": null,
+          "unit": null,
+          "evidenceRefs": [
+            "UNVERIFIED: no BOTC reader uses it (absent from BOTC:BOT.Domain/IsletmeModelleri.cs:48-58 and from IsletmeRaporlariWindow.xaml.cs:385-447); nothing may be inferred from the column name",
+            "CSV-STAT:endeksler.MCC_2_ENDEKS numeric-unparsable=0, empty-ratio=0.3043, non-decreasing-pairs=1, decreasing-pairs=0"
+          ]
+        },
+        {
+          "sourceColumn": "MCC_3_ENDEKS",
+          "label": "MCC_3_ENDEKS",
+          "verified": false,
+          "valueType": null,
+          "unit": null,
+          "evidenceRefs": [
+            "UNVERIFIED: no BOTC reader uses it (absent from BOTC:BOT.Domain/IsletmeModelleri.cs:48-58 and from IsletmeRaporlariWindow.xaml.cs:385-447); nothing may be inferred from the column name",
+            "CSV-STAT:endeksler.MCC_3_ENDEKS numeric-unparsable=0, empty-ratio=0.3043, non-decreasing-pairs=1, decreasing-pairs=0"
+          ]
+        }
+      ]
+    },
+    {
+      "catalogId": "scada-cat-gt_endeksler",
+      "sourceKey": "gt_endeksler",
+      "logicalSourceName": "GT Endeksler SCADA Snapshot Fixture",
+      "file": "veriler/raw/gt_endeksler.csv",
+      "table": "gt_endeksler",
+      "idColumn": "ID",
+      "dateColumn": "KAYIT_TARIHI",
+      "timeColumn": "KAYIT_SAATI",
+      "timezone": "UNVERIFIED",
+      "status": "DEVELOPMENT_FIXTURE",
+      "mappingStatus": "UNVERIFIED",
+      "sha256": "4217da6e8b40de3f116e9d909cc5d3266d1ecc35b1a1dd5c9d9b4fcff847fa6c",
+      "rowCount": 6383,
+      "columnCount": 24,
+      "developmentOnly": true,
+      "columns": [
+        {
+          "sourceColumn": "GT1_ELEKTRIK_URETIM_KWH",
+          "label": "GT1_ELEKTRIK_URETIM_KWH",
+          "verified": true,
+          "valueType": "INDEX",
+          "evidenceRefs": [
+            "BOTC:BOT/IsletmeRaporlariWindow.xaml.cs:385-387 (the column is used as a COUNTER: last − first over a day)",
+            "BOTC:BOT.Domain/IsletmeModelleri.cs:6-19 (GtEndeks) (column exists in the BOTC domain model)",
+            "BOTC:BOT/HourlyConsumptionWindow.xaml.cs:166-177 (GetDefaultValueTypeForTable: this table is not one of the three \"Gerçek Değer\" tables, so the per-column default is \"Endeks\")",
+            "CSV-STAT:gt_endeksler.GT1_ELEKTRIK_URETIM_KWH numeric-unparsable=0, empty-ratio=0, non-decreasing-pairs=0.9997, decreasing-pairs=2",
+            "UNIT-NOT-VERIFIED: BOTC:BOT/IsletmeRaporlariWindow.xaml.cs:213/225 label the electricity delta \"(MWh)\" although the column name says KWH and no conversion exists in BOTC:BOT/IsletmeRaporlariWindow.xaml.cs:385-387/404-406 — the unit is contradictory, so none is declared"
+          ]
+        },
+        {
+          "sourceColumn": "GT2_ELEKTRIK_URETIM_KWH",
+          "label": "GT2_ELEKTRIK_URETIM_KWH",
+          "verified": true,
+          "valueType": "INDEX",
+          "evidenceRefs": [
+            "BOTC:BOT/IsletmeRaporlariWindow.xaml.cs:385-387 (the column is used as a COUNTER: last − first over a day)",
+            "BOTC:BOT.Domain/IsletmeModelleri.cs:6-19 (GtEndeks) (column exists in the BOTC domain model)",
+            "BOTC:BOT/HourlyConsumptionWindow.xaml.cs:166-177 (GetDefaultValueTypeForTable: this table is not one of the three \"Gerçek Değer\" tables, so the per-column default is \"Endeks\")",
+            "CSV-STAT:gt_endeksler.GT2_ELEKTRIK_URETIM_KWH numeric-unparsable=0, empty-ratio=0, non-decreasing-pairs=0.9998, decreasing-pairs=1",
+            "UNIT-NOT-VERIFIED: BOTC:BOT/IsletmeRaporlariWindow.xaml.cs:213/225 label the electricity delta \"(MWh)\" although the column name says KWH and no conversion exists in BOTC:BOT/IsletmeRaporlariWindow.xaml.cs:385-387/404-406 — the unit is contradictory, so none is declared"
+          ]
+        },
+        {
+          "sourceColumn": "GT3_ELEKTRIK_URETIM_KWH",
+          "label": "GT3_ELEKTRIK_URETIM_KWH",
+          "verified": true,
+          "valueType": "INDEX",
+          "evidenceRefs": [
+            "BOTC:BOT/IsletmeRaporlariWindow.xaml.cs:385-387 (the column is used as a COUNTER: last − first over a day)",
+            "BOTC:BOT.Domain/IsletmeModelleri.cs:6-19 (GtEndeks) (column exists in the BOTC domain model)",
+            "BOTC:BOT/HourlyConsumptionWindow.xaml.cs:166-177 (GetDefaultValueTypeForTable: this table is not one of the three \"Gerçek Değer\" tables, so the per-column default is \"Endeks\")",
+            "CSV-STAT:gt_endeksler.GT3_ELEKTRIK_URETIM_KWH numeric-unparsable=0, empty-ratio=0, non-decreasing-pairs=0.9998, decreasing-pairs=1",
+            "UNIT-NOT-VERIFIED: BOTC:BOT/IsletmeRaporlariWindow.xaml.cs:213/225 label the electricity delta \"(MWh)\" although the column name says KWH and no conversion exists in BOTC:BOT/IsletmeRaporlariWindow.xaml.cs:385-387/404-406 — the unit is contradictory, so none is declared"
+          ]
+        },
+        {
+          "sourceColumn": "GT1_BUHAR_URETIM_TON",
+          "label": "GT1_BUHAR_URETIM_TON",
+          "verified": true,
+          "valueType": "INDEX",
+          "unit": "ton",
+          "evidenceRefs": [
+            "BOTC:BOT/IsletmeRaporlariWindow.xaml.cs:391-393 (the column is used as a COUNTER: last − first over a day)",
+            "BOTC:BOT.Domain/IsletmeModelleri.cs:6-19 (GtEndeks) (column exists in the BOTC domain model)",
+            "BOTC:BOT/HourlyConsumptionWindow.xaml.cs:166-177 (GetDefaultValueTypeForTable: this table is not one of the three \"Gerçek Değer\" tables, so the per-column default is \"Endeks\")",
+            "CSV-STAT:gt_endeksler.GT1_BUHAR_URETIM_TON numeric-unparsable=0, empty-ratio=0, non-decreasing-pairs=0.9997, decreasing-pairs=2",
+            "UNIT: BOTC:BOT/IsletmeRaporlariWindow.xaml.cs:219 (series \"GT Buhar (ton)\" fed by the GT_BUHAR counter delta BOTC:BOT/IsletmeRaporlariWindow.xaml.cs:391-393)"
+          ]
+        },
+        {
+          "sourceColumn": "GT2_BUHAR_URETIM_TON",
+          "label": "GT2_BUHAR_URETIM_TON",
+          "verified": true,
+          "valueType": "INDEX",
+          "unit": "ton",
+          "evidenceRefs": [
+            "BOTC:BOT/IsletmeRaporlariWindow.xaml.cs:391-393 (the column is used as a COUNTER: last − first over a day)",
+            "BOTC:BOT.Domain/IsletmeModelleri.cs:6-19 (GtEndeks) (column exists in the BOTC domain model)",
+            "BOTC:BOT/HourlyConsumptionWindow.xaml.cs:166-177 (GetDefaultValueTypeForTable: this table is not one of the three \"Gerçek Değer\" tables, so the per-column default is \"Endeks\")",
+            "CSV-STAT:gt_endeksler.GT2_BUHAR_URETIM_TON numeric-unparsable=0, empty-ratio=0, non-decreasing-pairs=0.9998, decreasing-pairs=1",
+            "UNIT: BOTC:BOT/IsletmeRaporlariWindow.xaml.cs:219 (series \"GT Buhar (ton)\" fed by the GT_BUHAR counter delta BOTC:BOT/IsletmeRaporlariWindow.xaml.cs:391-393)"
+          ]
+        },
+        {
+          "sourceColumn": "GT3_BUHAR_URETIM_TON",
+          "label": "GT3_BUHAR_URETIM_TON",
+          "verified": true,
+          "valueType": "INDEX",
+          "unit": "ton",
+          "evidenceRefs": [
+            "BOTC:BOT/IsletmeRaporlariWindow.xaml.cs:391-393 (the column is used as a COUNTER: last − first over a day)",
+            "BOTC:BOT.Domain/IsletmeModelleri.cs:6-19 (GtEndeks) (column exists in the BOTC domain model)",
+            "BOTC:BOT/HourlyConsumptionWindow.xaml.cs:166-177 (GetDefaultValueTypeForTable: this table is not one of the three \"Gerçek Değer\" tables, so the per-column default is \"Endeks\")",
+            "CSV-STAT:gt_endeksler.GT3_BUHAR_URETIM_TON numeric-unparsable=0, empty-ratio=0, non-decreasing-pairs=0.9998, decreasing-pairs=1",
+            "UNIT: BOTC:BOT/IsletmeRaporlariWindow.xaml.cs:219 (series \"GT Buhar (ton)\" fed by the GT_BUHAR counter delta BOTC:BOT/IsletmeRaporlariWindow.xaml.cs:391-393)"
+          ]
+        },
+        {
+          "sourceColumn": "GT1_SICAKSU_URETIM_KWH",
+          "label": "GT1_SICAKSU_URETIM_KWH",
+          "verified": false,
+          "valueType": null,
+          "unit": null,
+          "evidenceRefs": [
+            "UNVERIFIED: the column is constant zero in the snapshot, so no behaviour can be shown; nothing may be inferred from the column name",
+            "CSV-STAT:gt_endeksler.GT1_SICAKSU_URETIM_KWH numeric-unparsable=0, empty-ratio=0, non-decreasing-pairs=1, decreasing-pairs=0, all-zero"
+          ]
+        },
+        {
+          "sourceColumn": "GT2_SICAKSU_URETIM_KWH",
+          "label": "GT2_SICAKSU_URETIM_KWH",
+          "verified": false,
+          "valueType": null,
+          "unit": null,
+          "evidenceRefs": [
+            "UNVERIFIED: the column is constant zero in the snapshot, so no behaviour can be shown; nothing may be inferred from the column name",
+            "CSV-STAT:gt_endeksler.GT2_SICAKSU_URETIM_KWH numeric-unparsable=0, empty-ratio=0, non-decreasing-pairs=1, decreasing-pairs=0, all-zero"
+          ]
+        },
+        {
+          "sourceColumn": "GT3_SICAKSU_URETIM_KWH",
+          "label": "GT3_SICAKSU_URETIM_KWH",
+          "verified": false,
+          "valueType": null,
+          "unit": null,
+          "evidenceRefs": [
+            "UNVERIFIED: no BOTC reader uses it (absent from BOTC:BOT.Domain/IsletmeModelleri.cs:6-19 and from IsletmeRaporlariWindow.xaml.cs:385-447); nothing may be inferred from the column name",
+            "CSV-STAT:gt_endeksler.GT3_SICAKSU_URETIM_KWH numeric-unparsable=0, empty-ratio=0, non-decreasing-pairs=1, decreasing-pairs=0"
+          ]
+        },
+        {
+          "sourceColumn": "GT1_DOGALGAZ_TUKETIM_SM3",
+          "label": "GT1_DOGALGAZ_TUKETIM_SM3",
+          "verified": true,
+          "valueType": "INDEX",
+          "unit": "Sm3",
+          "evidenceRefs": [
+            "BOTC:BOT/IsletmeRaporlariWindow.xaml.cs:388-390 (the column is used as a COUNTER: last − first over a day)",
+            "BOTC:BOT.Domain/IsletmeModelleri.cs:6-19 (GtEndeks) (column exists in the BOTC domain model)",
+            "BOTC:BOT/HourlyConsumptionWindow.xaml.cs:166-177 (GetDefaultValueTypeForTable: this table is not one of the three \"Gerçek Değer\" tables, so the per-column default is \"Endeks\")",
+            "CSV-STAT:gt_endeksler.GT1_DOGALGAZ_TUKETIM_SM3 numeric-unparsable=0, empty-ratio=0, non-decreasing-pairs=0.9488, decreasing-pairs=327",
+            "UNIT: BOTC:BOT/IsletmeRaporlariWindow.xaml.cs:214 (series \"GT DG (Sm3)\" fed by the GT_DOGALGAZ counter delta BOTC:BOT/IsletmeRaporlariWindow.xaml.cs:388-390)"
+          ]
+        },
+        {
+          "sourceColumn": "GT2_DOGALGAZ_TUKETIM_SM3",
+          "label": "GT2_DOGALGAZ_TUKETIM_SM3",
+          "verified": true,
+          "valueType": "INDEX",
+          "unit": "Sm3",
+          "evidenceRefs": [
+            "BOTC:BOT/IsletmeRaporlariWindow.xaml.cs:388-390 (the column is used as a COUNTER: last − first over a day)",
+            "BOTC:BOT.Domain/IsletmeModelleri.cs:6-19 (GtEndeks) (column exists in the BOTC domain model)",
+            "BOTC:BOT/HourlyConsumptionWindow.xaml.cs:166-177 (GetDefaultValueTypeForTable: this table is not one of the three \"Gerçek Değer\" tables, so the per-column default is \"Endeks\")",
+            "CSV-STAT:gt_endeksler.GT2_DOGALGAZ_TUKETIM_SM3 numeric-unparsable=0, empty-ratio=0, non-decreasing-pairs=0.9549, decreasing-pairs=288",
+            "UNIT: BOTC:BOT/IsletmeRaporlariWindow.xaml.cs:214 (series \"GT DG (Sm3)\" fed by the GT_DOGALGAZ counter delta BOTC:BOT/IsletmeRaporlariWindow.xaml.cs:388-390)"
+          ]
+        },
+        {
+          "sourceColumn": "GT3_DOGALGAZ_TUKETIM_SM3",
+          "label": "GT3_DOGALGAZ_TUKETIM_SM3",
+          "verified": true,
+          "valueType": "INDEX",
+          "unit": "Sm3",
+          "evidenceRefs": [
+            "BOTC:BOT/IsletmeRaporlariWindow.xaml.cs:388-390 (the column is used as a COUNTER: last − first over a day)",
+            "BOTC:BOT.Domain/IsletmeModelleri.cs:6-19 (GtEndeks) (column exists in the BOTC domain model)",
+            "BOTC:BOT/HourlyConsumptionWindow.xaml.cs:166-177 (GetDefaultValueTypeForTable: this table is not one of the three \"Gerçek Değer\" tables, so the per-column default is \"Endeks\")",
+            "CSV-STAT:gt_endeksler.GT3_DOGALGAZ_TUKETIM_SM3 numeric-unparsable=0, empty-ratio=0, non-decreasing-pairs=0.9991, decreasing-pairs=6",
+            "UNIT: BOTC:BOT/IsletmeRaporlariWindow.xaml.cs:214 (series \"GT DG (Sm3)\" fed by the GT_DOGALGAZ counter delta BOTC:BOT/IsletmeRaporlariWindow.xaml.cs:388-390)"
+          ]
+        },
+        {
+          "sourceColumn": "GT1_BESISUYU_TON",
+          "label": "GT1_BESISUYU_TON",
+          "verified": false,
+          "valueType": null,
+          "unit": null,
+          "evidenceRefs": [
+            "UNVERIFIED: the column is constant zero in the snapshot, so no behaviour can be shown; nothing may be inferred from the column name",
+            "CSV-STAT:gt_endeksler.GT1_BESISUYU_TON numeric-unparsable=0, empty-ratio=0, non-decreasing-pairs=1, decreasing-pairs=0, all-zero"
+          ]
+        },
+        {
+          "sourceColumn": "GT2_BESISUYU_TON",
+          "label": "GT2_BESISUYU_TON",
+          "verified": false,
+          "valueType": null,
+          "unit": null,
+          "evidenceRefs": [
+            "UNVERIFIED: the column is constant zero in the snapshot, so no behaviour can be shown; nothing may be inferred from the column name",
+            "CSV-STAT:gt_endeksler.GT2_BESISUYU_TON numeric-unparsable=0, empty-ratio=0, non-decreasing-pairs=1, decreasing-pairs=0, all-zero"
+          ]
+        },
+        {
+          "sourceColumn": "GT3_BESISUYU_TON",
+          "label": "GT3_BESISUYU_TON",
+          "verified": false,
+          "valueType": null,
+          "unit": null,
+          "evidenceRefs": [
+            "UNVERIFIED: no BOTC reader uses it (absent from BOTC:BOT.Domain/IsletmeModelleri.cs:6-19 and from IsletmeRaporlariWindow.xaml.cs:385-447); nothing may be inferred from the column name",
+            "CSV-STAT:gt_endeksler.GT3_BESISUYU_TON numeric-unparsable=0, empty-ratio=0, non-decreasing-pairs=1, decreasing-pairs=0"
+          ]
+        },
+        {
+          "sourceColumn": "GT1_MAKEUP_TON",
+          "label": "GT1_MAKEUP_TON",
+          "verified": false,
+          "valueType": null,
+          "unit": null,
+          "evidenceRefs": [
+            "UNVERIFIED: the column is constant zero in the snapshot, so no behaviour can be shown; nothing may be inferred from the column name",
+            "CSV-STAT:gt_endeksler.GT1_MAKEUP_TON numeric-unparsable=0, empty-ratio=0, non-decreasing-pairs=1, decreasing-pairs=0, all-zero"
+          ]
+        },
+        {
+          "sourceColumn": "GT2_MAKEUP_TON",
+          "label": "GT2_MAKEUP_TON",
+          "verified": false,
+          "valueType": null,
+          "unit": null,
+          "evidenceRefs": [
+            "UNVERIFIED: the column is constant zero in the snapshot, so no behaviour can be shown; nothing may be inferred from the column name",
+            "CSV-STAT:gt_endeksler.GT2_MAKEUP_TON numeric-unparsable=0, empty-ratio=0, non-decreasing-pairs=1, decreasing-pairs=0, all-zero"
+          ]
+        },
+        {
+          "sourceColumn": "GT3_MAKEUP_TON",
+          "label": "GT3_MAKEUP_TON",
+          "verified": false,
+          "valueType": null,
+          "unit": null,
+          "evidenceRefs": [
+            "UNVERIFIED: no BOTC reader uses it (absent from BOTC:BOT.Domain/IsletmeModelleri.cs:6-19 and from IsletmeRaporlariWindow.xaml.cs:385-447); nothing may be inferred from the column name",
+            "CSV-STAT:gt_endeksler.GT3_MAKEUP_TON numeric-unparsable=0, empty-ratio=0, non-decreasing-pairs=1, decreasing-pairs=0"
+          ]
+        },
+        {
+          "sourceColumn": "GT1_KONDENS_TON",
+          "label": "GT1_KONDENS_TON",
+          "verified": false,
+          "valueType": null,
+          "unit": null,
+          "evidenceRefs": [
+            "UNVERIFIED: the column is constant zero in the snapshot, so no behaviour can be shown; nothing may be inferred from the column name",
+            "CSV-STAT:gt_endeksler.GT1_KONDENS_TON numeric-unparsable=0, empty-ratio=0, non-decreasing-pairs=1, decreasing-pairs=0, all-zero"
+          ]
+        },
+        {
+          "sourceColumn": "GT2_KONDENS_TON",
+          "label": "GT2_KONDENS_TON",
+          "verified": false,
+          "valueType": null,
+          "unit": null,
+          "evidenceRefs": [
+            "UNVERIFIED: the column is constant zero in the snapshot, so no behaviour can be shown; nothing may be inferred from the column name",
+            "CSV-STAT:gt_endeksler.GT2_KONDENS_TON numeric-unparsable=0, empty-ratio=0, non-decreasing-pairs=1, decreasing-pairs=0, all-zero"
+          ]
+        },
+        {
+          "sourceColumn": "GT3_KONDENS_TON",
+          "label": "GT3_KONDENS_TON",
+          "verified": false,
+          "valueType": null,
+          "unit": null,
+          "evidenceRefs": [
+            "UNVERIFIED: no BOTC reader uses it (absent from BOTC:BOT.Domain/IsletmeModelleri.cs:6-19 and from IsletmeRaporlariWindow.xaml.cs:385-447); nothing may be inferred from the column name",
+            "CSV-STAT:gt_endeksler.GT3_KONDENS_TON numeric-unparsable=0, empty-ratio=0, non-decreasing-pairs=1, decreasing-pairs=0"
+          ]
+        }
+      ]
+    },
+    {
+      "catalogId": "scada-cat-komur_endeksler",
+      "sourceKey": "komur_endeksler",
+      "logicalSourceName": "Kömür Endeksler SCADA Snapshot Fixture",
+      "file": "veriler/raw/komur_endeksler.csv",
+      "table": "komur_endeksler",
+      "idColumn": "ID",
+      "dateColumn": "KAYIT_TARIHI",
+      "timeColumn": "KAYIT_SAATI",
+      "timezone": "UNVERIFIED",
+      "status": "DEVELOPMENT_FIXTURE",
+      "mappingStatus": "UNVERIFIED",
+      "sha256": "3ce5fc3080c8bc7f4c0f2e3b21843388cde4484a076211c23c2a45b3521c707c",
+      "rowCount": 6384,
+      "columnCount": 15,
+      "developmentOnly": true,
+      "columns": [
+        {
+          "sourceColumn": "KK1_BUHAR_DN250_TON",
+          "label": "KK1_BUHAR_DN250_TON",
+          "verified": true,
+          "valueType": "INDEX",
+          "evidenceRefs": [
+            "BOTC:BOT/IsletmeRaporlariWindow.xaml.cs:423-424 (the column is used as a COUNTER: last − first over a day)",
+            "BOTC:BOT.Domain/IsletmeModelleri.cs:36-46 (KomurEndeks) (column exists in the BOTC domain model)",
+            "BOTC:BOT/HourlyConsumptionWindow.xaml.cs:166-177 (GetDefaultValueTypeForTable: this table is not one of the three \"Gerçek Değer\" tables, so the per-column default is \"Endeks\")",
+            "CSV-STAT:komur_endeksler.KK1_BUHAR_DN250_TON numeric-unparsable=0, empty-ratio=0, non-decreasing-pairs=0.9998, decreasing-pairs=1",
+            "UNIT-NOT-VERIFIED: the steam series of this column (\"KK Buhar\", BOTC:BOT/IsletmeRaporlariWindow.xaml.cs:193) carries no unit label; the suffix of the name is not evidence"
+          ]
+        },
+        {
+          "sourceColumn": "KK2_BUHAR_DN150_TON",
+          "label": "KK2_BUHAR_DN150_TON",
+          "verified": true,
+          "valueType": "INDEX",
+          "evidenceRefs": [
+            "BOTC:BOT/IsletmeRaporlariWindow.xaml.cs:423-424 (the column is used as a COUNTER: last − first over a day)",
+            "BOTC:BOT.Domain/IsletmeModelleri.cs:36-46 (KomurEndeks) (column exists in the BOTC domain model)",
+            "BOTC:BOT/HourlyConsumptionWindow.xaml.cs:166-177 (GetDefaultValueTypeForTable: this table is not one of the three \"Gerçek Değer\" tables, so the per-column default is \"Endeks\")",
+            "CSV-STAT:komur_endeksler.KK2_BUHAR_DN150_TON numeric-unparsable=0, empty-ratio=0, non-decreasing-pairs=0.9998, decreasing-pairs=1",
+            "UNIT-NOT-VERIFIED: the steam series of this column (\"KK Buhar\", BOTC:BOT/IsletmeRaporlariWindow.xaml.cs:193) carries no unit label; the suffix of the name is not evidence"
+          ]
+        },
+        {
+          "sourceColumn": "SICAK_SU_URETIM_KWH",
+          "label": "SICAK_SU_URETIM_KWH",
+          "verified": false,
+          "valueType": null,
+          "unit": null,
+          "evidenceRefs": [
+            "UNVERIFIED: no BOTC reader uses it (absent from BOTC:BOT.Domain/IsletmeModelleri.cs:36-46 and from IsletmeRaporlariWindow.xaml.cs:385-447); nothing may be inferred from the column name",
+            "CSV-STAT:komur_endeksler.SICAK_SU_URETIM_KWH numeric-unparsable=0, empty-ratio=0, non-decreasing-pairs=0.9998, decreasing-pairs=1"
+          ]
+        },
+        {
+          "sourceColumn": "SICAK_SU_BUHAR_TUK_TON",
+          "label": "SICAK_SU_BUHAR_TUK_TON",
+          "verified": true,
+          "valueType": "INDEX",
+          "evidenceRefs": [
+            "BOTC:BOT/IsletmeRaporlariWindow.xaml.cs:429 (the column is used as a COUNTER: last − first over a day)",
+            "BOTC:BOT.Domain/IsletmeModelleri.cs:36-46 (KomurEndeks) (column exists in the BOTC domain model)",
+            "BOTC:BOT/HourlyConsumptionWindow.xaml.cs:166-177 (GetDefaultValueTypeForTable: this table is not one of the three \"Gerçek Değer\" tables, so the per-column default is \"Endeks\")",
+            "CSV-STAT:komur_endeksler.SICAK_SU_BUHAR_TUK_TON numeric-unparsable=0, empty-ratio=0, non-decreasing-pairs=0.9998, decreasing-pairs=1",
+            "UNIT-NOT-VERIFIED: its series (\"Sıcak Su\", BOTC:BOT/IsletmeRaporlariWindow.xaml.cs:195) carries no unit label"
+          ]
+        },
+        {
+          "sourceColumn": "KK1_KOMUR_TUK_TON",
+          "label": "KK1_KOMUR_TUK_TON",
+          "verified": true,
+          "valueType": "INDEX",
+          "unit": "ton",
+          "evidenceRefs": [
+            "BOTC:BOT/IsletmeRaporlariWindow.xaml.cs:425-426 (the column is used as a COUNTER: last − first over a day)",
+            "BOTC:BOT.Domain/IsletmeModelleri.cs:36-46 (KomurEndeks) (column exists in the BOTC domain model)",
+            "BOTC:BOT/HourlyConsumptionWindow.xaml.cs:166-177 (GetDefaultValueTypeForTable: this table is not one of the three \"Gerçek Değer\" tables, so the per-column default is \"Endeks\")",
+            "CSV-STAT:komur_endeksler.KK1_KOMUR_TUK_TON numeric-unparsable=0, empty-ratio=0, non-decreasing-pairs=0.9978, decreasing-pairs=14",
+            "UNIT: BOTC:BOT/IsletmeRaporlariWindow.xaml.cs:199/202 (axis \"Kömür (ton)\", series \"KK Kömür (ton)\" fed by the KK_KOMUR counter delta BOTC:BOT/IsletmeRaporlariWindow.xaml.cs:425-426)"
+          ]
+        },
+        {
+          "sourceColumn": "KK2_KOMUR_TUK_TON",
+          "label": "KK2_KOMUR_TUK_TON",
+          "verified": true,
+          "valueType": "INDEX",
+          "unit": "ton",
+          "evidenceRefs": [
+            "BOTC:BOT/IsletmeRaporlariWindow.xaml.cs:425-426 (the column is used as a COUNTER: last − first over a day)",
+            "BOTC:BOT.Domain/IsletmeModelleri.cs:36-46 (KomurEndeks) (column exists in the BOTC domain model)",
+            "BOTC:BOT/HourlyConsumptionWindow.xaml.cs:166-177 (GetDefaultValueTypeForTable: this table is not one of the three \"Gerçek Değer\" tables, so the per-column default is \"Endeks\")",
+            "CSV-STAT:komur_endeksler.KK2_KOMUR_TUK_TON numeric-unparsable=0, empty-ratio=0, non-decreasing-pairs=0.998, decreasing-pairs=13",
+            "UNIT: BOTC:BOT/IsletmeRaporlariWindow.xaml.cs:199/202 (axis \"Kömür (ton)\", series \"KK Kömür (ton)\" fed by the KK_KOMUR counter delta BOTC:BOT/IsletmeRaporlariWindow.xaml.cs:425-426)"
+          ]
+        },
+        {
+          "sourceColumn": "DEGAZOR_BUHAR_TUK_TON",
+          "label": "DEGAZOR_BUHAR_TUK_TON",
+          "verified": true,
+          "valueType": "INDEX",
+          "evidenceRefs": [
+            "BOTC:BOT/IsletmeRaporlariWindow.xaml.cs:430 (the column is used as a COUNTER: last − first over a day)",
+            "BOTC:BOT.Domain/IsletmeModelleri.cs:36-46 (KomurEndeks) (column exists in the BOTC domain model)",
+            "BOTC:BOT/HourlyConsumptionWindow.xaml.cs:166-177 (GetDefaultValueTypeForTable: this table is not one of the three \"Gerçek Değer\" tables, so the per-column default is \"Endeks\")",
+            "CSV-STAT:komur_endeksler.DEGAZOR_BUHAR_TUK_TON numeric-unparsable=0, empty-ratio=0, non-decreasing-pairs=0.9998, decreasing-pairs=1",
+            "UNIT-NOT-VERIFIED: its series (\"KK Deg.\", BOTC:BOT/IsletmeRaporlariWindow.xaml.cs:196) carries no unit label"
+          ]
+        },
+        {
+          "sourceColumn": "TOPLAM_IC_ENERJI_KWH",
+          "label": "TOPLAM_IC_ENERJI_KWH",
+          "verified": false,
+          "valueType": null,
+          "unit": null,
+          "evidenceRefs": [
+            "UNVERIFIED: no BOTC reader uses it (absent from BOTC:BOT.Domain/IsletmeModelleri.cs:36-46 and from IsletmeRaporlariWindow.xaml.cs:385-447); nothing may be inferred from the column name",
+            "CSV-STAT:komur_endeksler.TOPLAM_IC_ENERJI_KWH numeric-unparsable=0, empty-ratio=0, non-decreasing-pairs=0.9998, decreasing-pairs=1"
+          ]
+        },
+        {
+          "sourceColumn": "DRUM_SU_BESLEME1_TON",
+          "label": "DRUM_SU_BESLEME1_TON",
+          "verified": false,
+          "valueType": null,
+          "unit": null,
+          "evidenceRefs": [
+            "UNVERIFIED: no BOTC reader uses it (absent from BOTC:BOT.Domain/IsletmeModelleri.cs:36-46 and from IsletmeRaporlariWindow.xaml.cs:385-447); nothing may be inferred from the column name",
+            "CSV-STAT:komur_endeksler.DRUM_SU_BESLEME1_TON numeric-unparsable=0, empty-ratio=0, non-decreasing-pairs=0.9998, decreasing-pairs=1"
+          ]
+        },
+        {
+          "sourceColumn": "DRUM_SU_BESLEME2_TON",
+          "label": "DRUM_SU_BESLEME2_TON",
+          "verified": false,
+          "valueType": null,
+          "unit": null,
+          "evidenceRefs": [
+            "UNVERIFIED: no BOTC reader uses it (absent from BOTC:BOT.Domain/IsletmeModelleri.cs:36-46 and from IsletmeRaporlariWindow.xaml.cs:385-447); nothing may be inferred from the column name",
+            "CSV-STAT:komur_endeksler.DRUM_SU_BESLEME2_TON numeric-unparsable=0, empty-ratio=0, non-decreasing-pairs=0.9998, decreasing-pairs=1"
+          ]
+        },
+        {
+          "sourceColumn": "IYI_SU_MAKEUP_TON",
+          "label": "IYI_SU_MAKEUP_TON",
+          "verified": false,
+          "valueType": null,
+          "unit": null,
+          "evidenceRefs": [
+            "UNVERIFIED: no BOTC reader uses it (absent from BOTC:BOT.Domain/IsletmeModelleri.cs:36-46 and from IsletmeRaporlariWindow.xaml.cs:385-447); nothing may be inferred from the column name",
+            "CSV-STAT:komur_endeksler.IYI_SU_MAKEUP_TON numeric-unparsable=0, empty-ratio=0, non-decreasing-pairs=0.9998, decreasing-pairs=1"
+          ]
+        },
+        {
+          "sourceColumn": "MUSTERI_KONDENS_DONUS_TON",
+          "label": "MUSTERI_KONDENS_DONUS_TON",
+          "verified": false,
+          "valueType": null,
+          "unit": null,
+          "evidenceRefs": [
+            "UNVERIFIED: no BOTC reader uses it (absent from BOTC:BOT.Domain/IsletmeModelleri.cs:36-46 and from IsletmeRaporlariWindow.xaml.cs:385-447); nothing may be inferred from the column name",
+            "CSV-STAT:komur_endeksler.MUSTERI_KONDENS_DONUS_TON numeric-unparsable=0, empty-ratio=0, non-decreasing-pairs=0.9998, decreasing-pairs=1"
+          ]
+        }
+      ]
+    },
+    {
+      "catalogId": "scada-cat-sg_endeksler",
+      "sourceKey": "sg_endeksler",
+      "logicalSourceName": "SG Endeksler SCADA Snapshot Fixture",
+      "file": "veriler/raw/sg_endeksler.csv",
+      "table": "sg_endeksler",
+      "idColumn": "ID",
+      "dateColumn": "KAYIT_TARIHI",
+      "timeColumn": "KAYIT_SAATI",
+      "timezone": "UNVERIFIED",
+      "status": "DEVELOPMENT_FIXTURE",
+      "mappingStatus": "UNVERIFIED",
+      "sha256": "04614809c0b2f1c4d08e76681f9b0883926452b05906b286e5ca0abfe562ff63",
+      "rowCount": 6383,
+      "columnCount": 19,
+      "developmentOnly": true,
+      "columns": [
+        {
+          "sourceColumn": "SG50_1_ELEKTRIK_URETIM_KWH",
+          "label": "SG50_1_ELEKTRIK_URETIM_KWH",
+          "verified": true,
+          "valueType": "INDEX",
+          "evidenceRefs": [
+            "BOTC:BOT/IsletmeRaporlariWindow.xaml.cs:404-406 (the column is used as a COUNTER: last − first over a day)",
+            "BOTC:BOT.Domain/IsletmeModelleri.cs:21-34 (SgEndeks) (column exists in the BOTC domain model)",
+            "BOTC:BOT/HourlyConsumptionWindow.xaml.cs:166-177 (GetDefaultValueTypeForTable: this table is not one of the three \"Gerçek Değer\" tables, so the per-column default is \"Endeks\")",
+            "CSV-STAT:sg_endeksler.SG50_1_ELEKTRIK_URETIM_KWH numeric-unparsable=0, empty-ratio=0, non-decreasing-pairs=0.9998, decreasing-pairs=1",
+            "UNIT-NOT-VERIFIED: BOTC:BOT/IsletmeRaporlariWindow.xaml.cs:213/225 label the electricity delta \"(MWh)\" although the column name says KWH and no conversion exists in BOTC:BOT/IsletmeRaporlariWindow.xaml.cs:385-387/404-406 — the unit is contradictory, so none is declared"
+          ]
+        },
+        {
+          "sourceColumn": "SG50_2_ELEKTRIK_URETIM_KWH",
+          "label": "SG50_2_ELEKTRIK_URETIM_KWH",
+          "verified": true,
+          "valueType": "INDEX",
+          "evidenceRefs": [
+            "BOTC:BOT/IsletmeRaporlariWindow.xaml.cs:404-406 (the column is used as a COUNTER: last − first over a day)",
+            "BOTC:BOT.Domain/IsletmeModelleri.cs:21-34 (SgEndeks) (column exists in the BOTC domain model)",
+            "BOTC:BOT/HourlyConsumptionWindow.xaml.cs:166-177 (GetDefaultValueTypeForTable: this table is not one of the three \"Gerçek Değer\" tables, so the per-column default is \"Endeks\")",
+            "CSV-STAT:sg_endeksler.SG50_2_ELEKTRIK_URETIM_KWH numeric-unparsable=0, empty-ratio=0, non-decreasing-pairs=1, decreasing-pairs=0",
+            "UNIT-NOT-VERIFIED: BOTC:BOT/IsletmeRaporlariWindow.xaml.cs:213/225 label the electricity delta \"(MWh)\" although the column name says KWH and no conversion exists in BOTC:BOT/IsletmeRaporlariWindow.xaml.cs:385-387/404-406 — the unit is contradictory, so none is declared"
+          ]
+        },
+        {
+          "sourceColumn": "SG50_3_ELEKTRIK_URETIM_KWH",
+          "label": "SG50_3_ELEKTRIK_URETIM_KWH",
+          "verified": true,
+          "valueType": "INDEX",
+          "evidenceRefs": [
+            "BOTC:BOT/IsletmeRaporlariWindow.xaml.cs:404-406 (the column is used as a COUNTER: last − first over a day)",
+            "BOTC:BOT.Domain/IsletmeModelleri.cs:21-34 (SgEndeks) (column exists in the BOTC domain model)",
+            "BOTC:BOT/HourlyConsumptionWindow.xaml.cs:166-177 (GetDefaultValueTypeForTable: this table is not one of the three \"Gerçek Değer\" tables, so the per-column default is \"Endeks\")",
+            "CSV-STAT:sg_endeksler.SG50_3_ELEKTRIK_URETIM_KWH numeric-unparsable=0, empty-ratio=0, non-decreasing-pairs=0.9998, decreasing-pairs=1",
+            "UNIT-NOT-VERIFIED: BOTC:BOT/IsletmeRaporlariWindow.xaml.cs:213/225 label the electricity delta \"(MWh)\" although the column name says KWH and no conversion exists in BOTC:BOT/IsletmeRaporlariWindow.xaml.cs:385-387/404-406 — the unit is contradictory, so none is declared"
+          ]
+        },
+        {
+          "sourceColumn": "SG50_1_BUHAR_URETIM_TON",
+          "label": "SG50_1_BUHAR_URETIM_TON",
+          "verified": true,
+          "valueType": "INDEX",
+          "unit": "ton",
+          "evidenceRefs": [
+            "BOTC:BOT/IsletmeRaporlariWindow.xaml.cs:410-412 (the column is used as a COUNTER: last − first over a day)",
+            "BOTC:BOT.Domain/IsletmeModelleri.cs:21-34 (SgEndeks) (column exists in the BOTC domain model)",
+            "BOTC:BOT/HourlyConsumptionWindow.xaml.cs:166-177 (GetDefaultValueTypeForTable: this table is not one of the three \"Gerçek Değer\" tables, so the per-column default is \"Endeks\")",
+            "CSV-STAT:sg_endeksler.SG50_1_BUHAR_URETIM_TON numeric-unparsable=0, empty-ratio=0, non-decreasing-pairs=1, decreasing-pairs=0",
+            "UNIT: BOTC:BOT/IsletmeRaporlariWindow.xaml.cs:231 (series \"SG Buhar (ton)\" fed by the SG_BUHAR counter delta BOTC:BOT/IsletmeRaporlariWindow.xaml.cs:410-412)"
+          ]
+        },
+        {
+          "sourceColumn": "SG50_2_BUHAR_URETIM_TON",
+          "label": "SG50_2_BUHAR_URETIM_TON",
+          "verified": true,
+          "valueType": "INDEX",
+          "unit": "ton",
+          "evidenceRefs": [
+            "BOTC:BOT/IsletmeRaporlariWindow.xaml.cs:410-412 (the column is used as a COUNTER: last − first over a day)",
+            "BOTC:BOT.Domain/IsletmeModelleri.cs:21-34 (SgEndeks) (column exists in the BOTC domain model)",
+            "BOTC:BOT/HourlyConsumptionWindow.xaml.cs:166-177 (GetDefaultValueTypeForTable: this table is not one of the three \"Gerçek Değer\" tables, so the per-column default is \"Endeks\")",
+            "CSV-STAT:sg_endeksler.SG50_2_BUHAR_URETIM_TON numeric-unparsable=0, empty-ratio=0, non-decreasing-pairs=1, decreasing-pairs=0",
+            "UNIT: BOTC:BOT/IsletmeRaporlariWindow.xaml.cs:231 (series \"SG Buhar (ton)\" fed by the SG_BUHAR counter delta BOTC:BOT/IsletmeRaporlariWindow.xaml.cs:410-412)"
+          ]
+        },
+        {
+          "sourceColumn": "SG50_3_BUHAR_URETIM_TON",
+          "label": "SG50_3_BUHAR_URETIM_TON",
+          "verified": true,
+          "valueType": "INDEX",
+          "unit": "ton",
+          "evidenceRefs": [
+            "BOTC:BOT/IsletmeRaporlariWindow.xaml.cs:410-412 (the column is used as a COUNTER: last − first over a day)",
+            "BOTC:BOT.Domain/IsletmeModelleri.cs:21-34 (SgEndeks) (column exists in the BOTC domain model)",
+            "BOTC:BOT/HourlyConsumptionWindow.xaml.cs:166-177 (GetDefaultValueTypeForTable: this table is not one of the three \"Gerçek Değer\" tables, so the per-column default is \"Endeks\")",
+            "CSV-STAT:sg_endeksler.SG50_3_BUHAR_URETIM_TON numeric-unparsable=0, empty-ratio=0, non-decreasing-pairs=0.9995, decreasing-pairs=3",
+            "UNIT: BOTC:BOT/IsletmeRaporlariWindow.xaml.cs:231 (series \"SG Buhar (ton)\" fed by the SG_BUHAR counter delta BOTC:BOT/IsletmeRaporlariWindow.xaml.cs:410-412)"
+          ]
+        },
+        {
+          "sourceColumn": "SG50_1_SICAKSU_URETIM_TON",
+          "label": "SG50_1_SICAKSU_URETIM_TON",
+          "verified": false,
+          "valueType": null,
+          "unit": null,
+          "evidenceRefs": [
+            "UNVERIFIED: no BOTC reader uses it (absent from BOTC:BOT.Domain/IsletmeModelleri.cs:21-34 and from IsletmeRaporlariWindow.xaml.cs:385-447); nothing may be inferred from the column name",
+            "CSV-STAT:sg_endeksler.SG50_1_SICAKSU_URETIM_TON numeric-unparsable=0, empty-ratio=0, non-decreasing-pairs=1, decreasing-pairs=0"
+          ]
+        },
+        {
+          "sourceColumn": "SG50_2_SICAKSU_URETIM_TON",
+          "label": "SG50_2_SICAKSU_URETIM_TON",
+          "verified": false,
+          "valueType": null,
+          "unit": null,
+          "evidenceRefs": [
+            "UNVERIFIED: no BOTC reader uses it (absent from BOTC:BOT.Domain/IsletmeModelleri.cs:21-34 and from IsletmeRaporlariWindow.xaml.cs:385-447); nothing may be inferred from the column name",
+            "CSV-STAT:sg_endeksler.SG50_2_SICAKSU_URETIM_TON numeric-unparsable=0, empty-ratio=0, non-decreasing-pairs=0.9998, decreasing-pairs=1"
+          ]
+        },
+        {
+          "sourceColumn": "SG50_3_SICAKSU_URETIM_TON",
+          "label": "SG50_3_SICAKSU_URETIM_TON",
+          "verified": false,
+          "valueType": null,
+          "unit": null,
+          "evidenceRefs": [
+            "UNVERIFIED: no BOTC reader uses it (absent from BOTC:BOT.Domain/IsletmeModelleri.cs:21-34 and from IsletmeRaporlariWindow.xaml.cs:385-447); nothing may be inferred from the column name",
+            "CSV-STAT:sg_endeksler.SG50_3_SICAKSU_URETIM_TON numeric-unparsable=0, empty-ratio=0, non-decreasing-pairs=1, decreasing-pairs=0"
+          ]
+        },
+        {
+          "sourceColumn": "SG50_1_DOGALGAZ_TUKETIM_SM3",
+          "label": "SG50_1_DOGALGAZ_TUKETIM_SM3",
+          "verified": true,
+          "valueType": "INDEX",
+          "unit": "Sm3",
+          "evidenceRefs": [
+            "BOTC:BOT/IsletmeRaporlariWindow.xaml.cs:407-409 (the column is used as a COUNTER: last − first over a day)",
+            "BOTC:BOT.Domain/IsletmeModelleri.cs:21-34 (SgEndeks) (column exists in the BOTC domain model)",
+            "BOTC:BOT/HourlyConsumptionWindow.xaml.cs:166-177 (GetDefaultValueTypeForTable: this table is not one of the three \"Gerçek Değer\" tables, so the per-column default is \"Endeks\")",
+            "CSV-STAT:sg_endeksler.SG50_1_DOGALGAZ_TUKETIM_SM3 numeric-unparsable=0, empty-ratio=0, non-decreasing-pairs=1, decreasing-pairs=0",
+            "UNIT: BOTC:BOT/IsletmeRaporlariWindow.xaml.cs:226 (series \"SG DG (Sm3)\" fed by the SG_DOGALGAZ counter delta BOTC:BOT/IsletmeRaporlariWindow.xaml.cs:407-409)"
+          ]
+        },
+        {
+          "sourceColumn": "SG50_2_DOGALGAZ_TUKETIM_SM3",
+          "label": "SG50_2_DOGALGAZ_TUKETIM_SM3",
+          "verified": true,
+          "valueType": "INDEX",
+          "unit": "Sm3",
+          "evidenceRefs": [
+            "BOTC:BOT/IsletmeRaporlariWindow.xaml.cs:407-409 (the column is used as a COUNTER: last − first over a day)",
+            "BOTC:BOT.Domain/IsletmeModelleri.cs:21-34 (SgEndeks) (column exists in the BOTC domain model)",
+            "BOTC:BOT/HourlyConsumptionWindow.xaml.cs:166-177 (GetDefaultValueTypeForTable: this table is not one of the three \"Gerçek Değer\" tables, so the per-column default is \"Endeks\")",
+            "CSV-STAT:sg_endeksler.SG50_2_DOGALGAZ_TUKETIM_SM3 numeric-unparsable=0, empty-ratio=0, non-decreasing-pairs=1, decreasing-pairs=0",
+            "UNIT: BOTC:BOT/IsletmeRaporlariWindow.xaml.cs:226 (series \"SG DG (Sm3)\" fed by the SG_DOGALGAZ counter delta BOTC:BOT/IsletmeRaporlariWindow.xaml.cs:407-409)"
+          ]
+        },
+        {
+          "sourceColumn": "SG50_3_DOGALGAZ_TUKETIM_SM3",
+          "label": "SG50_3_DOGALGAZ_TUKETIM_SM3",
+          "verified": true,
+          "valueType": "INDEX",
+          "unit": "Sm3",
+          "evidenceRefs": [
+            "BOTC:BOT/IsletmeRaporlariWindow.xaml.cs:407-409 (the column is used as a COUNTER: last − first over a day)",
+            "BOTC:BOT.Domain/IsletmeModelleri.cs:21-34 (SgEndeks) (column exists in the BOTC domain model)",
+            "BOTC:BOT/HourlyConsumptionWindow.xaml.cs:166-177 (GetDefaultValueTypeForTable: this table is not one of the three \"Gerçek Değer\" tables, so the per-column default is \"Endeks\")",
+            "CSV-STAT:sg_endeksler.SG50_3_DOGALGAZ_TUKETIM_SM3 numeric-unparsable=0, empty-ratio=0, non-decreasing-pairs=1, decreasing-pairs=0",
+            "UNIT: BOTC:BOT/IsletmeRaporlariWindow.xaml.cs:226 (series \"SG DG (Sm3)\" fed by the SG_DOGALGAZ counter delta BOTC:BOT/IsletmeRaporlariWindow.xaml.cs:407-409)"
+          ]
+        },
+        {
+          "sourceColumn": "SG50_1_BESI_TON",
+          "label": "SG50_1_BESI_TON",
+          "verified": false,
+          "valueType": null,
+          "unit": null,
+          "evidenceRefs": [
+            "UNVERIFIED: the column is constant zero in the snapshot, so no behaviour can be shown; nothing may be inferred from the column name",
+            "CSV-STAT:sg_endeksler.SG50_1_BESI_TON numeric-unparsable=0, empty-ratio=0, non-decreasing-pairs=1, decreasing-pairs=0, all-zero"
+          ]
+        },
+        {
+          "sourceColumn": "SG50_2_BESI_TON",
+          "label": "SG50_2_BESI_TON",
+          "verified": false,
+          "valueType": null,
+          "unit": null,
+          "evidenceRefs": [
+            "UNVERIFIED: the column is constant zero in the snapshot, so no behaviour can be shown; nothing may be inferred from the column name",
+            "CSV-STAT:sg_endeksler.SG50_2_BESI_TON numeric-unparsable=0, empty-ratio=0, non-decreasing-pairs=1, decreasing-pairs=0, all-zero"
+          ]
+        },
+        {
+          "sourceColumn": "SG50_3_BESI_TON",
+          "label": "SG50_3_BESI_TON",
+          "verified": false,
+          "valueType": null,
+          "unit": null,
+          "evidenceRefs": [
+            "UNVERIFIED: the column is constant zero in the snapshot, so no behaviour can be shown; nothing may be inferred from the column name",
+            "CSV-STAT:sg_endeksler.SG50_3_BESI_TON numeric-unparsable=0, empty-ratio=0, non-decreasing-pairs=1, decreasing-pairs=0, all-zero"
+          ]
+        },
+        {
+          "sourceColumn": "MSA_ISTASYONU",
+          "label": "MSA_ISTASYONU",
+          "verified": false,
+          "valueType": null,
+          "unit": null,
+          "evidenceRefs": [
+            "UNVERIFIED: the column is constant zero in the snapshot, so no behaviour can be shown; nothing may be inferred from the column name",
+            "CSV-STAT:sg_endeksler.MSA_ISTASYONU numeric-unparsable=0, empty-ratio=0, non-decreasing-pairs=1, decreasing-pairs=0, all-zero"
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jasperReport xmlns="http://jasperreports.sourceforge.net/jasperreports"
+              xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+              xsi:schemaLocation="http://jasperreports.sourceforge.net/jasperreports http://jasperreports.sourceforge.net/xsd/jasperreport.xsd"
+              name="scada-analysis-report" pageWidth="842" pageHeight="595" orientation="Landscape" columnWidth="802"
+              leftMargin="20" rightMargin="20" topMargin="20" bottomMargin="20">
+
+    <!-- TASK-027.74 — allowlisted SCADA analysis report. Bean-fed only (no SQL query element): the API sends pre-formatted text rows
+         (kind: TITLE | META | SECTION | HEADER | DATA | NOTE, cells c1..c8). Turkish characters need a font that has them. -->
+
+    <style name="base" isDefault="true" fontSize="8" pdfEncoding="Cp1254">
+        <conditionalStyle>
+            <conditionExpression><![CDATA[$F{kind}.equals("TITLE")]]></conditionExpression>
+            <style fontSize="14" isBold="true"/>
+        </conditionalStyle>
+        <conditionalStyle>
+            <conditionExpression><![CDATA[$F{kind}.equals("SECTION")]]></conditionExpression>
+            <style fontSize="10" isBold="true"/>
+        </conditionalStyle>
+        <conditionalStyle>
+            <conditionExpression><![CDATA[$F{kind}.equals("HEADER")]]></conditionExpression>
+            <style isBold="true" backcolor="#E8EDF3" mode="Opaque"/>
+        </conditionalStyle>
+        <conditionalStyle>
+            <conditionExpression><![CDATA[$F{kind}.equals("NOTE")]]></conditionExpression>
+            <style isBold="true" forecolor="#8A4B00"/>
+        </conditionalStyle>
+    </style>
+
+    <field name="kind" class="java.lang.String"/>
+    <field name="c1" class="java.lang.String"/>
+    <field name="c2" class="java.lang.String"/>
+    <field name="c3" class="java.lang.String"/>
+    <field name="c4" class="java.lang.String"/>
+    <field name="c5" class="java.lang.String"/>
+    <field name="c6" class="java.lang.String"/>
+    <field name="c7" class="java.lang.String"/>
+    <field name="c8" class="java.lang.String"/>
+
+    <detail>
+        <band height="14">
+            <textField textAdjust="StretchHeight" isBlankWhenNull="true">
+                <reportElement style="base" stretchType="RelativeToTallestObject" x="0" y="0" width="130" height="14"/>
+                <textFieldExpression><![CDATA[$F{c1}]]></textFieldExpression>
+            </textField>
+            <textField textAdjust="StretchHeight" isBlankWhenNull="true">
+                <reportElement style="base" stretchType="RelativeToTallestObject" x="130" y="0" width="170" height="14"/>
+                <textFieldExpression><![CDATA[$F{c2}]]></textFieldExpression>
+            </textField>
+            <textField textAdjust="StretchHeight" isBlankWhenNull="true">
+                <reportElement style="base" stretchType="RelativeToTallestObject" x="300" y="0" width="110" height="14"/>
+                <textFieldExpression><![CDATA[$F{c3}]]></textFieldExpression>
+            </textField>
+            <textField textAdjust="StretchHeight" isBlankWhenNull="true">
+                <reportElement style="base" stretchType="RelativeToTallestObject" x="410" y="0" width="80" height="14"/>
+                <textFieldExpression><![CDATA[$F{c4}]]></textFieldExpression>
+            </textField>
+            <textField textAdjust="StretchHeight" isBlankWhenNull="true">
+                <reportElement style="base" stretchType="RelativeToTallestObject" x="490" y="0" width="70" height="14"/>
+                <textFieldExpression><![CDATA[$F{c5}]]></textFieldExpression>
+            </textField>
+            <textField textAdjust="StretchHeight" isBlankWhenNull="true">
+                <reportElement style="base" stretchType="RelativeToTallestObject" x="560" y="0" width="80" height="14"/>
+                <textFieldExpression><![CDATA[$F{c6}]]></textFieldExpression>
+            </textField>
+            <textField textAdjust="StretchHeight" isBlankWhenNull="true">
+                <reportElement style="base" stretchType="RelativeToTallestObject" x="640" y="0" width="100" height="14"/>
+                <textFieldExpression><![CDATA[$F{c7}]]></textFieldExpression>
+            </textField>
+            <textField textAdjust="StretchHeight" isBlankWhenNull="true">
+                <reportElement style="base" stretchType="RelativeToTallestObject" x="740" y="0" width="62" height="14"/>
+                <textFieldExpression><![CDATA[$F{c8}]]></textFieldExpression>
+            </textField>
+        </band>
+    </detail>
+
+</jasperReport>

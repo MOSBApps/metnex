@@ -34,6 +34,7 @@ const FORBIDDEN_JRXML_TOKENS = [
  */
 const TEMPLATE_ALLOWLIST: Record<string, string> = {
   'sample-report': 'sample-report.jrxml',
+  'scada-analysis-report': 'scada-analysis-report.jrxml',
 }
 
 export interface ResolvedTemplate {
