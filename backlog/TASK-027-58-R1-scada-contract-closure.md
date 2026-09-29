@@ -98,6 +98,14 @@ tenant olmadığını doğrulayan negatif kullanım.
 | `tenant-mapping.ts` | KOD | `KNOWN_TENANT_SLUGS` | aynı |
 | `tenant-coverage.ts` | KOD | `usersByTenant` kaydı MOSEDAS anahtarlı | aynı |
 | `tenant-guards.ts` | KOD (ret kuralı) | TASK-027.63 katalog tenant koruması MOSEDAŞ'ı yalnızca **reddetmek** için adlandırır (`MOSEDAS_IS_NOT_A_TENANT`); tenant modellemez | aynı — tek izinli istisna |
+| `tenant-identity.ts` | KOD (ret kuralı) | TASK-029.01 (`apps/api/src/operations/domain/`) — `tenant-guards.ts` ile aynı desenin **bağımsız kopyası** (`isForbiddenMosedasTenant`); tenant modellemez | aynı — DEC-0017 D-04 açık, bu dosya onu kapatmaz |
+| `external-reference.contract.ts` | KOD (sistem adı) | TASK-029.01 — `EXTERNAL_SYSTEMS` listesinde MOSEDAŞ **yalnızca bir dış sistem adı**; tenant değil | aynı |
+| `operation-center.contract.ts` | KOD (tüketici) | TASK-029.01 — `resolveOperationCenterOwner` MOSEDAŞ-slugged tenant'ı sahip olarak **reddeder** (`isForbiddenMosedasTenant` çağrısı) | aynı |
+| `tenant-operation-scope.contract.ts` | KOD (tüketici) | TASK-029.01 — `resolveUserOperationAccess`/`validateUserOperationCenterScope` MOSEDAŞ-slugged tenant kapsamını **reddeder** | aynı |
+| `operation-center.spec.ts`, `tenant-operation-scope.spec.ts`, `external-reference.spec.ts`, `static-guarantees.spec.ts` | TEST (negatif) | TASK-029.01 domain testleri: MOSEDAŞ'ın tenant sahibi/kapsamı olamayacağını ve yalnız iki dosyada (ret kuralı + sistem adı) geçtiğini doğrular | aynı |
+| `mosedas/b2b-client-identity.contract.ts`, `mosedas/message-envelope.contract.ts` | KOD (sistem adı) | TASK-029.02 — MOSEDAŞ B2B kimliği/mesaj sözleşmesinde MOSEDAŞ yalnız `externalSystem`/`sourceSystem` **sistem adı**; tenant değil | aynı |
+| `mosedas/idempotency.contract.ts`, `mosedas/inbound-message-validation.contract.ts`, `mosedas/retry-classification.contract.ts`, `mosedas/audit-entry.contract.ts` | KOD (yorum/tüketici) | TASK-029.02 — bu dosyalar MOSEDAŞ'ı yalnız doküman yorumunda anar veya yukarıdaki sözleşmeleri tüketir; tenant modellemez | aynı |
+| `mosedas/__tests__/b2b-client-identity.spec.ts`, `mosedas/__tests__/message-envelope.spec.ts`, `mosedas/__tests__/idempotency.spec.ts`, `mosedas/__tests__/inbound-message-validation.spec.ts`, `mosedas/__tests__/audit-entry.spec.ts`, `mosedas/__tests__/static-guarantees.spec.ts` | TEST (negatif) | TASK-029.02 domain testleri: MOSEDAŞ'ın hiçbir zaman tenant/B2B kimliği-tek-başına-yetki olamayacağını doğrular | aynı |
 | `catalog.service.spec.ts` | TEST (negatif) | TASK-027.63 katalog testi: MOSEDAŞ slug'lı tenant'ın mapping'e **reddedildiğini** doğrular | aynı |
 | `adapter-static.spec.ts` | TEST (negatif) | TASK-027.64 adapter statik testi: MOSEDAŞ/`Sirket` sözcüklerinin adapter kodunda **bulunmadığını** doğrular | aynı |
 | `sqlserver-readonly.adapter.spec.ts` | TEST (negatif) | TASK-027.64 adapter testi: MOSEDAŞ slug'lı tenant'ın okuma anında reddedildiğini doğrular | aynı |

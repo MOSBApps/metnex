@@ -51,8 +51,10 @@ describe('SCADA/DMS static security scans (TASK-027.58)', () => {
   })
 
   it('no production code outside the identity-migration source mapping references MOSEDAŞ — it is not created or modelled as a tenant', () => {
-    // The catalog tenant guard names it only to REJECT it (DEC-0014/DEC-0015 Q-SC01 C) — the single allowed exception.
-    const guarded = productionFiles.filter(file => !rel(file).startsWith('migration/') && rel(file) !== 'reporting/scada/catalog/tenant-guards.ts')
+    // The catalog tenant guard (TASK-027.63) and the operations domain's own independent copy (TASK-029.01,
+    // `docs/decisions/DEC-0017-…md`) name it only to REJECT it as a tenant, or (in `external-reference.contract.ts`)
+    // as a plain external SYSTEM name — the allowed exceptions; see `dec-0014-slug-consistency.spec.ts` for the full register.
+    const guarded = productionFiles.filter(file => !rel(file).startsWith('migration/') && rel(file) !== 'reporting/scada/catalog/tenant-guards.ts' && !rel(file).startsWith('operations/domain/'))
     expect(offenders(guarded, /mosedas|mosedaş/i)).toEqual([])
   })
 

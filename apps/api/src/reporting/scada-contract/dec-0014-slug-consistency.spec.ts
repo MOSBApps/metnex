@@ -49,6 +49,28 @@ const KNOWN_PRODUCTION_CONFLICTS = [
 /** Catalog tenant guard (TASK-027.63): names MOSEDAŞ only to REJECT mapping it as a tenant. */
 const CATALOG_REJECTION_RULE = 'reporting/scada/catalog/tenant-guards.ts'
 
+/**
+ * TASK-029.01 — the operations domain's OWN independent copy of the same rejection rule (defense in
+ * depth, same pattern as `CATALOG_REJECTION_RULE`), plus its two direct consumers (`operation-center`
+ * refuses a MOSEDAŞ-slugged owner tenant; `tenant-operation-scope` refuses a MOSEDAŞ-slugged scope
+ * grant) and the one file where MOSEDAŞ is legitimately a plain EXTERNAL SYSTEM NAME (never a
+ * tenant) inside `ExternalSystemReference`. None of these four create or model MOSEDAŞ as a tenant.
+ */
+const OPERATIONS_DOMAIN_FILES = [
+  'operations/domain/tenant-identity.ts',
+  'operations/domain/external-reference.contract.ts',
+  'operations/domain/operation-center.contract.ts',
+  'operations/domain/tenant-operation-scope.contract.ts',
+  // TASK-029.02 — the MOSEDAŞ B2B message/identity contract: MOSEDAŞ is named as the external
+  // system these files are ABOUT (never as a tenant); none of these creates or models a tenant.
+  'operations/domain/mosedas/b2b-client-identity.contract.ts',
+  'operations/domain/mosedas/message-envelope.contract.ts',
+  'operations/domain/mosedas/idempotency.contract.ts',
+  'operations/domain/mosedas/inbound-message-validation.contract.ts',
+  'operations/domain/mosedas/retry-classification.contract.ts',
+  'operations/domain/mosedas/audit-entry.contract.ts',
+]
+
 /** Slug status against DEC-0014. `MOSB` is ambiguous: DEC-0014 names the tenant "MOSB Enerji". */
 const CONFORMING_SLUGS = ['MOSBIO']
 const REGISTERED_CONFLICTS = ['MOSEDAS'] // DEC-0014: not a tenant
@@ -64,12 +86,20 @@ describe('DEC-0014 tenant-slug consistency (TASK-027.58-R1)', () => {
 
   it('the production code that mentions MOSEDAŞ is exactly the known-conflict register (any new reference fails)', () => {
     const production = mentioning.filter(file => !file.endsWith('.spec.ts') && !file.includes('/fixtures/') && !file.startsWith('reporting/scada-contract/'))
-    expect(production).toEqual([...KNOWN_PRODUCTION_CONFLICTS, CATALOG_REJECTION_RULE].sort())
+    expect(production).toEqual([...KNOWN_PRODUCTION_CONFLICTS, CATALOG_REJECTION_RULE, ...OPERATIONS_DOMAIN_FILES].sort())
   })
 
-  it('outside the identity-migration directory only the test-only SCADA contract mentions MOSEDAŞ (as a negative check, never as a tenant)', () => {
+  it('outside the identity-migration directory only the test-only SCADA contract and the operations domain (rejection rule + its consumers + its own tests) mention MOSEDAŞ — never as a tenant', () => {
     const outside = mentioning.filter(file => !file.startsWith('migration/botc-identity/'))
-    expect(outside.every(file => file.startsWith('reporting/scada-contract/') || file === CATALOG_REJECTION_RULE || (file.startsWith('reporting/scada/') && file.endsWith('.spec.ts')))).toBe(true)
+    expect(
+      outside.every(
+        file =>
+          file.startsWith('reporting/scada-contract/') ||
+          file === CATALOG_REJECTION_RULE ||
+          (file.startsWith('reporting/scada/') && file.endsWith('.spec.ts')) ||
+          file.startsWith('operations/domain/'),
+      ),
+    ).toBe(true)
   })
 
   it('every slug the migration code accepts is either DEC-0014-conforming or a registered conflict/ambiguity — no new slug can appear unnoticed', () => {

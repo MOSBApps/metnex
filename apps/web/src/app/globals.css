@@ -187,6 +187,10 @@
   a {
     color: inherit;
   }
+  input[type='checkbox'],
+  input[type='radio'] {
+    accent-color: var(--brand);
+  }
 }
 
 .dark {
@@ -218,6 +222,11 @@
   & input::placeholder,
   & textarea::placeholder { color: #64748b }
 
+  & input[type='checkbox'],
+  & input[type='radio'] {
+    color-scheme: dark;
+  }
+
   & input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]),
   & select,
   & textarea {
@@ -226,6 +235,15 @@
     border-color: rgba(255, 255, 255, 0.20);
     color-scheme: dark;
     transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  }
+
+  & select option {
+    background-color: #181e2a;
+    color: #f1f5f9;
+  }
+
+  & select option:disabled {
+    color: #64748b;
   }
 
   & input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):focus,

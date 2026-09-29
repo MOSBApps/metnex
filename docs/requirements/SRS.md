@@ -450,6 +450,8 @@ criterion oluşturmaz.
 
 ## MOD-007 — Elektrik Üretim Siparişi ve Üretim Planlama
 
+> **DEC-0017 notu (2026-09-28):** FR-067–071 yalnızca **enerji üretim emrini** (MOSEDAŞ SoR) kapsar. Kırım Tesisi'nin kendi (paçal) üretim emri bu FR'lerin kapsamında **değildir** — ayrı, Metnex-SoR'lu bir bounded context'tir; bkz. §9.2 FEAT-026.
+
 **FR-067:** MOSEDAŞ tarafından üretim yapan şirket/şirketlere elektrik üretim siparişi oluşturulabilmelidir.  
 **FR-068 (DEC-0014 ile superseded):** MOSEDAŞ üretim planı ve üretim emrini oluşturmalı; Metnex emri teknik/operasyonel olarak doğrulayıp kabul veya reddetmelidir.
 **FR-069 (DEC-0014):** Üretim planı ve emirlerinin System of Record'u ayrı MOSEDAŞ uygulamasıdır; Metnex operasyon yürütme ve gerçekleşme System of Record'udur.
@@ -486,26 +488,28 @@ criterion oluşturmaz.
 
 ## MOD-009 — Yakıt, Biyokütle ve Laboratuvar
 
+> **DEC-0017 notu (2026-09-28):** FEAT-019–021'in kesin akışı `METNEX_AI1_DISCOVERY_BRIF2.md` görüşmesiyle önemli ölçüde detaylandı (ortak lab, kantar/Netsis, kova ölçümü, Kırım Tesisi reçete/emir). Aşağıdaki FR'ler **silinmedi**; DEC-0017 §9.2 (FEAT-026–029) bu FR'lerin **karma yaşam döngüsü, esas-sonuç ve bildirim kurallarıyla** genişletilmiş halidir. TBD-OPS-005/006/007 bu addendumla **kısmen** yanıtlanmıştır (bkz. ilgili not).
+
 ### FEAT-019 — Biyokütle Reçete / Paçal
 
 **FR-082:** MOSBİO biyokütle reçeteleri birden fazla bileşen içerebilmelidir.  
 **FR-083:** Sistem en az pulper, gübre, tahta, orman atıkları ve kurutulmuş atık su çamurunu reçete bileşeni olarak destekleyebilmelidir.  
 **FR-084:** Her reçete bileşeninin bağımsız kalori değeri kaydedilebilmelidir.  
 **FR-085:** Paçal / karışım sonucu kalori değeri kaydedilebilmelidir.  
-**TBD-OPS-005:** Paçal kalorisinin hesaplanan mı, laboratuvarda ölçülen mi, yoksa ikisinin de mi olacağı.
+**TBD-OPS-005 (DEC-0017 ile kısmen kapandı):** Toplu paçal kalitesi **aritmetik ortalama** ile hesaplanır (reçete sürümü bazında); ağırlıklı ortalama, numune-miktar verisi doğrulanana kadar uygulanmaz (DEC-0017 D-07, D-17). Kalorinin "ölçülen mi hesaplanan mı" sorusu, kalori değeri **laboratuvarda ölçülür** (`KALORI HESAP.xlsx` G6→G7, DEC-0017 D-12) şeklinde yanıtlanmıştır; formülün tam doğrulaması **hâlâ açıktır** (TBD-L02).
 
 ### FEAT-020 — Kömür Kalitesi
 
 **FR-086:** Kömür kalori sonucu ilgili kömür/kantar operasyon kaydıyla ilişkilendirilebilmelidir.  
-**TBD-OPS-006:** Brüt/dara/net, numune ve sevkiyat workflow'u ayrıca doğrulanmalıdır.
+**TBD-OPS-006 (DEC-0017 ile kısmen kapandı):** Kantar/tartım kaydının SoR'u **geçici olarak Netsis**'tir (DEC-0017 D-05); Metnex okur/eşler. Brüt/dara/net alanları ve kesin Netsis veri sözleşmesi **hâlâ açıktır** (Q-024).
 
 ### FEAT-021 — Manuel Laboratuvar Verisi
 
 **FR-087:** Kömür, biyokütle bileşeni, paçal/karışım ve su laboratuvar analiz sonuçları yetkili kullanıcı tarafından manuel girilmelidir.  
-**FR-088:** Mevcut kapsamda laboratuvar cihazı, LIMS veya başka bir sistemden otomatik analiz sonucu aktarımı yapılmamalıdır.  
+**FR-088 (DEC-0017 ile karma modele genişletildi):** Mevcut kapsamda laboratuvar cihazı, LIMS veya başka bir sistemden otomatik analiz sonucu aktarımı yapılmamalıdır (MOSBİO Online Drum/Steam istisnası hariç: DEC-0017 D-19 uyarınca bu da ilk fazda **manuel** girilir, ayrı kolonlarda).  
 **FR-089:** Laboratuvar kaydı kaydı giren kullanıcı ve zaman bilgisiyle izlenebilir olmalıdır.  
-**FR-090:** Sonradan yapılan değişikliklerin audit izi korunmalıdır.  
-**TBD-OPS-007:** Su analizi parametreleri, limitleri ve sıklıkları.
+**FR-090 (DEC-0017 ile netleşti):** Sonradan yapılan değişikliklerin audit izi korunmalıdır; **analiz sonucu katmanında** düzeltme yeni revizyonla (eski/yeni değer, talep eden, düzelten, zaman) yapılır, **tekrar analiz** (yeni ölçüm) ayrı bağımsız kayıttır (DEC-0017 D-02). Audit'te yalnız asgari kullanıcı kimliği tutulur (DEC-0017 D-21).  
+**TBD-OPS-007:** Su analizi parametreleri, limitleri ve sıklıkları — **hâlâ açık** (Q-023, DEC-0017 D-13).
 
 ---
 
@@ -589,6 +593,30 @@ form, onay, kilitleme, revizyon, audit ve raporlama ile yönetilir.
 
 Laboratuvar ve İşletme ayrı altyapı, domain, permission ve audit sınırlarına
 sahiptir. Wave 2 ve Wave 3 bu yeni programa dahil değildir.
+
+---
+
+## 9.2 DEC-0017 Etki Listesi — Operasyon, Laboratuvar ve Kırım Tesisi
+
+Bu bölüm, `docs/decisions/DEC-0017-…md`'nin (TASK-029.00-R2) §9.1'i **genişleten**, silmeyen etki listesidir. Buradaki FEAT/FR taslakları **henüz onaylı acceptance criterion değildir**; AI1/PO tarafından ayrıca yazılıp SRS'e kesin madde numarasıyla işlenecektir. Amaç, hangi alanların DEC-0017 ile etkilendiğini görünür kılmaktır.
+
+**Etkilenen mevcut maddeler:** FR-067–071 (§9.1.2, yalnız enerji emri), FEAT-022 (Vardiya raporu, §11.5 ile birlikte — D-08 ile "vardiya = boyut" netleşti), FEAT-023 (Operasyon Merkezi — D-08, D-09), FEAT-024 (Laboratuvar — D-02, D-03, D-03a), FR-082–090 (§9 üstünde işlendi), BR-015/016 (değişmedi), IR-001–004 (Netsis/BEAM entegrasyon yönü D-05 ile kısmen netleşti, MOD-011 Uygulama Programı yön/kimlik hâlâ açık).
+
+**Yeni FEAT taslakları (isim/numara AI1 onayıyla kesinleşecek):**
+- **FEAT-026 — Kırım Tesisi Üretim Emri, Reçete ve Paçal (Metnex SoR):** reçete/reçete sürümü, iç üretim emri (MOSEDAŞ'tan bağımsız), kova ölçümü (ölçülmüş/tahmini/kontrol-bekleyen ayrımı), paçal analiz eşleştirmesi, reçete sürümü bazlı toplu kalite özeti (aritmetik; TBD-L03 kapanana kadar ağırlıklı yok). **TBD:** kepçe cihazı sözleşmesi (TBD-K01–K04), nihai paçal miktarı ölçümü (kapsam dışı, TBD-G02).
+- **FEAT-027 — MOSB Enerji Kömür Kabul, Kantar ve Yığın:** araç/tartım (Netsis SoR, geçici — D-05), fiziksel yığın, günlük ortak numune (katılan/uygulanan araç ayrımı), kazan besleme sayacı (SCADA ana kaynak + manuel istisna — D-10), kazan külü analizi. **TBD:** Netsis veri sözleşmesi (Q-024), brüt/dara/net (TBD-OPS-006).
+- **FEAT-028 — MOSBİO Gelen Biyokütle Ürünü Analizi:** araç bazlı analiz, parametre bazlı esas sonuç, değiştirilebilir kriter, ortak alıcı bildirimi, sonuç/tartım düzeltme talebi.
+- **FEAT-029 — Su Laboratuvarı (MOSB Enerji / MOSBİO):** numune noktası bazlı referans/kriter, kısmi kayıt, limit dışı bildirim (kayıt tamamlanınca), MOSBİO Online Drum/Steam manuel giriş (D-19). **TBD:** parametre/limit/sıklık (Q-023).
+- **FEAT-024 genişlemesi (Ortak Laboratuvar):** çoklu tenant üyeliği (D-03), işletme+ortak performans raporu (D-03a, Operasyon Merkezi'nden ayrı), karma yaşam döngüsü (D-02).
+
+**Yeni BR/IR taslakları:**
+- **BR-020 (taslak):** Kırım Tesisi üretim emrinin SoR'u Metnex'tir; MOSEDAŞ'ın enerji üretim emri sözleşmesiyle (FR-067–071) karıştırılamaz.
+- **BR-021 (taslak):** Toplam yüklenen kova/kepçe miktarı, nihai paçal üretim miktarı olarak raporlanamaz (D-18).
+- **IR-005 (taslak):** Kantar/tartım entegrasyonunun SoR'u ve yönü — geçici Netsis (D-05); kesin sözleşme TBD.
+
+**Kapatılmayan TBD'ler (bu SRS güncellemesiyle kapatılmamıştır):** `TBD-OPS-005` (kısmen), `TBD-OPS-006` (kısmen), `TBD-OPS-007`, `Q-022`, `Q-023`, `Q-024`, `TBD-L01`, `TBD-L02`, `TBD-L04`, `TBD-K01`–`K04`, `TBD-G02` — DEC-0017 "Açık statüler" tablosuyla birebir.
+
+Bu bölüm implementation task'larını `ready` yapmaz; TASK-029.01 kapsamı, bu etki listesindeki FEAT taslaklarının hangi task'a düştüğünü ayrıca netleştirir.
 
 ---
 

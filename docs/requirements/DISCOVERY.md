@@ -670,6 +670,8 @@ Mevcut §5 ve §5.1 kurallarına ek olarak:
 
 ## 21.1 Elektrik Üretim Talebi ve Planlama — DEC-0014 ile Güncellenmiş Gelecek Adayı
 
+> **DEC-0017 notu (2026-09-28):** Bu bölümdeki "üretim emri" **yalnızca enerji üretim emrini** (MOSEDAŞ SoR) ifade eder. Kırım Tesisi'nin kendi (paçal) üretim emri **ayrı bir bounded context**'tir, MOSEDAŞ'tan gelmez ve bu bölümün kapsamında değildir — bkz. §27.1.
+
 - MOSEDAŞ enerji ticareti yapmaktadır.
 - Elektrik fiyatlarının üretimi anlamlı kıldığı durumlarda üretim siparişi oluşturulur.
 - Üretim planı ve üretim emri ayrı MOSEDAŞ uygulamasında oluşturulur.
@@ -730,6 +732,8 @@ Bilinen üretim kaynakları:
 
 # 22. Biyokütle, Kömür ve Laboratuvar — Wave 2/3 Dışı Gelecek Adayı
 
+> **DEC-0017 notu (2026-09-28):** Bu bölüm 2026-09-22 tarihli görüşme (`METNEX_AI1_DISCOVERY_BRIF2.md`) ile önemli ölçüde genişletildi: ortak laboratuvar ekibi, MOSB ENERJİ kömür kabul/kantar/yığın/kazan külü, MOSBİO gelen biyokütle ürünü analizleri ve Kırım Tesisi reçete/üretim emri/paçal/kova ölçümü. Ayrıntılı addendum §27'dedir; bu bölümün eski metni silinmemiştir, §27 ile birlikte okunmalıdır.
+
 ## 22.1 Biyokütle Reçete / Paçal
 
 Bilinen bileşenler:
@@ -769,6 +773,8 @@ Otomatik cihaz / LIMS veri aktarımı mevcut kapsamın parçası değildir.
 - İlk analiz kümesi kömür, biyokütle, blend/paçal ve su analizleridir.
 - Analiz tanımları Laboratuvar domain yöneticisi tarafından onay ve audit ile yönetilir.
 - Sonuç yaşam döngüsü taslak → onay → kilitli şeklindedir; düzeltme yeni revizyonla yapılır.
+
+> **DEC-0017 ile karma model (2026-09-28):** "Taslak → onay → kilitli" yalnız **analiz türü/parametre/referans tanımı** katmanı için geçerlidir. **Sonuç/analiz kaydı** katmanında: kısmi parametrelerle açılıp tamamlanabilir, her parametre için laboratuvar yetkilisi ayrı **esas sonuç** seçer, tamamlanmış kayıt sunucu tarafında kilitlenir ve düzeltme yeni revizyonla (eski/yeni değer, kullanıcı, zaman) yapılır — bu, bağımsız yeni bir ölçüm olan "tekrar analiz"den ayrı bir işlemdir. Ayrıntı: DEC-0017 §D-02, §27.2.
 
 ## 22.4 İşletme Modülü Ürün Sınırı
 
@@ -849,3 +855,78 @@ Mevcut §7.4 adımlarına ek olarak:
 4. Wave 4 Vardiya ve Wave 5 Reporting/SCADA öncelikleri Product Owner tarafından onaylanır.
 5. Wave 5 için Q-012–Q-020 açık soruları kapatılır.
 6. Onaylı gereksinimler SRS'e aktarılır ve AI1 engineering task'ları üretir.
+
+---
+
+# 27. DEC-0017 Addendum — Operasyon, Laboratuvar ve Kırım Tesisi (2026-09-28)
+
+> **Kaynak:** `METNEX_AI1_DISCOVERY_BRIF2.md` (PO görüşme aktarımı, 2026-09-22/25) → `docs/discovery/METNEX_AI1_DISCOVERY_BRIF2_EVALUATION.md` (TASK-029.00-R1, kanıt/çelişki analizi) → `docs/decisions/DEC-0017-…md` (TASK-029.00-R2, kapanış). Bu bölüm **eski metni değiştirmez**; §21/§22'yi tamamlar. Production kodu, migration veya UI bu addendum ile başlamaz.
+
+## 27.1 Üretim emri — iki bounded context (DEC-0017 D-01)
+
+- **Enerji üretim emri:** §21.1'deki tanım aynen geçerlidir; SoR MOSEDAŞ, Metnex doğrular/kabul-ret/yürütür/geri bildirir.
+- **Kırım Tesisi (paçal) üretim emri:** yeni, **Metnex SoR'lu**, MOSEDAŞ'tan gelmeyen ayrı bir emir türü. Reçeteyi hazırlayan yetkili kişi açar; vardiya sorumlusu fiilî üretimi başlatır/tamamlar; bir reçete farklı zamanlarda yeniden kullanılabilir; bir emir vardiyalar arasında açık kalabilir; hedefe ulaşmadan (gerekçeyle veya "miktar bilinmiyor" ile) tamamlanabilir; tamamlanan emir yeniden açılmaz, devamı için yeni emir açılır; ilgili üretim dönemine ait numune/analiz sonradan eklenebilir ve bu, emri yeniden açmaz.
+
+## 27.2 Laboratuvar — karma yaşam döngüsü (DEC-0017 D-02)
+
+- **Tanım katmanı** (analiz türü, parametre, referans/kriter): taslak → onay → versiyonlu (mevcut §22.3.1 hükmü).
+- **Sonuç katmanı** (analiz kaydı): kısmi parametrelerle açılır/tamamlanır; eksik parametre sonradan aynı kayda eklenir; parametre bazında laboratuvar yetkilisi **esas sonucu** seçer (önceki/yeni seçim + kullanıcı + zaman korunur); tamamlanmış kayıt kilitlenir; düzeltme yeni revizyon; **tekrar analiz** (yeni numune/ölçüm) ayrı, bağımsız bir kayıttır.
+- Uygulama alanları: kömür (araç numunesi, günlük ortak numune, kazan külü), MOSBİO gelen biyokütle ürünü (araç bazlı), su laboratuvarı (numune noktası bazlı), paçal (Kırım Tesisi, reçete sürümü bazlı).
+
+## 27.3 Ortak laboratuvar ve tenant modeli (DEC-0017 D-03, D-03a)
+
+- Ortak laboratuvar ekibi **MOSB Enerji** ve **MOSBİO** tenant'larına **ayrı ayrı üyelik** ile bağlanır (mevcut `tenantMemberships` mekanizması, yeni mekanizma yok); görüntüleme/veri girişi yetkisi her üyelikte ayrı tanımlanır.
+- Laboratuvar performansı işletme bazında ve iki üyeliğin toplamı olarak (ortak toplam) raporlanır; bu, **Vardiya Operasyon Merkezi'nin bir parçası değildir**, laboratuvar kendi domain'inde raporlanır; yeni bir aggregate/root mekanizması değildir.
+
+## 27.4 MOSB / MOSB ENERJİ / MOSBİO tenant dili (DEC-0017 D-04)
+
+`docs/migration/BOTC_MIP_TENANT_LOCATION_MAPPING.md` ve ilgili mapping belgelerindeki "MOSEDAŞ tenant'tır" ifadesi ile DEC-0014/DEC-0017 (MOSEDAŞ tenant değildir) arasındaki fark, **ayrı bir uyum task'ı** ile ele alınacaktır (bu addendum onu kapatmaz). §2.3, D-005 ve ilgili tablo bu ayrı task tamamlanana kadar **eski hükümleriyle** okunmalı, DEC-0014/DEC-0017'nin MOSEDAŞ/MOSB tenant sınırına **üstün gelmediği** unutulmamalıdır.
+
+## 27.5 Kantar / Netsis (DEC-0017 D-05 — kısmen açık)
+
+Kantar kaydının SoR'u **geçici olarak Netsis** kabul edilir (§10 tablosundaki "Metnex adayı" ifadesi bu addendum ile netleşir): Netsis'te oluşup eşleşmeden Metnex işlemi kesinleşmez; Metnex okur/eşler, istisnai yetkili manuel eşleştirme yapılabilir. **Netsis entegrasyon anahtarları/veri sözleşmesi (Q-024) hâlâ açıktır.**
+
+## 27.6 MOSB ENERJİ kömür kabulü, yığın, kazan külü
+
+- Araç → tartım (kantar/Netsis) → laboratuvar araç numunesi (4 nokta) → **günlük ortak numune** (kül/uçucu, tedarikçi bazlı): katılan araçlar ile uygulandığı araçlar **ayrı ilişkilerdir**; bir analiz sonucu birden çok araca uygulanması, birden çok test sayılmaz.
+- Fiziksel **kömür yığını**: araç/tedarikçi ile ilişkili, aynı tedarikçiye ait birden çok ayrı yığın olabilir.
+- Kazan besleme sayacı: **ana kaynak SCADA** (Wave 5 read-only, DEC-0015 sınırı korunur — bu domain SCADA'ya yazmaz), **manuel giriş yalnızca istisna** ve açıkça işaretli (DEC-0017 D-10).
+- Yanma sonrası **kazan külü** gelen kömürün laboratuvar kül yüzdesinden ayrı bir analizdir; vardiya başına birden çok numune olabilir; kabul zamanı ile fiilî alma zamanı ayrı izlenir; yığın ilişkisi önerilir, laboratuvar personeli düzeltebilir.
+- Yığın kapanışını operatör yapar; uzman inceleyip "İncelendi" işaretleyebilir.
+
+## 27.7 MOSBİO gelen biyokütle ürünü analizi
+
+Araç bazlı tartım → 6 noktadan numune → laboratuvar araç numunesi (kendi analiz kaydı); ürünler ortak stokta tutulduğundan **araç/sevkiyat → belirli paçal üretimi düzeyinde izlenebilirlik iddia edilmez**. Kısmi sonuç, parametre bazında esas sonuç, değiştirilebilir alt/üst kalite sınırı (kriter yoksa "Kriter tanımlı değil"), ortak alıcı listesine bildirim (uygulama içi + e-posta, ortak notification service — DEC-0017 D-15), sonuç/tartım eşleştirme düzeltme talebi + laboratuvar yetkilisi gerçekleştirmesi.
+
+## 27.8 Su laboratuvarı (MOSB Enerji / MOSBİO)
+
+Tek zaman alanı = laboratuvar numune kabul tarihi/saati; kısmi kayıt; otomatik görev/gerçekleşmemiş analiz kaydı üretilmez; referans işletme+sistem+numune noktası+parametre bağlamında, versiyonlu; referansı olmayan sonuç "Referans tanımlı değil"; limit dışı sonuç **numune kaydı tamamlandığında** bildirilir (zorunlu onay/aksiyon yok); MOSBİO Online Drum/Steam ilk fazda manuel girilir, ayrı kolonlar (DEC-0017 D-19); su analiz parametreleri/limitleri **Q-023 hâlâ açık**.
+
+## 27.9 Kırım Tesisi — reçete, üretim emri, paçal, kova ölçümü
+
+- Kırım Tesisi **MOSBİO'nun alt operasyonudur**, kendi tenant'ı (MOSBİO) altında bir operasyon merkezidir (DEC-0017 D-09); Kömür Kazanı aynı biçimde MOSB Enerji altındadır. **`MOSBİO KIRIM DEPO` ile aynı birim olup olmadığı dış doğrulama bekliyor.**
+- Reçete sürümü: fiilen uygulanmaya başlama zamanı vardiya sorumlusundan; hedefler/ürün miktarları/paçal analizleri sürüm bazında; revizyon yetkisi reçete yetkilisi + Kırım Tesisi sorumlusu.
+- Paçal numunesi yalnız laboratuvar kabul zamanı taşır; emir/sürüm eşleştirmesi Metnex tarafından önerilir, laboratuvar doğrular/düzeltir.
+- **Toplu kalite özeti reçete sürümü bazında** hesaplanır, güncel esas sonuçlara göre yeniden hesaplanır, eski değerlendirmeler korunur (DEC-0017 D-07); yöntem **yalnızca aritmetik ortalama**dır, ağırlıklı ortalama miktar verisi (TBD-L03) doğrulanana kadar uygulanmaz (DEC-0017 D-17).
+- **Hedef dışı paçal analizi için rutin/otomatik bildirim yoktur; sonradan parametre eklenince veya esas sonuç değişince güncel analiz yeniden bildirilir** (DEC-0017 D-06 — TBD-G01 kapandı).
+- **Kova ölçümü:** her kepçe yüklemesi ayrı ölçüm kaydı; ürün/emir/sürüm fiilî yükleme zamanına göre belirlenir; **toplam yüklenen malzeme miktarı nihai paçal üretim miktarı değildir**, raporda eşitlenemez; ölçülmüş/tahmini/birleşik toplam ayrı gösterilir; tahmin doğrulanınca güncel toplamda yerini alır, eski tahmin geçmişte kalır. Kepçe cihazı entegrasyonu **açık** (TBD-K01–K04, DEC-0017 D-11). Nihai paçal miktarının ayrıca ölçülmesi **kapsam dışı, ileride değerlendirilecek** (DEC-0017 D-18).
+
+## 27.10 Vardiya — bağımsız varlık değil, boyut (DEC-0017 D-08)
+
+Vardiya, üretim emri/kova ölçümü/olay/rapor kayıtlarının **zaman ve sorumluluk boyutudur**; ayrı zorunlu bir "vardiya operasyonu" kaydı açılmaz. Bu, §11.5/§11.6 Wave 4 Vardiya raporu/arşiv modelini (FEAT-022) **değiştirmez** — FEAT-022 kendi lokasyon bazlı raporunu sürdürür; FEAT-023 Operasyon Merkezi bu yeni "boyut" yaklaşımını sunar.
+
+## 27.11 Kalori/kül raporlama (DEC-0017 D-12, D-20)
+
+Kullanılan alt kalori sonucu = `KALORI HESAP.xlsx` G6 (üst kalori girdisi) → G7 (alt kalori, esas sonuç); diğer kalori değerleri silinmez, ayrı kolonlarda tutulur. Ana raporda ekranda ilk+güncel değer, Excel/PDF çıktısında yalnız güncel değer. **Formülün tam doğrulaması (TBD-L02) ve rapor kolonlarının/Jasper şablonlarının kesinleşmesi (TBD-L01) hâlâ açıktır.**
+
+## 27.12 Veri yerleşimi, bildirim, rol modeli, audit, migration (DEC-0017 D-14, D-15, D-16, D-21, D-22)
+
+- Bu addendumdaki domain kayıtları **tenant data-plane şemasında** tutulacaktır (DEC-0010 Faz 5'in ilk gerçek tüketicisi); data-plane altyapısı bugün eksiktir, bu bir ön koşuldur.
+- Bildirimler **ortak bir notification service** üzerinden (uygulama içi + e-posta) gönderilir.
+- Yeni roller mevcut tenant rol/permission modelinin **genişletilmesiyle** tanımlanır; yeni bir paralel yetki sistemi açılmaz.
+- Audit kayıtlarında yalnız **asgari kullanıcı kimliği** (id + görünen ad) tutulur; serbest metin alanlarındaki olası kişisel veri implementation task'ında ayrıca ele alınmalıdır.
+- Tarihsel Excel/kağıt veri migration'ı, yapılırsa **seçilmiş kapsamla** yapılır; otomatik/tam geçmiş taşınması varsayılmaz.
+
+## 27.13 Kapatılmayan açık sorular (bilinçli olarak korunmuştur)
+
+`Q-023` (su analiz parametreleri/limitleri), `Q-024` (Netsis veri sözleşmesi), `TBD-L01` (rapor kolonları/Jasper), `TBD-L02` (kalori formülü tam doğrulama), `TBD-L04`/`TBD-013`'ün lab karşılığı (başlangıç kalite limitleri), `TBD-K01`–`TBD-K04` (kepçe cihazı), `TBD-G02` (nihai paçal miktarı ölçümü) — **bu addendum ile kapatılmamıştır**, DEC-0017'nin "Açık statüler" tablosuyla birebir eşleşir.

@@ -99,8 +99,8 @@ export function SearchableSelect({
                   setQuery(option.label)
                   setOptions([])
                 }}
-                className={`block w-full px-3 py-2 text-left text-xs hover:bg-surface-subtle ${
-                  option.value === value ? 'bg-brand/5 text-brand' : 'text-ink'
+                className={`block w-full px-3 py-2 text-left text-xs hover:bg-surface-subtle focus-visible:bg-surface-subtle focus-visible:outline-none ${
+                  option.value === value ? 'bg-brand/15 font-semibold text-brand' : 'text-ink'
                 }`}
               >
                 <span className="block font-medium">{option.label}</span>

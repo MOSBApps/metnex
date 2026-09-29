@@ -2255,3 +2255,54 @@ Development bellek-içi preset store + `POST …/presets` (dört kapı; id/versi
 
 ## 2026-09-24 — TASK-027.60 Wave 5 Commit ve Push
 Wave 5 (027.59 + R1 dahil) tek commit ile `dev` dalına commit edildi ve upstream `origin/dev`e push edildi (`feat(reporting): complete Wave 5 SCADA reporting acceptance`). `veriler/raw/`, .env, secret ve build çıktıları kapsam dışı; force/amend/history rewrite yok. Commit hash: `git log -1` (bu satır commit içinde olduğundan hash burada yazılmaz).
+
+## 2026-09-25 — TASK-029.00-R1 METNEX AI1 Discovery Reconciliation — `review`
+`METNEX_AI1_DISCOVERY_BRIF2.md` mevcut Discovery/SRS/domain/DB/DEC/EPIC-005/Vardiya/Wave 5 ve koda karşı karşılaştırıldı: `docs/discovery/METNEX_AI1_DISCOVERY_BRIF2_EVALUATION.md` (A–L; 9 çelişki, 14 domain nesnesi, entegrasyon/risk/faz/karar masası). Kritik: Kırım iç emri ↔ DEC-0014 dış emir SoR (C-01); lab yaşam döngüsü (C-02); Netsis/kantar (C-03); kodda MOSEDAS/MOSB tenant slug kümesi (C-04). Canonical belgeler ve kod değişmedi; AI2 task ready yapılmadı; commit/push yok.
+
+## 2026-09-28 — TASK-029.00-R2 BRIF2 Kararlarının Discovery/SRS/EPIC-005e İşlenmesi — `review`
+DEC-0017 (D-01–D-22, D-05/D-11/D-12-formül/D-13/D-18/D-20 bilinçli açık) yazıldı; Discovery §21.1/§22 supersede notları + yeni §27 addendum (13 alt bölüm); SRS MOD-007/MOD-009 üzeri notlar + yeni §9.2 etki listesi (FEAT-026–029, BR-020/021, IR-005 taslak); EPIC-005 kapsam/task planı ve blocker tablosu genişletildi; TASK-029-00 12 task kapsamına [DEC-0017] notları eklendi; BOTC_MIGRATION_OPEN_QUESTIONS.md append-only çapraz referans eklendi. Kod/migration/schema/tenant/rol/permission yok; TASK-029.01 ready yapılmadı. Git commit/push yok.
+
+## 2026-09-28 — TASK-029.01 Domain, Tenant, Operasyon Merkezi ve External Reference Sözleşmesi — `review`
+İlk gerçek EPIC-005 teknik task'ı: `apps/api/src/operations/domain/` altında saf TypeScript domain/reference sözleşmesi (API/UI/DB/migration yok, NestJS'e bağlanmadı). `OperationCenter` + sabit `OPERATION_CENTER_OWNER_ROLE` tablosu (Kömür Kazanı yalnız MOSB_ENERJI, Kırım Tesisi yalnız MOSBIO rolüne atanmış tenant altında çözülür; rol asla slug'dan türetilmez — D-04 açık kalır), `FacilityReference`/`MachineReference`, `ExternalSystemReference` (BEAM/NETSIS/MOSEDAS/SCADA_DMS; MOSEDAŞ yalnız sistem adı), `AssetOwnershipReference`/`OperatorReference` (sahip≠işletmeci, zaman bazlı çözümleme), `TenantOperationScope`/`UserOperationCenterScope` (tenant+operationCenter birlikte kapsam anahtarı, operationCenterId tek başına asla yetki vermez, VIEW/DATA_ENTRY/APPROVAL/CORRECTION/MANAGEMENT ayrı). 94 yeni test (6 dosya), toplam API testi 3375→3469, `tsc` temiz, `check.sh --skip-docker` yeşil. Yan etki: TASK-027.58/58-R1'in "yeni MOSEDAŞ referansı sessizce geçmez" statik kilidi beklendiği gibi tetiklendi; `dec-0014-slug-consistency.spec.ts`, `scada-static-security.spec.ts` ve R1 envanter dosyasına gerekçeli istisna eklendi (DEC-0014/DEC-0017 kararı değişmedi). EPIC-005/TASK-029-00'a bağımlılık/etki notları eklendi. Yeni tenant/rol/permission/migration/API/UI/Docker yok. D-04 blocker olarak raporlandı, kapatılmadı. Git commit/push yok.
+
+## 2026-09-28 — AI1 Onayı: TASK-029.01 `done`
+Doğru sınırlar korunmuş bulundu: saf domain sözleşmesi, NestJS/API/UI/DB/migration değişmemiş, operasyon merkezi ayrı tenant yapılmamış, tenantId+operationCenterId birlikte kapsam anahtarı, varlık sahibi/işletmeci ayrı, MOSEDAŞ yalnız external-system adı, D-04 otomatik düzeltilmemiş, yeni permission/gerçek entegrasyon yok. MOSEDAŞ statik test istisnası gerekçeli/kontrollü bulundu. Sıradaki: TASK-029.02.
+
+## 2026-09-28 — TASK-029.02 MOSEDAŞ B2B Güvenlik ve Mesaj Sözleşmesi — `review`
+`docs/migration/METNEX_MOSEDAS_B2B_SECURITY_DECISION_PACKAGE.md` (kanıt tablosu, DEC-0014 k.7/8'in zaten kapalı olduğu tespiti, mesaj sözleşmesi + örnek payload, idempotency/revision, retry/DLQ karar tablosu, threat model, audit/redaction, 9 açık soru D-B01–D-B09, EPIC-005/029.03–.12 bağımlılık notları) + `apps/api/src/operations/domain/mosedas/` (6 dosya: `b2b-client-identity.contract.ts`, `message-envelope.contract.ts` [6 tür, Kırım emri yok], `idempotency.contract.ts`, `inbound-message-validation.contract.ts` [tek fail-closed pipeline], `retry-classification.contract.ts` [8 kategori, yalnız transient-infra retryable, sayısal eşik yok], `audit-entry.contract.ts` [yasak anahtar kapısı]). API/worker/migration/yeni permission yok. 178 yeni test, API toplamı 3469→3553, `tsc`/eslint temiz, `check.sh --skip-docker` yeşil. TASK-027.58/58-R1 MOSEDAŞ statik kilidi yine genişletildi (gerekçeli, karar değişmedi). EPIC-005/TASK-029-00'a bağımlılık notları eklendi. D-B01–D-B09 kapatılmadı. Git commit/push yok. `review` onayı bekleniyor.
+
+## 2026-09-28 — AI1 Onayı: TASK-029.02 `done`
+Doğru sınırlar korunmuş bulundu: birleşik mTLS+OAuth2 kararı değiştirilmemiş, MOSEDAŞ kullanıcı/tenant olarak modellenmemiş, allowlist tenant+tesis+makine+operasyon merkezi kapsamında, Kırım iç üretim emri dış MOSEDAŞ mesajlarına eklenmemiş, idempotency/revision kuralları tanımlanmış, retry eşikleri uydurulmamış, secret/ham payload redaction korunmuş, gerçek bağlantı/endpoint açılmamış. D-B01–D-B09'un açık kalması doğru bulundu.
+
+## 2026-09-29 — TASK-029.13 Dark Theme Combobox Contrast ve Dropdown Görünümü — `review`
+EPIC-005 dışı, bağımsız UI düzeltme task'ı (backend/DB yok). Repository discovery: gerçek combobox
+tek `SearchableSelect` (portal/popover değil, inline panel); `FilteredCheckboxList` adında ayrı
+component repoda yok, eşdeğeri SCADA analiz panellerindeki inline checkbox listeleri; native
+`<select>` 10+ dosyada `app-input-dense` kullanıyor; hiçbir yerde React portal yok. Bulunan üç
+kontrast hatası: (1) native `<select>`'in `<option>` listesi için `.dark`'ta hiç stil yoktu, (2)
+`<input type="checkbox"/radio">` dark override'dan tamamen hariç tutulmuştu ve `accent-color`/
+`color-scheme` tanımı yoktu — karanlık panelde açık/beyaz kutucuk olarak kalıyordu, (3)
+`SearchableSelect`'in seçili seçenek vurgusu `bg-brand/5` — koyu yüzeyde pratik olarak görünmüyor.
+Düzeltmeler `apps/web/src/app/globals.css`e (checkbox/radio `accent-color: var(--brand)` +
+`.dark`'ta `color-scheme: dark` ve `select option`/`select option:disabled` dark stilleri) ve
+`apps/web/src/components/searchable-select.tsx`e (`bg-brand/5`→`bg-brand/15 font-semibold` +
+`focus-visible:bg-surface-subtle`) uygulandı. Light tema değiştirilmedi. Yeni component yok,
+`// @ui-override` gerekmedi, dropdown dynamic loading davranışı (debounce/minChars/race-condition)
+dokunulmadı. 2 yeni test dosyası (9 test): `searchable-select.spec.tsx`,
+`globals.dark-theme.spec.ts` (CSS ham metin doğrulaması, Tailwind jsdom'da derlenmediği için).
+`pnpm --filter web exec vitest run`: 397/397 (önceki 388). `tsc --noEmit`: temiz. `check.sh
+--skip-docker`: yeşil (ilk denemede backend'deki ilgisiz `reporting.jasper-integration.spec.ts`
+5s timeout flake verdi, izole 6/6 yeşil, ikinci tam çalıştırma tamamen yeşil). Tarayıcıda manuel
+görsel doğrulama yapılmadı (dev server'a dokunulmadı). Ayrı iş notu: `colors.md`'nin "karanlık mod
+desteklenmez" ifadesi kod tabanıyla çelişiyor (güncel değil); tenant/kullanıcı tablolarındaki satır
+seçimi de aynı `bg-brand/5` desenini kullanıyor ama bu task'ın combobox/dropdown kapsamı dışında
+bırakıldı. Git commit/push yok. `review` onayı bekleniyor.
+
+## 2026-09-29 — AI1 Onayı: TASK-029.13 `done`
+Doğru yapılanlar: repository discovery gerçek bileşenleri doğrulamış; SearchableSelect, native
+select, checkbox/radio dark tema sorunları düzeltilmiş; light tema korunmuş; dropdown dynamic
+loading davranışı değişmemiş; yeni component/API/permission/bağımlılık eklenmemiş; UI Contract
+semantic stilleri korunmuş; web testleri/typecheck/`check.sh --skip-docker` geçmiş; tarayıcı
+doğrulamasının yapılmadığı açıkça raporlanmış. `colors.md`'deki "dark mode desteklenmez" ifadesi ve
+tablo satır seçimindeki `bg-brand/5` kullanımı bu task'ın dışında bırakıldı — ayrı UI bakım
+task'ları olarak değerlendirilecek.

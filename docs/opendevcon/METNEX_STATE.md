@@ -2567,3 +2567,36 @@ AI1/PO’nun bağlayıcı kararları append-only işlendi: **Q-W501–Q-W515, Q-
 **TASK-027.59-R1 ve TASK-027.59 → `done`; Wave 5 development kabulü tamamlandı (AI1 onayı, 2026-09-24).** Operasyonel not: tarayıcıda manuel kabul yapılmadı. Ayrı iş adayları: PNG completion için kalıcı/kısa ömürlü store, Türkçe font dev-renderer smoke testi, production preset/sanal kolon repository.
 
 **TASK-027.60 (2026-09-24):** Wave 5 kabul edilmiş değişiklikleri tek commit olarak `dev` dalına commit + `origin/dev`e push edildi; `veriler/raw/` ve secret içermez. Sonraki: yeni spec bekleniyor.
+
+**TASK-029.00-R1 (2026-09-25, `review`):** BRIF2 reconciliation raporu `docs/discovery/METNEX_AI1_DISCOVERY_BRIF2_EVALUATION.md` — implementation başlatılmadı; karar masası (D-01…D-22) AI1/PO bekliyor. Canonical belge/kod değişikliği yok.
+
+**TASK-029.00-R2 (2026-09-28, `review`):** DEC-0017 (BRIF2 karar kapanışları D-01–D-22) yazıldı ve Discovery §27 / SRS §9.2 / EPIC-005 / TASK-029-00 belgelerine addendum olarak işlendi; eski metin korunmuştur. D-05 (Netsis), D-11 (kepçe cihazı), D-12 (kalori formülü), D-13 (kalite limitleri), D-18 (nihai paçal), D-20 (rapor şablonu) bilinçli açık bırakıldı. TASK-029.01 `ready` yapılmadı.
+
+**TASK-029.01 → `done` (AI1 onayı, 2026-09-28).** İlk EPIC-005 teknik task'ı — `apps/api/src/operations/domain/` altında saf domain/reference sözleşmesi (API/UI/DB yok): `OperationCenter` (Kömür Kazanı → yalnız MOSB_ENERJI rolüne atanmış tenant, Kırım Tesisi → yalnız MOSBIO; rol slug'dan türetilmez, D-04 açık), `FacilityReference`/`MachineReference`, `ExternalSystemReference` (BEAM/NETSIS/MOSEDAS/SCADA_DMS, MOSEDAŞ yalnız sistem adı), `AssetOwnershipReference`/`OperatorReference` (zaman bazlı, sahip≠işletmeci), `TenantOperationScope`/`UserOperationCenterScope` (tenant+operationCenter birlikte kapsam anahtarı, operationCenterId tek başına yetki vermez). 94 test, API toplamı 3469, `check.sh --skip-docker` yeşil. TASK-027.58/58-R1'in MOSEDAŞ statik kilidi genişletildi (gerekçeli istisna, karar değişmedi onaylandı).
+
+**TASK-029.02 → `done` (AI1 onayı, 2026-09-28).** MOSEDAŞ B2B güvenlik ve mesaj sözleşmesi —
+`docs/migration/METNEX_MOSEDAS_B2B_SECURITY_DECISION_PACKAGE.md` + `apps/api/src/operations/domain/mosedas/`
+(6 dosya, 178 test; API/worker/migration yok). DEC-0014 k.7/8 (birleşik mTLS+OAuth2, tenant/tesis/
+makine allowlist) doğrudan uygulandı, değiştirilmedi. Altı mesaj türü, Kırım Tesisi emri **bu
+sözleşmede yok** (D-01). Idempotency/revizyon, 8 retry kategorisi (yalnız geçici altyapı hatası
+retryable, sayısal eşik icat edilmedi), audit/redaction (yasak anahtar kapısı). 9 açık soru
+(D-B01–D-B09) bilinçli açık bırakıldı. API toplamı 3469→3553, `check.sh --skip-docker` yeşil.
+Sıradaki: bir sonraki EPIC-005 task'ının spesifikasyonu (029.03/029.04/029.07).
+
+**TASK-029.13 (2026-09-29, `review`):** EPIC-005 dışı, bağımsız dark theme combobox/dropdown
+kontrast düzeltmesi. Repository discovery ile gerçek combobox envanteri çıkarıldı (`SearchableSelect`
+tek gerçek combobox, inline panel — portal/popover yok; `FilteredCheckboxList` adında ayrı bir
+component repoda mevcut değil; native `<select>` `app-input-dense` kullanıyor). Üç kontrast hatası
+düzeltildi: native `<select>` `<option>` listesi için `.dark`'ta stil eksikti; checkbox/radio dark
+override'dan tamamen hariç tutulmuştu ve `accent-color`/`color-scheme` yoktu (karanlık panelde
+beyaz kutucuk); `SearchableSelect`'in seçili seçenek vurgusu `bg-brand/5` koyu yüzeyde görünmüyordu
+(→ `bg-brand/15 font-semibold`). Light tema değişmedi, yeni component/bağımlılık/permission/API
+değişikliği yok, dropdown dynamic loading davranışı korundu. 9 yeni test (397/397 web), `tsc` temiz,
+`check.sh --skip-docker` yeşil (ilgisiz Jasper entegrasyon testi flake'i izole doğrulandı). Tarayıcı
+manuel doğrulaması yapılmadı. Ayrı iş notu: `colors.md`'nin "karanlık mod desteklenmez" ifadesi
+güncel değil; tenant/kullanıcı tablo satırı seçimi aynı `bg-brand/5` desenini kullanıyor (kapsam
+dışı bırakıldı). `done` onayı bekleniyor.
+
+**TASK-029.13 → `done` (AI1 onayı, 2026-09-29).** `colors.md`'deki "dark mode desteklenmez" ifadesi
+ve tablo satır seçimindeki `bg-brand/5` kullanımı bu task'ın dışında bırakıldı, ayrı UI bakım
+task'ları olarak değerlendirilecek.
