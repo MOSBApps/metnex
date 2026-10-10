@@ -131,3 +131,12 @@ action adı, gerçek MOSEDAŞ payload'ı, mTLS/OAuth2 sağlayıcısı, imzalı m
 test, API toplamı 3469→3553, `check.sh --skip-docker` yeşil. TASK-027.58/58-R1 MOSEDAŞ statik
 kilidi yine genişletildi (gerekçeli, karar değişmedi).
 
+## TASK-029.14 doğrulama notu (2026-10-06, `review`)
+
+TASK-029.14 (Discovery/SRS canonical güncelleme v1.4) bu dosyanın "Task planı", "Kapsam" ve "Yeni
+blocker'lar" tablolarını inceledi ve **güncel/doğru** buldu — TASK-029.01/029.02 zaten `done`
+işaretli, 029.03+ bağımlılıkları ve blocker'lar zaten doğru listelenmiş durumda; bu task hiçbir
+satırı değiştirmedi. Değişiklik yalnız `docs/requirements/DISCOVERY.md` ve
+`docs/requirements/SRS.md`'nin v1.4'e taşınmasında ve `docs/domain/DOMAIN_MODEL.md`'ye saf domain
+sözleşmesi notunun eklenmesindedir.
+

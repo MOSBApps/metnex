@@ -11,11 +11,18 @@
 | Görüşme No | DISC-MIP-001 |
 | Kaynak Discovery | `../BOTC/DISCOVERY.md` — reverse engineering ve paydaş teyidi |
 | Hedef Repository | `metnex` |
-| Doküman Sürümü | 1.3 — Birleştirilmiş migration wave planı işlendi |
+| Doküman Sürümü | 1.4 — TASK-029.14: DEC-0017 kararları ana bölümlere taşındı, açık soru/TBD durumu tekilleştirildi (bkz. §28) |
 
 > Bu Discovery, BOTC uygulamasının kaynak kodundan çıkarılan mevcut davranışları ve MİP/Metnex
 > hedef mimarisi için verilen paydaş kararlarını birleştirir. BOTC’deki WPF ekranları davranış
 > referansıdır; WPF/.NET katmanları hedef teknoloji olarak doğrudan taşınmayacaktır.
+
+> **v1.4 notu (2026-10-06, TASK-029.14):** Bu sürüm hiçbir eski metni silmez veya yeni iş kuralı
+> icat etmez. §21/§22'deki DEC-0017 kararları ilgili ana bölümlere kısa özet olarak taşınmıştır
+> (ayrıntı hâlâ §27'dedir); Wave 5 implementation'ıyla (TASK-027.6x–.74, DEC-0015) kapanmış eski
+> TBD'ler kendi yerlerinde kapatıldı notuyla işaretlenmiştir; tüm açık soru/TBD maddeleri tek bir
+> durum sınıflandırmasıyla (`RESOLVED`/`PARTIALLY_RESOLVED`/`TBD`/
+> `EXTERNAL_VALIDATION_REQUIRED`/`OUT_OF_SCOPE`) §28'de tekilleştirilmiştir.
 
 ---
 
@@ -519,6 +526,11 @@ Mevcut EXE bazı veri kaynakları / tablolar için `Gerçek Değer` seçeneği d
 
 **TBD:** `Gerçek Değer` tipinin hangi tablolar için, hangi kesin iş kuralıyla kullanılacağı Metnex'e aktarılmadan önce ayrıca doğrulanmalıdır.
 
+> **Durum (v1.4, TASK-029.14):** `RESOLVED` — Q-W503 kararı (2026-09-23, DEC-0015): davranış
+> katalog + analiz parametreleriyle tanımlanır, tablo adına göre varsayım yapılmaz; saatlik/günlük
+> işlem tipi, toplam/ortalama/min/max ve zaman kaydırması katalogda parametriktir. Bkz.
+> `docs/migration/BOTC_MIGRATION_OPEN_QUESTIONS.md` Q-W503.
+
 ---
 
 # 14. Wave 5 — Sanal Kolon
@@ -552,6 +564,12 @@ Verim = KolonA / KolonB
 - maksimum sanal kolon bağımlılık derinliği.
 
 **AI0 önerisi:** Sanal kolon tanımları legacy yerel JSON dosyası yerine kullanıcı/tenant bağlamlı merkezi Metnex verisi olarak saklanmalıdır.
+
+> **Durum (v1.4, TASK-029.14):** `RESOLVED` — Q-W504 kararı (DEC-0015): serbest JS/SQL/
+> `DataTable.Compute` yok; allowlist tabanlı, versiyonlu formül dili; sıfıra bölme/null/negatif/
+> NaN/∞/derinlik limitleri tanımlı, hatalı sonuç sessizce 0 yapılmaz. AI0 önerisi (merkezi saklama)
+> de Q-W505 ile `RESOLVED`: control-plane'de `tenantId`+`ownerUserId` sahipliğiyle, TASK-027.70/.71
+> implementation'ında teslim edildi.
 
 ---
 
@@ -603,6 +621,10 @@ desteklemektedir.
 
 **TBD:** İki farklı veri kaynağındaki zaman kayıtlarının kesin eşleştirme kuralı ayrıca doğrulanmalıdır.
 
+> **Durum (v1.4, TASK-029.14):** `RESOLVED` — Q-W508 kararı (DEC-0015): normalize zaman kovalarıyla
+> eşleme; satır sırası/pozisyonel eşleme esas değildir; gizli/otomatik tolerans yok; eşleşmeyen
+> kovalar veri kalite durumuyla işaretlenir.
+
 ---
 
 # 17. Wave 5 — Rapor Şablonları / Preset
@@ -636,6 +658,10 @@ Mevcut EXE seçilen seriler için aşağıdaki özet istatistikleri üretmektedi
 - Minimum
 
 **TBD:** Minimum hesabında sıfır değerlerinin dahil edilip edilmeyeceği ve istatistiklerin `Endeks / Gerçek Değer` tipine göre kesin davranışı doğrulanmalıdır.
+
+> **Durum (v1.4, TASK-029.14):** `RESOLVED` — Q-W509 kararı (DEC-0015): min/max/toplam/ortalama
+> ayrı kurallarla, kaynak/kolon katalog politikasına göre hesaplanır; null/boş seri/eksik veri
+> sessizce 0 yapılmaz, veri yoksa null + veri kalite durumu döner.
 
 ---
 
@@ -688,8 +714,18 @@ Mevcut §5 ve §5.1 kurallarına ek olarak:
 - MOSEDAŞ Metnex tenantı değildir; external-system kimliği ve allowlist ile entegre olur.
 - Varlık sahipliği BEAM/ERP'de; Metnex tesis/makine referansı ve operasyonel snapshot kullanır.
 - Kömür Kazanı MOSB Enerji altında tesis/ünite operasyon referansıdır.
+- **Kırım Tesisi, MOSBİO altında aynı biçimde bir tesis/ünite operasyon referansıdır** (DEC-0017
+  D-09, ana bölüme taşındı — ayrıntı §27.9). Kırım Tesisi ile `MOSBİO KIRIM DEPO` lokasyonunun aynı
+  fiziksel/işletme birimi olup olmadığı **dış doğrulama bekliyor**, varsayılmamıştır.
 
 ### 21.1.2 Üretim emri ve olay akışı
+
+> **Ana bölüme taşındı (DEC-0017 D-01, v1.4):** Bu alt bölümdeki emir/olay akışı **yalnızca enerji
+> üretim emrini** (MOSEDAŞ SoR) kapsar. Kırım Tesisi'nin kendi (paçal) üretim emri **ayrı bir
+> bounded context**'tir — Metnex SoR'ludur, MOSEDAŞ'tan gelmez, bu akışa girmez; reçeteyi hazırlayan
+> yetkili kişi açar, vardiya sorumlusu yürütür/tamamlar; bir reçete farklı zamanlarda yeniden
+> kullanılabilir, bir emir vardiyalar arasında açık kalabilir, tamamlanan emir yeniden açılmaz.
+> Ayrıntı: §27.1.
 
 - Emirler versiyonlu ve idempotent alınır; Metnex operasyon uygunluğunu kontrol eder.
 - Koşullar bozulursa emir `PAUSED` veya `EXECUTION_BLOCKED` olur ve MOSEDAŞ'a olay gönderilir.
@@ -789,6 +825,24 @@ Otomatik cihaz / LIMS veri aktarımı mevcut kapsamın parçası değildir.
 2. Laboratuvar analiz/parametre, numune, sonuç, onay/kilit ve geçmiş ekranları.
 3. İşletme form/alan, veri girişi, onay/kilit ve geçmiş ekranları.
 
+## 22.6 DEC-0017 ile Ana Bölüme Taşınan Kararlar (v1.4 — ayrıntı §27)
+
+Aşağıdaki kararlar `METNEX_AI1_DISCOVERY_BRIF2.md` görüşmesinden çıkmış, DEC-0017 ile kapanmış ve
+bu ana bölüme taşınmıştır (tam ayrıntı §27'de kalır, silinmemiştir):
+
+- **Laboratuvar yaşam döngüsü karma modeldir** (D-02): tanım/referans katmanı taslak → onay →
+  versiyon (yukarıdaki §22.3.1 ile aynı); sonuç/analiz kaydı katmanı kısmi-kayıt + parametre bazlı
+  esas-sonuç + kilit-sonrası-revizyon; "tekrar analiz" bundan ayrı, bağımsız bir kayıttır.
+- **Ortak laboratuvar ekibi çoklu tenant üyeliğiyle çalışır** (D-03/D-03a): mevcut
+  `tenantMemberships` mekanizmasıyla MOSB Enerji ve MOSBİO'ya ayrı ayrı üyelik; performans raporu
+  işletme bazında + ortak toplam, Vardiya Operasyon Merkezi'nin parçası değildir, yeni bir
+  aggregate mekanizması icat edilmez.
+- **Vardiya bağımsız bir varlık değil, zaman/sorumluluk boyutudur** (D-08): ayrı zorunlu bir
+  "vardiya operasyonu" kaydı açılmaz; bu, §11.5/§11.6'daki Wave 4 Vardiya raporu/arşiv modelini
+  (FEAT-022) değiştirmez.
+- **Yeni domain kayıtları tenant data-plane şemasında tutulacaktır** (D-14): data-plane fan-out
+  altyapısı bugün eksiktir; bu bir ön koşuldur, bu notla giderilmiş değildir.
+
 ---
 
 # 23. Hafif No-Code Yaklaşımı — Wave 2/3 Dışı Gelecek Adayı
@@ -864,16 +918,22 @@ Mevcut §7.4 adımlarına ek olarak:
 
 ## 27.1 Üretim emri — iki bounded context (DEC-0017 D-01)
 
+> **v1.4:** Kısa özet §21.1.2'ye taşındı; burada tam ayrıntı korunur.
+
 - **Enerji üretim emri:** §21.1'deki tanım aynen geçerlidir; SoR MOSEDAŞ, Metnex doğrular/kabul-ret/yürütür/geri bildirir.
 - **Kırım Tesisi (paçal) üretim emri:** yeni, **Metnex SoR'lu**, MOSEDAŞ'tan gelmeyen ayrı bir emir türü. Reçeteyi hazırlayan yetkili kişi açar; vardiya sorumlusu fiilî üretimi başlatır/tamamlar; bir reçete farklı zamanlarda yeniden kullanılabilir; bir emir vardiyalar arasında açık kalabilir; hedefe ulaşmadan (gerekçeyle veya "miktar bilinmiyor" ile) tamamlanabilir; tamamlanan emir yeniden açılmaz, devamı için yeni emir açılır; ilgili üretim dönemine ait numune/analiz sonradan eklenebilir ve bu, emri yeniden açmaz.
 
 ## 27.2 Laboratuvar — karma yaşam döngüsü (DEC-0017 D-02)
+
+> **v1.4:** Kısa özet §22.6'ya taşındı; burada tam ayrıntı korunur.
 
 - **Tanım katmanı** (analiz türü, parametre, referans/kriter): taslak → onay → versiyonlu (mevcut §22.3.1 hükmü).
 - **Sonuç katmanı** (analiz kaydı): kısmi parametrelerle açılır/tamamlanır; eksik parametre sonradan aynı kayda eklenir; parametre bazında laboratuvar yetkilisi **esas sonucu** seçer (önceki/yeni seçim + kullanıcı + zaman korunur); tamamlanmış kayıt kilitlenir; düzeltme yeni revizyon; **tekrar analiz** (yeni numune/ölçüm) ayrı, bağımsız bir kayıttır.
 - Uygulama alanları: kömür (araç numunesi, günlük ortak numune, kazan külü), MOSBİO gelen biyokütle ürünü (araç bazlı), su laboratuvarı (numune noktası bazlı), paçal (Kırım Tesisi, reçete sürümü bazlı).
 
 ## 27.3 Ortak laboratuvar ve tenant modeli (DEC-0017 D-03, D-03a)
+
+> **v1.4:** Kısa özet §22.6'ya taşındı; burada tam ayrıntı korunur.
 
 - Ortak laboratuvar ekibi **MOSB Enerji** ve **MOSBİO** tenant'larına **ayrı ayrı üyelik** ile bağlanır (mevcut `tenantMemberships` mekanizması, yeni mekanizma yok); görüntüleme/veri girişi yetkisi her üyelikte ayrı tanımlanır.
 - Laboratuvar performansı işletme bazında ve iki üyeliğin toplamı olarak (ortak toplam) raporlanır; bu, **Vardiya Operasyon Merkezi'nin bir parçası değildir**, laboratuvar kendi domain'inde raporlanır; yeni bir aggregate/root mekanizması değildir.
@@ -904,6 +964,8 @@ Tek zaman alanı = laboratuvar numune kabul tarihi/saati; kısmi kayıt; otomati
 
 ## 27.9 Kırım Tesisi — reçete, üretim emri, paçal, kova ölçümü
 
+> **v1.4:** Tenant/operasyon merkezi özeti §21.1.1'e taşındı; burada tam ayrıntı korunur.
+
 - Kırım Tesisi **MOSBİO'nun alt operasyonudur**, kendi tenant'ı (MOSBİO) altında bir operasyon merkezidir (DEC-0017 D-09); Kömür Kazanı aynı biçimde MOSB Enerji altındadır. **`MOSBİO KIRIM DEPO` ile aynı birim olup olmadığı dış doğrulama bekliyor.**
 - Reçete sürümü: fiilen uygulanmaya başlama zamanı vardiya sorumlusundan; hedefler/ürün miktarları/paçal analizleri sürüm bazında; revizyon yetkisi reçete yetkilisi + Kırım Tesisi sorumlusu.
 - Paçal numunesi yalnız laboratuvar kabul zamanı taşır; emir/sürüm eşleştirmesi Metnex tarafından önerilir, laboratuvar doğrular/düzeltir.
@@ -913,6 +975,8 @@ Tek zaman alanı = laboratuvar numune kabul tarihi/saati; kısmi kayıt; otomati
 
 ## 27.10 Vardiya — bağımsız varlık değil, boyut (DEC-0017 D-08)
 
+> **v1.4:** Kısa özet §22.6'ya taşındı; burada tam ayrıntı korunur.
+
 Vardiya, üretim emri/kova ölçümü/olay/rapor kayıtlarının **zaman ve sorumluluk boyutudur**; ayrı zorunlu bir "vardiya operasyonu" kaydı açılmaz. Bu, §11.5/§11.6 Wave 4 Vardiya raporu/arşiv modelini (FEAT-022) **değiştirmez** — FEAT-022 kendi lokasyon bazlı raporunu sürdürür; FEAT-023 Operasyon Merkezi bu yeni "boyut" yaklaşımını sunar.
 
 ## 27.11 Kalori/kül raporlama (DEC-0017 D-12, D-20)
@@ -920,6 +984,9 @@ Vardiya, üretim emri/kova ölçümü/olay/rapor kayıtlarının **zaman ve soru
 Kullanılan alt kalori sonucu = `KALORI HESAP.xlsx` G6 (üst kalori girdisi) → G7 (alt kalori, esas sonuç); diğer kalori değerleri silinmez, ayrı kolonlarda tutulur. Ana raporda ekranda ilk+güncel değer, Excel/PDF çıktısında yalnız güncel değer. **Formülün tam doğrulaması (TBD-L02) ve rapor kolonlarının/Jasper şablonlarının kesinleşmesi (TBD-L01) hâlâ açıktır.**
 
 ## 27.12 Veri yerleşimi, bildirim, rol modeli, audit, migration (DEC-0017 D-14, D-15, D-16, D-21, D-22)
+
+> **v1.4:** D-14 (data-plane yerleşimi) özeti §22.6'ya taşındı; burada tam ayrıntı (D-15/D-16/D-21/
+> D-22 dahil) korunur.
 
 - Bu addendumdaki domain kayıtları **tenant data-plane şemasında** tutulacaktır (DEC-0010 Faz 5'in ilk gerçek tüketicisi); data-plane altyapısı bugün eksiktir, bu bir ön koşuldur.
 - Bildirimler **ortak bir notification service** üzerinden (uygulama içi + e-posta) gönderilir.
@@ -930,3 +997,80 @@ Kullanılan alt kalori sonucu = `KALORI HESAP.xlsx` G6 (üst kalori girdisi) →
 ## 27.13 Kapatılmayan açık sorular (bilinçli olarak korunmuştur)
 
 `Q-023` (su analiz parametreleri/limitleri), `Q-024` (Netsis veri sözleşmesi), `TBD-L01` (rapor kolonları/Jasper), `TBD-L02` (kalori formülü tam doğrulama), `TBD-L04`/`TBD-013`'ün lab karşılığı (başlangıç kalite limitleri), `TBD-K01`–`TBD-K04` (kepçe cihazı), `TBD-G02` (nihai paçal miktarı ölçümü) — **bu addendum ile kapatılmamıştır**, DEC-0017'nin "Açık statüler" tablosuyla birebir eşleşir.
+
+---
+
+# 28. Açık Soru ve TBD Durum Sınıflandırması (v1.4, TASK-029.14)
+
+> Bu bölüm hiçbir eski soruyu veya TBD'yi siler/kapatmaz; yalnızca §7.3, §12–§18, §21, §25 ve
+> §27.13'teki maddeleri **tek bir durum sözlüğüyle** görünür kılar. Kaynak kararlar: DEC-0014,
+> DEC-0015 (`docs/migration/BOTC_MIGRATION_OPEN_QUESTIONS.md` Q-W5xx kapanışları, 2026-09-23),
+> DEC-0017. Yeni iş kuralı icat edilmemiştir.
+>
+> **Durum sözlüğü:**
+> - `RESOLVED` — bağlayıcı bir kararla kapandı, implementation'da kullanılabilir.
+> - `PARTIALLY_RESOLVED` — ilke/mimari karar var, bir alt-parçası hâlâ açık.
+> - `TBD` — henüz ele alınmadı, PO/AI1 kararı bekliyor.
+> - `EXTERNAL_VALIDATION_REQUIRED` — kararı Metnex içinde verilemez, dış kaynak (Netsis, kepçe
+>   tedarikçisi, laboratuvar, SQL Server sahibi) doğrulaması gerekir.
+> - `OUT_OF_SCOPE` — mevcut program kapsamına bilinçli olarak alınmadı (Wave 2/3 veya ayrı karar).
+
+## 28.1 §7.3 — Discovery İlk Açık Sorular
+
+| ID | Konu | Durum | Kapanış / kalan parça |
+|---|---|---|---|
+| Q-001 | MİP root tenant ağacı ve işletme kodları | `PARTIALLY_RESOLVED` | DEC-0014: MOSB Enerji/MOSBIO ayrı operasyon tenant, Kömür Kazanı/Kırım Tesisi operasyon merkezi (D-09). Kesin tenant slug/kod eşlemesi D-04'e (ayrı uyum task'ı) devredildi. |
+| Q-002 | SQL Server database/schema/table/kolon ayrımı | `PARTIALLY_RESOLVED` | Mimari karar: SCADA catalog + allowlist (TASK-027.63, Q-W515). Gerçek kaynak envanteri hâlâ çıkarılmadı. |
+| Q-003 | Her SQL Server kaynağı için read-only kullanıcı/bağlantı hazır mı | `EXTERNAL_VALIDATION_REQUIRED` | Operasyonel/deployment; gerçek SQL Server bağlantısı henüz kurulmadı. |
+| Q-004 | Root aggregate analiz yetkisi hangi kullanıcılarda | `RESOLVED` | FR-002B: permission + `canAggregateChildren` + data scope birlikte (TenantScopeService). |
+| Q-005 | İlk migration'a Vardiya/Arşiv dahil mi | `PARTIALLY_RESOLVED` | Wave 1 (kimlik) ilk migration oldu; Wave 4 (Vardiya, FEAT-022) Discovery/SRS tamam ama Q-V01–V10 çözülmeden implementation başlamaz. |
+| Q-006 | `BOT_APP` migrate edilecek tablolar / geçmiş veri başlangıcı | `PARTIALLY_RESOLVED` | Kullanıcı/rol/izin Wave 1 ile `RESOLVED` (TASK-027.12–.20 done). Diğer modüller için tablo/tarih kapsamı hâlâ TBD. |
+| Q-007 | Eski kullanıcılar için parola reset/hash prosedürü | `RESOLVED` | TASK-027.16 done. |
+| Q-008 | SCADA canlı mı sorgulanacak, cache/read-model mi | `PARTIALLY_RESOLVED` | Mimari karar `RESOLVED` (Q-W512: UTC normalize, canlı sorgu, cache modeli yok). Gerçek SQL Server provider hâlâ yok (dev fixture ile çalışıyor). |
+| Q-009 | Saatlik tüketim/işletme raporu kanonik çıktı formatları | `RESOLVED` | Q-W513 + TASK-027.74 (export: CSV/PNG/PDF/XLSX aynı sözleşmeden). |
+| Q-010 | BOTC SMTP/Telegram bildirimlerinin MVP'ye taşınması | `TBD` | Henüz ele alınmadı; Wave 1 yalnızca kimlik migration'ı yaptı. |
+| Q-011 | SCADA sorgu timeout/max satır/export sınırı | `TBD` | SRS §8 NFR-001–006 hâlâ TBD. |
+
+## 28.2 §25 — Ek Açık Sorular
+
+| ID | Konu | Durum | Kapanış / kalan parça |
+|---|---|---|---|
+| Q-012 | `Gerçek Değer` ile `Endeks` kesin iş kuralı | `RESOLVED` | Q-W503 (katalog + analiz parametreleri, tablo adına göre varsayım yok). |
+| Q-013 | Sayaç rollover hangi sayaçlarda, hangi maksimum değerle | `RESOLVED` | Q-W502 (katalog bazlı, sabit `+100000` taşınmadı, kalite uyarısı). |
+| Q-014 | Sanal kolonda izin verilecek operatör/fonksiyon | `RESOLVED` | Q-W504 (allowlist tabanlı, versiyonlu formül dili). |
+| Q-015 | Sanal kolon geçersiz sonuç davranışı (0/null/hata) | `RESOLVED` | Q-W504 (sessizce 0 yapılmaz; limit/derinlik kararlı). |
+| Q-016 | Farklı kaynaklar arası zaman noktası eşleme | `RESOLVED` | Q-W507/Q-W508 (normalize zaman kovaları, pozisyonel eşleme yok). |
+| Q-017 | Maksimum sorgu tarih aralığı ve maksimum seri sayısı | `TBD` | SRS §8 NFR-001/002 hâlâ TBD. |
+| Q-018 | CSV/PNG kesin Wave 5 export formatları mı | `RESOLVED` | Q-W513 + TASK-027.74 (CSV/PNG/PDF/XLSX hepsi aynı sözleşmeden, export done). |
+| Q-019 | Rapor şablonları kişisel mi, ekip/tenant paylaşımlı mı | `RESOLVED` | Q-W506 (`PRIVATE`/`TENANT_SHARED`, aynı ad sessizce üzerine yazılmaz). |
+| Q-020 | Saatlik Rapor modülünün nihai kullanıcı-görünür adı | `TBD` | Ürün terminolojisi kararı henüz verilmedi. |
+| Q-021 | Buhar arzında fazla arz marjı hesabı | `OUT_OF_SCOPE` | §21.2 "Wave 2/3 Dışı Gelecek Adayı" — mevcut program kapsamında değil. |
+| Q-022 | Biyokütle paçal kalori değeri ölçülen mi, hesaplanan mı | `PARTIALLY_RESOLVED` | DEC-0017 D-12/D-17: kalori laboratuvarda ölçülür (`KALORI HESAP.xlsx` G6→G7), ağırlıklı ortalama veri gelene kadar yok. Formülün tam doğrulaması (TBD-L02) hâlâ açık. |
+| Q-023 | Su analiz parametreleri, limitleri, sıklıkları | `EXTERNAL_VALIDATION_REQUIRED` | DEC-0017 D-13 — laboratuvarın gerçek kriter verisi gerekir. |
+| Q-024 | Netsis üretim tetikleme entegrasyonunun veri sözleşmesi | `EXTERNAL_VALIDATION_REQUIRED` | DEC-0017 D-05 — kantar SoR'u geçici Netsis kabul edildi, teknik sözleşme dış doğrulama bekliyor. |
+
+## 28.3 Wave 5 TBD'leri (§13.2, §14, §16.2, §18) ve `TBD-W5-00x`
+
+Hepsi `RESOLVED` — DEC-0015 (Q-W501–Q-W515, 2026-09-23) ile kapandı; kapanış notları ilgili
+bölümlerin hemen altına da işlendi (§13.2, §14, §16.2, §18). `TBD-W5-001–004` (sanal kolon
+operatör/null/limit/derinlik) → Q-W504; `TBD-W5-005` (minimum istatistik sıfır) → Q-W509;
+`TBD-W5-006` (ekip/tenant preset) → Q-W506.
+
+## 28.4 DEC-0017 Açık Statüleri (Wave 2/3 dışı laboratuvar/Kırım/kantar alanı)
+
+| ID | Konu | Durum |
+|---|---|---|
+| D-04 | MOSB/MOSB ENERJİ/MOSBİO tenant dili uyumu | `TBD` — ayrı, henüz `ready` olmayan uyum task'ı gerekir |
+| D-05 (teknik) | Netsis entegrasyon anahtarları/veri sözleşmesi | `EXTERNAL_VALIDATION_REQUIRED` |
+| D-11 | Kepçe ölçüm cihazı entegrasyonu (TBD-K01–K04) | `EXTERNAL_VALIDATION_REQUIRED` |
+| D-12 (formül) | `KALORI HESAP.xlsx` tam formül/birim/test doğrulaması (TBD-L02) | `EXTERNAL_VALIDATION_REQUIRED` |
+| D-13 | Ürün/parametre bazlı başlangıç kalite limitleri (TBD-L04, Q-023) | `EXTERNAL_VALIDATION_REQUIRED` |
+| D-18 | Nihai paçal miktarının ayrıca ölçülmesi (TBD-G02) | `OUT_OF_SCOPE` — ileride değerlendirilecek |
+| D-20 | Rapor kolonları ve Jasper şablonları (TBD-L01) | `EXTERNAL_VALIDATION_REQUIRED` |
+
+## 28.5 Wave 2/3 ve Diğer Gelecek Adayları
+
+§11.3 (Bakım/Arıza), §11.4 (DÖF), §21.2 (Buhar arz marjı), §21.3 (Sıcak su), §23 (hafif no-code
+genel amaçlı designer/script/SQL/low-code istisnaları) — tümü `OUT_OF_SCOPE`: mevcut geliştirme
+programının implementation kapsamında değildir, ancak ayrı Discovery/SRS ve açık Product Owner
+onayıyla yeniden ele alınabilir (§11.6, §4.2 ile tutarlı).

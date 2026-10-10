@@ -6,9 +6,9 @@
 |---|---|
 | Proje / Ürün Adı | Metnex — MİP Çok Kiracılı Operasyon, SCADA/DMS Analiz Platformu |
 | Doküman | Software Requirements Specification (SRS) |
-| Sürüm | 1.3 |
-| Tarih | 2026-09-22 |
-| Durum | Review — DEC-0014 ürün sınırı güncellemesi |
+| Sürüm | 1.4 |
+| Tarih | 2026-10-06 |
+| Durum | Review — TASK-029.14: DEC-0017 kararları yansıtıldı, FEAT-026–029 taslak statüsü açıkça işaretlendi, açık maddeler görünür kılındı |
 | Kaynak Discovery Dokümanı | `docs/requirements/DISCOVERY.md` |
 | Hazırlayan | AI0 / AI1 Pipeline |
 | Gözden Geçiren | Product Governance Agent (AI1) |
@@ -602,12 +602,14 @@ Bu bölüm, `docs/decisions/DEC-0017-…md`'nin (TASK-029.00-R2) §9.1'i **geni�
 
 **Etkilenen mevcut maddeler:** FR-067–071 (§9.1.2, yalnız enerji emri), FEAT-022 (Vardiya raporu, §11.5 ile birlikte — D-08 ile "vardiya = boyut" netleşti), FEAT-023 (Operasyon Merkezi — D-08, D-09), FEAT-024 (Laboratuvar — D-02, D-03, D-03a), FR-082–090 (§9 üstünde işlendi), BR-015/016 (değişmedi), IR-001–004 (Netsis/BEAM entegrasyon yönü D-05 ile kısmen netleşti, MOD-011 Uygulama Programı yön/kimlik hâlâ açık).
 
-**Yeni FEAT taslakları (isim/numara AI1 onayıyla kesinleşecek):**
-- **FEAT-026 — Kırım Tesisi Üretim Emri, Reçete ve Paçal (Metnex SoR):** reçete/reçete sürümü, iç üretim emri (MOSEDAŞ'tan bağımsız), kova ölçümü (ölçülmüş/tahmini/kontrol-bekleyen ayrımı), paçal analiz eşleştirmesi, reçete sürümü bazlı toplu kalite özeti (aritmetik; TBD-L03 kapanana kadar ağırlıklı yok). **TBD:** kepçe cihazı sözleşmesi (TBD-K01–K04), nihai paçal miktarı ölçümü (kapsam dışı, TBD-G02).
-- **FEAT-027 — MOSB Enerji Kömür Kabul, Kantar ve Yığın:** araç/tartım (Netsis SoR, geçici — D-05), fiziksel yığın, günlük ortak numune (katılan/uygulanan araç ayrımı), kazan besleme sayacı (SCADA ana kaynak + manuel istisna — D-10), kazan külü analizi. **TBD:** Netsis veri sözleşmesi (Q-024), brüt/dara/net (TBD-OPS-006).
-- **FEAT-028 — MOSBİO Gelen Biyokütle Ürünü Analizi:** araç bazlı analiz, parametre bazlı esas sonuç, değiştirilebilir kriter, ortak alıcı bildirimi, sonuç/tartım düzeltme talebi.
-- **FEAT-029 — Su Laboratuvarı (MOSB Enerji / MOSBİO):** numune noktası bazlı referans/kriter, kısmi kayıt, limit dışı bildirim (kayıt tamamlanınca), MOSBİO Online Drum/Steam manuel giriş (D-19). **TBD:** parametre/limit/sıklık (Q-023).
-- **FEAT-024 genişlemesi (Ortak Laboratuvar):** çoklu tenant üyeliği (D-03), işletme+ortak performans raporu (D-03a, Operasyon Merkezi'nden ayrı), karma yaşam döngüsü (D-02).
+**Yeni FEAT taslakları (isim/numara AI1 onayıyla kesinleşecek) — v1.4 notu: aşağıdaki dört FEAT
+(026–029) ve FEAT-024 genişlemesi `Durum: TASLAK` olarak işaretlenmiştir; hiçbiri Product Owner
+tarafından kesin FR/BR olarak onaylanmamıştır ve implementation task'ı `ready` yapmaz:**
+- **FEAT-026 — Kırım Tesisi Üretim Emri, Reçete ve Paçal (Metnex SoR):** *(Durum: TASLAK)* reçete/reçete sürümü, iç üretim emri (MOSEDAŞ'tan bağımsız), kova ölçümü (ölçülmüş/tahmini/kontrol-bekleyen ayrımı), paçal analiz eşleştirmesi, reçete sürümü bazlı toplu kalite özeti (aritmetik; TBD-L03 kapanana kadar ağırlıklı yok). **TBD:** kepçe cihazı sözleşmesi (TBD-K01–K04), nihai paçal miktarı ölçümü (kapsam dışı, TBD-G02).
+- **FEAT-027 — MOSB Enerji Kömür Kabul, Kantar ve Yığın:** *(Durum: TASLAK)* araç/tartım (Netsis SoR, geçici — D-05), fiziksel yığın, günlük ortak numune (katılan/uygulanan araç ayrımı), kazan besleme sayacı (SCADA ana kaynak + manuel istisna — D-10), kazan külü analizi. **TBD:** Netsis veri sözleşmesi (Q-024), brüt/dara/net (TBD-OPS-006).
+- **FEAT-028 — MOSBİO Gelen Biyokütle Ürünü Analizi:** *(Durum: TASLAK)* araç bazlı analiz, parametre bazlı esas sonuç, değiştirilebilir kriter, ortak alıcı bildirimi, sonuç/tartım düzeltme talebi.
+- **FEAT-029 — Su Laboratuvarı (MOSB Enerji / MOSBİO):** *(Durum: TASLAK)* numune noktası bazlı referans/kriter, kısmi kayıt, limit dışı bildirim (kayıt tamamlanınca), MOSBİO Online Drum/Steam manuel giriş (D-19). **TBD:** parametre/limit/sıklık (Q-023).
+- **FEAT-024 genişlemesi (Ortak Laboratuvar):** *(Durum: TASLAK)* çoklu tenant üyeliği (D-03), işletme+ortak performans raporu (D-03a, Operasyon Merkezi'nden ayrı), karma yaşam döngüsü (D-02).
 
 **Yeni BR/IR taslakları:**
 - **BR-020 (taslak):** Kırım Tesisi üretim emrinin SoR'u Metnex'tir; MOSEDAŞ'ın enerji üretim emri sözleşmesiyle (FR-067–071) karıştırılamaz.
@@ -617,6 +619,45 @@ Bu bölüm, `docs/decisions/DEC-0017-…md`'nin (TASK-029.00-R2) §9.1'i **geni�
 **Kapatılmayan TBD'ler (bu SRS güncellemesiyle kapatılmamıştır):** `TBD-OPS-005` (kısmen), `TBD-OPS-006` (kısmen), `TBD-OPS-007`, `Q-022`, `Q-023`, `Q-024`, `TBD-L01`, `TBD-L02`, `TBD-L04`, `TBD-K01`–`K04`, `TBD-G02` — DEC-0017 "Açık statüler" tablosuyla birebir.
 
 Bu bölüm implementation task'larını `ready` yapmaz; TASK-029.01 kapsamı, bu etki listesindeki FEAT taslaklarının hangi task'a düştüğünü ayrıca netleştirir.
+
+**v1.4 notu (TASK-029.14):** TASK-029.01 ve TASK-029.02 `done` olarak tamamlandı — bu iki task
+yalnız pure domain/B2B sözleşmesi teslim etti (`apps/api/src/operations/domain/`), FEAT-026–029
+taslaklarını kesin FR'ye dönüştürmedi; FEAT-026–029 hâlâ `TASLAK` statüsündedir (bkz. yukarıdaki
+işaretler). Gerçek implementation sırası ve bağımlılıkları `backlog/EPIC-005-…md`'nin "Task planı"
+tablosunda güncel tutulur.
+
+## 9.3 Ana Ayrımlar — Görünürlük Listesi (v1.4)
+
+Aşağıdaki ayrımlar, DEC-0014/DEC-0017 ile karara bağlanmış ve kod/doküman genelinde tekrar
+karıştırılmaması gereken sınırlardır. Bu liste yeni bir gereksinim icat etmez; mevcut FR/BR/DEC
+maddelerine görünür bir referans tablosudur.
+
+| Ayrım | Kısa kural | Kaynak |
+|---|---|---|
+| MOSEDAŞ enerji emri ↔ Kırım Tesisi iç üretim emri | İki ayrı bounded context; aynı tabloda/durum makinesinde/entegrasyon sözleşmesinde birleştirilemez. SoR'ları farklıdır (MOSEDAŞ / Metnex). | DEC-0017 D-01, §9.1.2, §9.2 FEAT-026 |
+| Vardiyanın zaman/sorumluluk boyutu | Vardiya bağımsız bir entity değil; üretim emri/kova ölçümü/olay kayıtlarının zaman ve sorumluluk boyutudur. | DEC-0017 D-08, FEAT-023 |
+| Operasyon merkezi kapsamı | Kömür Kazanı (MOSB Enerji) ve Kırım Tesisi (MOSBİO) kendi tenant'ları altında tesis/ünite referansıdır; asla ayrı tenant değildir. | DEC-0017 D-09, DEC-0014 k.2 |
+| Ortak laboratuvar çoklu tenant üyeliği | Ortak lab ekibi MOSB Enerji ve MOSBİO'ya **ayrı ayrı üyelik** alır; yeni bir "ortak ekip" tenant'ı veya scope mekanizması açılmaz. | DEC-0017 D-03, D-03a |
+| Tenant data-plane yerleşimi | Laboratuvar/kantar/Kırım/operasyon merkezi kayıtları `public` şemada değil, tenant data-plane şemasında tutulacaktır; altyapı bugün eksik, bu bir ön koşuldur. | DEC-0017 D-14 |
+| Netsis'in geçici kantar SoR'u | Kantar/tartım kaydının SoR'u **geçici olarak** Netsis'tir; Metnex yazmaz, okur/eşler. Kesin teknik sözleşme hâlâ açık. | DEC-0017 D-05 |
+| SCADA ana sayaç kaynağı ve manuel istisna | Kazan besleme sayacının ana kaynağı SCADA'dır (read-only); manuel giriş yalnız istisna ve açıkça işaretlenir, iki kaynak "tek gerçek" gibi birleştirilmez. | DEC-0017 D-10, DEC-0015 (read-only sınırı) |
+| Ölçülen/tahmini/geçici miktar ayrımı | Kova/kepçe ölçümü ölçülmüş/tahmini/kontrol-bekleyen olarak ayrı gösterilir; toplam yüklenen malzeme miktarı nihai paçal üretim miktarı olarak **asla** raporlanmaz. | DEC-0017 D-18, BR-021 (taslak) |
+| G6 üst kalori girdisi → G7 alt kalori sonucu | Kullanılan esas sonuç `KALORI HESAP.xlsx` G6 (üst kalori girdi) → G7 (alt kalori, esas sonuç); diğer kalori değerleri silinmez, ayrı kolonlarda tutulur. Formülün tam doğrulaması hâlâ açık. | DEC-0017 D-12, TBD-L02 |
+
+## 9.4 Açık Kalacak Maddeler — Kanıt Gelmeden Kapatılmayacak (v1.4)
+
+Aşağıdaki sekiz madde, kanıt/dış doğrulama gelmeden implementation kararına dönüştürülmeyecektir.
+Bu liste DEC-0017 "Açık statüler" tablosunun ve `docs/requirements/DISCOVERY.md` §28.2/§28.4'ün
+SRS'teki görünür karşılığıdır:
+
+1. Netsis teknik sözleşmesi ve entegrasyon anahtarları (`Q-024`, DEC-0017 D-05 teknik kısım).
+2. Kepçe cihazı entegrasyonu (`TBD-K01`–`K04`, DEC-0017 D-11).
+3. Kalori/kül formüllerinin tam doğrulaması (`TBD-L02`, DEC-0017 D-12 formül kısmı).
+4. Ürün ve parametre kalite limitleri (`TBD-L04`, `Q-023`, DEC-0017 D-13).
+5. Nihai paçal miktarının ayrıca ölçülmesi (`TBD-G02`, DEC-0017 D-18 — kapsam dışı, ileride değerlendirilecek).
+6. Rapor kolonları ve Jasper şablonları (`TBD-L01`, DEC-0017 D-20).
+7. Tarihsel veri migration kapsamı (DEC-0017 D-22 — yapılırsa seçilmiş kapsamla, otomatik tam taşınma varsayılmaz).
+8. Gerçek SQL Server provider/preflight (Q-003, Q-008 kısmen — dev fixture ile çalışır durumda, production bağlantısı henüz yok).
 
 ---
 
@@ -651,6 +692,10 @@ Bu bölüm implementation task'larını `ready` yapmaz; TASK-029.01 kapsamı, bu
 **OQ-W5-008:** CSV ve PNG Wave 5'in kesin export formatları olarak korunacak mıdır?  
 **OQ-W5-009:** Rapor şablonları ekip/tenant ile paylaşılabilecek midir?  
 **OQ-W5-010:** Wave 5 modülünün kullanıcıya görünen nihai adı “Saatlik Rapor” olarak mı kalacaktır?
+
+> **v1.4 notu (TASK-029.14):** `OQ-W5-001`–`OQ-W5-009`, DEC-0015 (`Q-W501`–`Q-W515`,
+> 2026-09-23) ile `RESOLVED` — ayrıntı `docs/requirements/DISCOVERY.md` §28.3. `OQ-W5-010`
+> (modülün nihai kullanıcı-görünür adı) hâlâ `TBD`'dir.
 
 ---
 

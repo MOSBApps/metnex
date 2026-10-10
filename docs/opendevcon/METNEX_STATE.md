@@ -1,8 +1,8 @@
 ---
 stage: development
-updated_at: 2026-09-24
+updated_at: 2026-10-06
 updated_by: Engineering Executor (AI2)
-active_epics: [EPIC-001, EPIC-002, EPIC-003]
+active_epics: [EPIC-001, EPIC-002, EPIC-003, EPIC-005]
 blocked_epics: []
 last_release: v1.0.0
   TASK-027.66 (bkz. backlog/TASK-027-66-hourly-daily-aggregation-engine.md, status: done, parent_epic: EPIC-004) kapsamında ham zaman serisinden saatlik (Q-W501 LEAD(next) - current delta, buffer row dışlama, son satır null/INSUFFICIENT_NEXT_READING) ve günlük (Q-W503 katalog SUM/AVERAGE/MIN/MAX işlemleri, timezone localDateKey gruplaması, eksik kovayı 0 yapmama) saf deterministik aggregation engine'i `apps/api/src/reporting/scada/aggregation/` altında yazıldı. Sayaç devri için `negative-delta.policy.ts` portu entegre edildi. 29 unit/statik test ve `./scripts/check.sh --skip-docker` (%100 PASS) doğrulandı.
@@ -2600,3 +2600,30 @@ dışı bırakıldı). `done` onayı bekleniyor.
 **TASK-029.13 → `done` (AI1 onayı, 2026-09-29).** `colors.md`'deki "dark mode desteklenmez" ifadesi
 ve tablo satır seçimindeki `bg-brand/5` kullanımı bu task'ın dışında bırakıldı, ayrı UI bakım
 task'ları olarak değerlendirilecek.
+
+**TASK-029.14 (2026-10-06, `review`):** Discovery/SRS canonical güncelleme v1.4 — kod/API/UI/
+migration/schema değişmedi, yeni tenant/rol/permission yok, yeni iş kuralı icat edilmedi.
+`docs/requirements/DISCOVERY.md` v1.3→v1.4: §21.1.1/§21.1.2'ye DEC-0017 D-01/D-09 kısa özeti
+(ayrıntı §27'de kalır), §22.6 yeni alt bölüm (D-02/D-03/D-03a/D-08/D-14 ana bölüme taşındı), §13.2/
+§14/§16.2/§18'deki eski Wave 5 TBD'lerine yerinde "RESOLVED" notu (DEC-0015 Q-W5xx), yeni §28 açık
+soru/TBD durum sınıflandırması (`RESOLVED`/`PARTIALLY_RESOLVED`/`TBD`/
+`EXTERNAL_VALIDATION_REQUIRED`/`OUT_OF_SCOPE` — Q-001–024, TBD-W5-00x, OQ-W5-00x, DEC-0017 açık
+statüleri). `docs/requirements/SRS.md` v1.3→v1.4: FEAT-026–029 + FEAT-024 genişlemesi açıkça
+`(Durum: TASLAK)` işaretlendi, yeni §9.3 "Ana Ayrımlar — Görünürlük Listesi" (MOSEDAŞ/Kırım emri,
+vardiya boyutu, operasyon merkezi, ortak lab üyeliği, data-plane, Netsis, SCADA sayaç, ölçülen/
+tahmini miktar, G6→G7 kalori), yeni §9.4 "Açık Kalacak Maddeler" (8 madde, kanıt gelmeden
+kapatılmayacak), §12 OQ-W5-001–009 `RESOLVED` notu. `docs/domain/DOMAIN_MODEL.md`'ye yalnız
+doğrulanmış domain etkisi eklendi: `apps/api/src/operations/domain/` (TASK-029.01/029.02, pure
+TypeScript, NestJS'e bağlı değil, tablo/migration yok) §9 Known Gaps'e not olarak işlendi.
+EPIC-005/TASK-029-00'un task planı ve bağımlılıkları incelendi, **zaten güncel** bulundu (029.01/
+.02 done, 029.03+ bağımlılıkları doğru) — değişmedi, yalnız doğrulama notu eklendi.
+`active_epics`'e EPIC-005 eklendi (eksikti). `BOTC_MIGRATION_OPEN_QUESTIONS.md` incelendi, güncel
+bulundu, değiştirilmedi. Eski metin hiçbir yerde silinmedi, yalnız supersede/durum notlarıyla
+tamamlandı. Gerçek DB/SQL Server/Docker/production credential kullanılmadı. Git commit/push
+yapılmadı.
+
+**TASK-029.14 → `done` (AI1 onayı, 2026-10-06).** Kontroller doğrulandı: sürümler 1.4, eski
+içerik silinmemiş, DEC-0017 ana bölümlere taşınmış ve §27/§9.2 referansları korunmuş, FEAT-026–029
+taslak işaretli, açık sorular tekilleştirilmiş/statülendirilmiş, DOMAIN_MODEL.md yalnız doğrulanmış
+etkiyle güncellenmiş, EPIC-005 `active_epics`'te, kod/API/UI/DB/migration/tenant/rol/permission
+değişmemiş.

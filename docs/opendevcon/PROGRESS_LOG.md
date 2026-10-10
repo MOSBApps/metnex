@@ -2306,3 +2306,30 @@ semantic stilleri korunmuş; web testleri/typecheck/`check.sh --skip-docker` ge�
 doğrulamasının yapılmadığı açıkça raporlanmış. `colors.md`'deki "dark mode desteklenmez" ifadesi ve
 tablo satır seçimindeki `bg-brand/5` kullanımı bu task'ın dışında bırakıldı — ayrı UI bakım
 task'ları olarak değerlendirilecek.
+
+## 2026-10-06 — TASK-029.14 Discovery ve SRS Canonical Güncelleme v1.4 — `review`
+Dokümantasyon/gereksinim normalizasyonu — kod/API/UI/migration/schema/tenant/rol/permission yok,
+yeni iş kuralı icat edilmedi. `DISCOVERY.md` v1.3→v1.4: §21.1.1/§21.1.2'ye DEC-0017 D-01/D-09 kısa
+özeti (ana bölüme taşındı, §27'deki tam ayrıntı silinmedi, çapraz pointer notları eklendi), §22.6
+yeni alt bölüm (D-02/D-03/D-03a/D-08/D-14 taşındı), §13.2/§14/§16.2/§18'deki eski Wave 5 TBD'lerine
+yerinde "RESOLVED" notu (DEC-0015 Q-W501–Q-W515 kapanışlarına dayanarak), yeni §28 (Q-001–024,
+TBD-W5-00x, OQ-W5-00x, DEC-0017 açık statüleri için tek durum sözlüğü:
+`RESOLVED`/`PARTIALLY_RESOLVED`/`TBD`/`EXTERNAL_VALIDATION_REQUIRED`/`OUT_OF_SCOPE`). `SRS.md`
+v1.3→v1.4: FEAT-026–029 + FEAT-024 genişlemesi her biri `(Durum: TASLAK)` olarak işaretlendi (PO
+onayı yok, `ready` yapmaz), yeni §9.3 "Ana Ayrımlar — Görünürlük Listesi" (9 ayrım: MOSEDAŞ/Kırım
+emri, vardiya boyutu, operasyon merkezi, ortak lab üyeliği, data-plane, Netsis, SCADA sayaç,
+ölçülen/tahmini miktar, G6→G7 kalori), yeni §9.4 "Açık Kalacak Maddeler" (8 madde), §12
+OQ-W5-001–009 RESOLVED notu. `DOMAIN_MODEL.md`'ye yalnız doğrulanmış domain etkisi eklendi:
+`apps/api/src/operations/domain/` (TASK-029.01/029.02, pure TypeScript, NestJS'e bağlı değil,
+tablo/migration yok) §9 Known Gaps'e not. `EPIC-005`/`TASK-029-00` incelendi, zaten güncel bulundu
+(029.01/.02 done, 029.03+ bağımlılıkları doğru), değiştirilmedi, yalnız doğrulama notu eklendi.
+`METNEX_STATE.md` `active_epics`'e EPIC-005 eklendi (eksikti). `BOTC_MIGRATION_OPEN_QUESTIONS.md`
+incelendi, güncel bulundu, değiştirilmedi. Eski metin hiçbir yerde silinmedi. Gerçek DB/SQL
+Server/Docker/production credential kullanılmadı. Git commit/push yapılmadı.
+
+## 2026-10-06 — AI1 Onayı: TASK-029.14 `done`
+Kontroller doğrulandı: Discovery ve SRS sürümleri 1.4; eski içerikler silinmemiş; DEC-0017
+kararları ana bölümlere taşınmış ve §27/§9.2 referansları korunmuş; FEAT-026–029 taslak olarak
+işaretlenmiş; açık sorular tekilleştirilmiş ve statülendirilmiş; DOMAIN_MODEL.md yalnız
+doğrulanmış etkiyle güncellenmiş; EPIC-005 `active_epics` içine eklenmiş; METNEX_STATE.md ve
+PROGRESS_LOG.md güncellenmiş; kod, API, UI, DB, migration, tenant, rol ve permission değişmemiş.

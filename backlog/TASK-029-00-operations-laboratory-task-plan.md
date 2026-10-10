@@ -191,3 +191,11 @@ mTLS+OAuth2, tenant/tesis/makine allowlist) doğrudan uygulandı, yeniden tartı
 (audit action adı), D-B07 (gerçek MOSEDAŞ payload'ı, dış), D-B08 (mTLS/OAuth2 sağlayıcısı, dış),
 D-B09 (imzalı mesaj ek katmanı). Ayrıntı: karar paketi §11.
 
+## TASK-029.14 doğrulama notu (2026-10-06, `review`)
+
+Bu dosyanın "Bağımlılık sırası" ve "Task kapsamları" bölümleri TASK-029.14 tarafından incelendi ve
+**güncel/doğru** bulundu; hiçbir satır değiştirilmedi. 029.03+ task'ların gerçek bağımlılıkları
+zaten yukarıda açıkça yazılı (`029.01 → 029.02/029.03 → 029.04 → …`, Kırım Tesisi'nin `029.02`'ye
+bağımlı olmadığı notu dahil). Durum düzeltmesi ihtiyacı yalnız `docs/opendevcon/METNEX_STATE.md`'nin
+`active_epics` listesinde bulundu (EPIC-005 eksikti) — oraya işlendi.
+
